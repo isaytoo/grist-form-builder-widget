@@ -685,6 +685,13 @@ function renderPropertiesPanel() {
   
   document.getElementById('prop-column')?.addEventListener('change', (e) => {
     selectedField.columnId = e.target.value || null;
+    // Mettre à jour le libellé avec le nom de la colonne
+    if (e.target.value) {
+      selectedField.label = e.target.value;
+      document.getElementById('prop-label').value = e.target.value;
+      renderFormFields();
+      selectField(selectedField.id);
+    }
   });
   
   // Options
