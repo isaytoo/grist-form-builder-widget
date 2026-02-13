@@ -70,6 +70,9 @@
     .form-section-title { padding: 8px 12px; font-size: 0.85em; font-weight: 600; color: #475569; background: white; border-bottom: 1px dashed #cbd5e1; border-radius: 6px 6px 0 0; }
     .form-section-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
     .form-section:hover .form-section-delete { display: flex; }
+    .form-section .form-field-resize { position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; opacity: 0; }
+    .form-section:hover .form-field-resize { opacity: 1; }
+    .form-section .form-field-resize::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
     .signature-pad { border: 1px solid #e2e8f0; border-radius: 4px; background: #fafafa; height: 80px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.8em; }
     .options-preview { display: flex; flex-direction: column; gap: 4px; }
     .option-item { display: flex; align-items: center; gap: 6px; font-size: 0.8em; color: #64748b; }

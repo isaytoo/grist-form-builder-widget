@@ -540,16 +540,25 @@ function createSectionElement(field) {
   sectionEl.innerHTML = `
     <button class="form-section-delete" title="Supprimer">×</button>
     <div class="form-section-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${field.label}</div>
+    <div class="form-field-resize"></div>
   `;
   
   sectionEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-section-delete')) return;
+    if (e.target.classList.contains('form-field-resize')) return;
     selectField(field.id);
     startDragField(e, sectionEl, field);
   });
   
   sectionEl.querySelector('.form-section-delete').addEventListener('click', () => {
     deleteField(field.id);
+  });
+  
+  // Redimensionnement
+  const resizeHandle = sectionEl.querySelector('.form-field-resize');
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    startResizeImage(e, sectionEl, field);
   });
   
   return sectionEl;
