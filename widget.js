@@ -1,6 +1,13 @@
 // Widget Grist - Form Builder Pro
 // Copiez ce code dans l'onglet JavaScript d'un widget personnalisé Grist
 
+/**
+ * Grist Form Builder Pro Widget
+ * Copyright 2026 Said Hamadou
+ * Licensed under the Apache License, Version 2.0
+ * https://github.com/isaytoo/grist-form-builder-widget
+ */
+
 // Variables globales
 let availableTables = [];
 let currentTable = null;
