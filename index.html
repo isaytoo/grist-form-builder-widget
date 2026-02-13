@@ -103,6 +103,10 @@
     .form-image-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f8fafc; color: #94a3b8; font-size: 2em; }
     .form-image-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
     .form-image:hover .form-image-delete { display: flex; }
+    .form-image .form-field-resize { position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; opacity: 0; }
+    .form-image:hover .form-field-resize { opacity: 1; }
+    .form-image .form-field-resize::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
+    .form-image.selected { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
     .form-title-element { position: absolute; background: transparent; cursor: move; font-size: 1.2em; font-weight: 600; color: #1e293b; padding: 5px; }
     .form-title-element.selected { outline: 2px solid #3b82f6; }
     .form-title-element-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }

@@ -354,17 +354,21 @@ function createImageElement(field) {
   if (field.imageData) {
     imageEl.innerHTML = `
       <button class="form-image-delete" title="Supprimer">×</button>
-      <img src="${field.imageData}" alt="${field.label}">
+      <img src="${field.imageData}" alt="${field.label}" draggable="false">
+      <div class="form-field-resize"></div>
     `;
   } else {
     imageEl.innerHTML = `
       <button class="form-image-delete" title="Supprimer">×</button>
       <div class="form-image-placeholder">🖼️</div>
+      <div class="form-field-resize"></div>
     `;
   }
   
   imageEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-image-delete')) return;
+    if (e.target.classList.contains('form-field-resize')) return;
+    e.preventDefault();
     selectField(field.id);
     startDragField(e, imageEl, field);
   });
@@ -373,7 +377,48 @@ function createImageElement(field) {
     deleteField(field.id);
   });
   
+  // Redimensionnement
+  const resizeHandle = imageEl.querySelector('.form-field-resize');
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    startResizeImage(e, imageEl, field);
+  });
+  
   return imageEl;
+}
+
+// Redimensionner une image (largeur + hauteur)
+function startResizeImage(e, imageEl, field) {
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startWidth = field.width;
+  const startHeight = field.height || 100;
+  
+  function onMouseMove(e) {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    
+    let newWidth = startWidth + dx;
+    let newHeight = startHeight + dy;
+    
+    if (snapToGrid) {
+      newWidth = Math.round(newWidth / 20) * 20;
+      newHeight = Math.round(newHeight / 20) * 20;
+    }
+    
+    field.width = Math.max(50, newWidth);
+    field.height = Math.max(50, newHeight);
+    imageEl.style.width = field.width + 'px';
+    imageEl.style.height = field.height + 'px';
+  }
+  
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
+  
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
 }
 
 // Créer un élément titre/texte
@@ -755,8 +800,20 @@ function renderPropertiesPanel() {
   // Event listeners
   document.getElementById('prop-label')?.addEventListener('input', (e) => {
     selectedField.label = e.target.value;
-    renderFormFields();
-    selectField(selectedField.id);
+    // Mettre à jour le texte directement sans re-render complet
+    const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
+    if (fieldEl) {
+      if (selectedField.fieldType === 'title') {
+        const span = fieldEl.querySelector('span');
+        if (span) span.textContent = e.target.value;
+      } else if (selectedField.fieldType === 'section') {
+        const title = fieldEl.querySelector('.form-section-title');
+        if (title) title.textContent = e.target.value;
+      } else {
+        const label = fieldEl.querySelector('.form-field-label');
+        if (label) label.textContent = e.target.value + (selectedField.required ? ' *' : '');
+      }
+    }
   });
   
   document.getElementById('prop-placeholder')?.addEventListener('input', (e) => {
