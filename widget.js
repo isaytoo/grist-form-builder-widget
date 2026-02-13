@@ -430,6 +430,12 @@ function createTitleElement(field) {
   titleEl.style.top = field.y + 'px';
   titleEl.style.width = field.width + 'px';
   titleEl.style.fontSize = (field.fontSize || 1.2) + 'em';
+  if (field.textColor) titleEl.style.color = field.textColor;
+  if (field.bgColor) {
+    titleEl.style.backgroundColor = field.bgColor;
+    titleEl.style.padding = '8px 12px';
+    titleEl.style.borderRadius = '6px';
+  }
   
   titleEl.innerHTML = `
     <button class="form-title-element-delete" title="Supprimer">×</button>
@@ -529,10 +535,11 @@ function createSectionElement(field) {
   sectionEl.style.top = field.y + 'px';
   sectionEl.style.width = field.width + 'px';
   sectionEl.style.height = (field.height || 150) + 'px';
+  if (field.bgColor) sectionEl.style.backgroundColor = field.bgColor;
   
   sectionEl.innerHTML = `
     <button class="form-section-delete" title="Supprimer">×</button>
-    <div class="form-section-title">${field.label}</div>
+    <div class="form-section-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${field.label}</div>
   `;
   
   sectionEl.addEventListener('mousedown', (e) => {
@@ -668,6 +675,20 @@ function renderPropertiesPanel() {
       <div class="property-group">
         <div class="property-label">Taille de police (em)</div>
         <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 1.2}" min="0.5" max="4" step="0.1">
+      </div>
+    `;
+  }
+  
+  // Couleurs (pour section, titre et champs)
+  if (isSection || isTitle) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Couleur du texte</div>
+        <input type="color" id="prop-text-color" value="${f.textColor || '#1e293b'}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Couleur de fond</div>
+        <input type="color" id="prop-bg-color" value="${f.bgColor || (isSection ? '#f8fafc' : '#ffffff')}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
       </div>
     `;
   }
@@ -857,6 +878,20 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
+  // Couleur du texte
+  document.getElementById('prop-text-color')?.addEventListener('input', (e) => {
+    selectedField.textColor = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Couleur de fond
+  document.getElementById('prop-bg-color')?.addEventListener('input', (e) => {
+    selectedField.bgColor = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
   document.getElementById('prop-required')?.addEventListener('change', (e) => {
     selectedField.required = e.target.checked;
     renderFormFields();
@@ -1038,7 +1073,8 @@ function renderFormView() {
       sectionDiv.style.top = field.y + 'px';
       sectionDiv.style.width = field.width + 'px';
       sectionDiv.style.height = (field.height || 150) + 'px';
-      sectionDiv.innerHTML = `<div class="form-section-view-title">${field.label}</div>`;
+      if (field.bgColor) sectionDiv.style.backgroundColor = field.bgColor;
+      sectionDiv.innerHTML = `<div class="form-section-view-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${field.label}</div>`;
       formFieldsView.appendChild(sectionDiv);
       return;
     }
@@ -1067,7 +1103,12 @@ function renderFormView() {
       titleDiv.style.width = field.width + 'px';
       titleDiv.style.fontSize = (field.fontSize || 1.2) + 'em';
       titleDiv.style.fontWeight = '600';
-      titleDiv.style.color = '#1e293b';
+      titleDiv.style.color = field.textColor || '#1e293b';
+      if (field.bgColor) {
+        titleDiv.style.backgroundColor = field.bgColor;
+        titleDiv.style.padding = '8px 12px';
+        titleDiv.style.borderRadius = '6px';
+      }
       titleDiv.textContent = field.label;
       formFieldsView.appendChild(titleDiv);
       return;
