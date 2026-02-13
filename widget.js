@@ -564,12 +564,42 @@ function createSectionElement(field) {
   return sectionEl;
 }
 
+// Trouver les éléments contenus dans une section
+function getFieldsInSection(section) {
+  const sectionLeft = section.x;
+  const sectionTop = section.y;
+  const sectionRight = section.x + section.width;
+  const sectionBottom = section.y + (section.height || 150);
+  
+  return formFields.filter(f => {
+    if (f.id === section.id) return false;
+    if (f.fieldType === 'section') return false;
+    
+    // Vérifier si le centre du champ est dans la section
+    const fieldCenterX = f.x + (f.width / 2);
+    const fieldCenterY = f.y + 40; // Approximation du centre vertical
+    
+    return fieldCenterX >= sectionLeft && 
+           fieldCenterX <= sectionRight && 
+           fieldCenterY >= sectionTop && 
+           fieldCenterY <= sectionBottom;
+  });
+}
+
 // Déplacer un champ
 function startDragField(e, fieldEl, field) {
   const startX = e.clientX;
   const startY = e.clientY;
   const startLeft = field.x;
   const startTop = field.y;
+  
+  // Si c'est une section, récupérer les éléments à l'intérieur
+  let childFields = [];
+  let childStartPositions = [];
+  if (field.fieldType === 'section') {
+    childFields = getFieldsInSection(field);
+    childStartPositions = childFields.map(f => ({ id: f.id, x: f.x, y: f.y }));
+  }
   
   function onMouseMove(e) {
     let dx = e.clientX - startX;
@@ -583,11 +613,30 @@ function startDragField(e, fieldEl, field) {
       newY = Math.round(newY / 20) * 20;
     }
     
+    const actualDx = newX - startLeft;
+    const actualDy = newY - startTop;
+    
     field.x = Math.max(0, newX);
     field.y = Math.max(0, newY);
     
     fieldEl.style.left = field.x + 'px';
     fieldEl.style.top = field.y + 'px';
+    
+    // Déplacer aussi les éléments enfants
+    if (field.fieldType === 'section') {
+      childStartPositions.forEach(pos => {
+        const childField = formFields.find(f => f.id === pos.id);
+        if (childField) {
+          childField.x = Math.max(0, pos.x + actualDx);
+          childField.y = Math.max(0, pos.y + actualDy);
+          const childEl = formCanvas.querySelector(`[data-field-id="${pos.id}"]`);
+          if (childEl) {
+            childEl.style.left = childField.x + 'px';
+            childEl.style.top = childField.y + 'px';
+          }
+        }
+      });
+    }
   }
   
   function onMouseUp() {
