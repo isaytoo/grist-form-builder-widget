@@ -957,7 +957,7 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
-  document.getElementById('prop-width-cm')?.addEventListener('input', (e) => {
+  document.getElementById('prop-width-cm')?.addEventListener('change', (e) => {
     const cm = parseFloat(e.target.value) || 5;
     selectedField.width = Math.round(cm * 37.8);
     // Mettre à jour le champ px
@@ -976,7 +976,7 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
-  document.getElementById('prop-height-cm')?.addEventListener('input', (e) => {
+  document.getElementById('prop-height-cm')?.addEventListener('change', (e) => {
     const cm = parseFloat(e.target.value) || 3;
     selectedField.height = Math.round(cm * 37.8);
     // Mettre à jour le champ px
