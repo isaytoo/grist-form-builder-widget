@@ -1836,3 +1836,46 @@ modalTemplates.addEventListener('click', (e) => {
 
 // Initialiser snap comme actif
 btnSnap.classList.add('active');
+
+// Règles (rulers)
+const btnRulers = document.getElementById('btn-rulers');
+const rulerH = document.getElementById('ruler-h');
+const rulerV = document.getElementById('ruler-v');
+const rulerCorner = document.getElementById('ruler-corner');
+const workspace = document.getElementById('workspace');
+let showRulers = false;
+
+function generateRulerMarks() {
+  const rulerHMarks = document.getElementById('ruler-h-marks');
+  const rulerVMarks = document.getElementById('ruler-v-marks');
+  
+  // A4 = 21cm x 29.7cm, 1cm = 37.8px
+  const cmToPx = 37.8;
+  
+  // Règle horizontale (21 cm)
+  let hHtml = '';
+  for (let i = 0; i <= 21; i++) {
+    hHtml += `<div class="ruler-mark" style="left: ${i * cmToPx}px;">${i}</div>`;
+  }
+  rulerHMarks.innerHTML = hHtml;
+  
+  // Règle verticale (29.7 cm)
+  let vHtml = '';
+  for (let i = 0; i <= 30; i++) {
+    vHtml += `<div class="ruler-mark" style="top: ${i * cmToPx}px;">${i}</div>`;
+  }
+  rulerVMarks.innerHTML = vHtml;
+}
+
+btnRulers.addEventListener('click', () => {
+  showRulers = !showRulers;
+  btnRulers.classList.toggle('active', showRulers);
+  rulerH.classList.toggle('show', showRulers);
+  rulerV.classList.toggle('show', showRulers);
+  rulerCorner.classList.toggle('show', showRulers);
+  workspace.classList.toggle('with-rulers', showRulers);
+  
+  if (showRulers) {
+    generateRulerMarks();
+  }
+});

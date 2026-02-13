@@ -53,6 +53,17 @@
     .toolbar-separator { width: 1px; background: #e2e8f0; margin: 0 4px; }
     .page-a4 { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); position: relative; padding: 15mm; background-size: 20px 20px; }
     .page-a4.show-grid { background-image: linear-gradient(to right, #f1f5f9 1px, transparent 1px), linear-gradient(to bottom, #f1f5f9 1px, transparent 1px); }
+    .workspace-with-rulers { position: relative; }
+    .ruler { background: #f8fafc; position: absolute; z-index: 10; }
+    .ruler-h { top: 0; left: 30px; right: 0; height: 20px; border-bottom: 1px solid #e2e8f0; display: none; }
+    .ruler-v { top: 20px; left: 0; width: 30px; bottom: 0; border-right: 1px solid #e2e8f0; display: none; }
+    .ruler.show { display: block; }
+    .ruler-marks { position: relative; height: 100%; width: 100%; }
+    .ruler-h .ruler-mark { position: absolute; top: 0; height: 100%; border-left: 1px solid #cbd5e1; font-size: 9px; color: #64748b; padding-left: 2px; }
+    .ruler-v .ruler-mark { position: absolute; left: 0; width: 100%; border-top: 1px solid #cbd5e1; font-size: 9px; color: #64748b; writing-mode: vertical-rl; text-orientation: mixed; padding-top: 2px; }
+    .ruler-corner { position: absolute; top: 0; left: 0; width: 30px; height: 20px; background: #f8fafc; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; z-index: 11; display: none; }
+    .ruler-corner.show { display: block; }
+    .workspace.with-rulers .page-a4 { margin-top: 25px; margin-left: 35px; }
     .page-a4.drag-over { outline: 2px dashed #3b82f6; outline-offset: -5px; }
     .form-field { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; min-width: 180px; cursor: move; transition: box-shadow 0.15s; }
     .form-field:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -230,15 +241,19 @@
       </div>
     </div>
     
-    <div class="workspace">
+    <div class="workspace" id="workspace">
       <div class="workspace-toolbar">
         <button class="toolbar-btn" id="btn-grid" title="Grille">⊞ Grille</button>
         <button class="toolbar-btn" id="btn-snap" title="Snap">🧲 Snap</button>
+        <button class="toolbar-btn" id="btn-rulers" title="Règles">📏 Règles</button>
         <div class="toolbar-separator"></div>
         <button class="toolbar-btn" id="btn-zoom-out">−</button>
         <span id="zoom-level" style="font-size: 0.8em; padding: 0 5px;">100%</span>
         <button class="toolbar-btn" id="btn-zoom-in">+</button>
       </div>
+      <div class="ruler-corner" id="ruler-corner"></div>
+      <div class="ruler ruler-h" id="ruler-h"><div class="ruler-marks" id="ruler-h-marks"></div></div>
+      <div class="ruler ruler-v" id="ruler-v"><div class="ruler-marks" id="ruler-v-marks"></div></div>
       <div class="page-a4 show-grid" id="form-canvas">
         <div class="empty-message" id="empty-message">
           <div class="empty-message-icon">📄</div>
