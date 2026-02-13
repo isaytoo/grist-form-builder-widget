@@ -115,7 +115,11 @@ async function loadTableColumns(tableId) {
     currentTable = tableId;
     const columns = await grist.docApi.fetchTable(tableId);
     
-    const columnNames = Object.keys(columns).filter(col => col !== 'id' && !col.startsWith('grist'));
+    const columnNames = Object.keys(columns).filter(col => 
+      col !== 'id' && 
+      !col.startsWith('grist') && 
+      col !== 'manualSort'
+    );
     tableColumns = columnNames.map(name => ({
       id: name,
       name: name,
