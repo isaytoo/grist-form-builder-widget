@@ -814,18 +814,30 @@ function renderPropertiesPanel() {
     </div>
   `;
   
+  const widthCm = (f.width / 37.8).toFixed(1);
   html += `
     <div class="property-group">
-      <div class="property-label">Largeur (px)</div>
-      <input type="number" class="property-input" id="prop-width" value="${f.width}" min="50" max="800">
+      <div class="property-label">Largeur</div>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <input type="number" class="property-input" id="prop-width" value="${f.width}" min="50" max="800" style="flex: 1;">
+        <span style="font-size: 0.75em; color: #64748b;">px</span>
+        <input type="number" class="property-input" id="prop-width-cm" value="${widthCm}" min="1" max="21" step="0.1" style="flex: 1;">
+        <span style="font-size: 0.75em; color: #64748b;">cm</span>
+      </div>
     </div>
   `;
   
   if (isSection || isImage) {
+    const heightCm = ((f.height || 100) / 37.8).toFixed(1);
     html += `
       <div class="property-group">
-        <div class="property-label">Hauteur (px)</div>
-        <input type="number" class="property-input" id="prop-height" value="${f.height || 100}" min="30" max="500">
+        <div class="property-label">Hauteur</div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="number" class="property-input" id="prop-height" value="${f.height || 100}" min="30" max="500" style="flex: 1;">
+          <span style="font-size: 0.75em; color: #64748b;">px</span>
+          <input type="number" class="property-input" id="prop-height-cm" value="${heightCm}" min="1" max="29" step="0.1" style="flex: 1;">
+          <span style="font-size: 0.75em; color: #64748b;">cm</span>
+        </div>
       </div>
     `;
   }
@@ -938,12 +950,38 @@ function renderPropertiesPanel() {
   
   document.getElementById('prop-width')?.addEventListener('input', (e) => {
     selectedField.width = parseInt(e.target.value) || 200;
+    // Mettre à jour le champ cm
+    const cmInput = document.getElementById('prop-width-cm');
+    if (cmInput) cmInput.value = (selectedField.width / 37.8).toFixed(1);
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-width-cm')?.addEventListener('input', (e) => {
+    const cm = parseFloat(e.target.value) || 5;
+    selectedField.width = Math.round(cm * 37.8);
+    // Mettre à jour le champ px
+    const pxInput = document.getElementById('prop-width');
+    if (pxInput) pxInput.value = selectedField.width;
     renderFormFields();
     selectField(selectedField.id);
   });
   
   document.getElementById('prop-height')?.addEventListener('input', (e) => {
     selectedField.height = parseInt(e.target.value) || 150;
+    // Mettre à jour le champ cm
+    const cmInput = document.getElementById('prop-height-cm');
+    if (cmInput) cmInput.value = (selectedField.height / 37.8).toFixed(1);
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-height-cm')?.addEventListener('input', (e) => {
+    const cm = parseFloat(e.target.value) || 3;
+    selectedField.height = Math.round(cm * 37.8);
+    // Mettre à jour le champ px
+    const pxInput = document.getElementById('prop-height');
+    if (pxInput) pxInput.value = selectedField.height;
     renderFormFields();
     selectField(selectedField.id);
   });
