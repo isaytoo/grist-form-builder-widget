@@ -837,28 +837,38 @@ function renderFormView() {
     return;
   }
   
-  formTitle.textContent = formConfig.title || 'Formulaire de saisie';
-  
-  // Trier par position
-  const sortedFields = [...formConfig.fields].sort((a, b) => {
-    if (Math.abs(a.y - b.y) < 30) return a.x - b.x;
-    return a.y - b.y;
-  });
-  
   formFieldsView.innerHTML = '';
   
-  sortedFields.forEach(field => {
+  // Calculer la hauteur minimale du canvas
+  let maxY = 297; // A4 height in mm (converted to approximate px later)
+  formConfig.fields.forEach(field => {
+    const fieldBottom = field.y + (field.height || 80);
+    if (fieldBottom > maxY) maxY = fieldBottom;
+  });
+  
+  const canvasView = document.getElementById('form-canvas-view');
+  canvasView.style.minHeight = Math.max(maxY + 100, 800) + 'px';
+  
+  formConfig.fields.forEach(field => {
     if (field.fieldType === 'section') {
       const sectionDiv = document.createElement('div');
       sectionDiv.className = 'form-section-view';
+      sectionDiv.style.position = 'absolute';
+      sectionDiv.style.left = field.x + 'px';
+      sectionDiv.style.top = field.y + 'px';
+      sectionDiv.style.width = field.width + 'px';
+      sectionDiv.style.height = (field.height || 150) + 'px';
       sectionDiv.innerHTML = `<div class="form-section-view-title">${field.label}</div>`;
       formFieldsView.appendChild(sectionDiv);
       return;
     }
     
     const group = document.createElement('div');
-    group.className = 'form-group';
+    group.className = 'form-field-view';
     group.dataset.fieldId = field.id;
+    group.style.left = field.x + 'px';
+    group.style.top = field.y + 'px';
+    group.style.width = field.width + 'px';
     
     if (field.condition) {
       group.dataset.conditionFieldId = field.condition.fieldId;
@@ -870,7 +880,7 @@ function renderFormView() {
     
     switch (field.fieldType) {
       case 'textarea':
-        inputHtml = `<textarea id="input-${field.id}" class="form-textarea-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}></textarea>`;
+        inputHtml = `<textarea id="input-${field.id}" class="form-textarea-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''} style="min-height: 60px;"></textarea>`;
         break;
       case 'select':
         inputHtml = `<select id="input-${field.id}" class="form-select" ${field.required ? 'required' : ''}>
@@ -882,7 +892,7 @@ function renderFormView() {
         inputHtml = `<div class="form-radio-group" id="input-${field.id}">
           ${field.options.map((o, i) => `
             <label class="form-radio-item">
-              <input type="radio" name="radio-${field.id}" value="${o}" ${field.required && i === 0 ? '' : ''}>
+              <input type="radio" name="radio-${field.id}" value="${o}">
               <span>${o}</span>
             </label>
           `).join('')}
@@ -984,7 +994,7 @@ function initSignatureCanvases() {
 
 // Initialiser les conditions d'affichage
 function initConditions() {
-  document.querySelectorAll('.form-group[data-condition-field-id]').forEach(group => {
+  document.querySelectorAll('.form-field-view[data-condition-field-id]').forEach(group => {
     const conditionFieldId = group.dataset.conditionFieldId;
     const operator = group.dataset.conditionOperator;
     const value = group.dataset.conditionValue;
@@ -1057,7 +1067,7 @@ async function submitForm() {
     if (field.fieldType === 'section') return;
     if (!field.columnId) return;
     
-    const group = document.querySelector(`.form-group[data-field-id="${field.id}"]`);
+    const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
     if (group && group.classList.contains('hidden')) return;
     
     const errorEl = document.getElementById(`error-${field.id}`);

@@ -94,6 +94,11 @@
     .editor-view { display: flex; }
     .editor-view.hidden { display: none; }
     .form-container { max-width: 700px; margin: 0 auto; padding: 30px; }
+    .form-canvas-view { position: relative; width: 210mm; min-height: 297mm; background: white; margin: 0 auto; padding: 15mm; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .form-field-view { position: absolute; background: white; }
+    .form-field-view .form-label { margin-bottom: 4px; }
+    .form-field-view .form-input, .form-field-view .form-select, .form-field-view .form-textarea-input { padding: 8px 10px; font-size: 0.9em; }
+    .form-actions-fixed { position: sticky; bottom: 0; background: white; padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; justify-content: center; }
     .form-title { font-size: 1.3em; font-weight: 600; color: #1e293b; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; }
     .form-section-view { margin-bottom: 25px; padding: 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
     .form-section-view-title { font-size: 1em; font-weight: 600; color: #334155; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0; }
@@ -231,10 +236,11 @@
   </div>
   
   <div class="form-view" id="form-view">
-    <div class="form-container">
-      <div class="form-title" id="form-title">Formulaire de saisie</div>
-      <div id="form-fields-view"></div>
-      <div class="form-actions">
+    <div style="padding: 20px; background: #e2e8f0; min-height: 100%;">
+      <div class="form-canvas-view" id="form-canvas-view">
+        <div id="form-fields-view"></div>
+      </div>
+      <div class="form-actions-fixed">
         <button class="btn btn-success" id="btn-submit">✅ Enregistrer</button>
         <button class="btn btn-secondary" id="btn-reset-form">↺ Réinitialiser</button>
       </div>
