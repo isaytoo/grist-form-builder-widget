@@ -637,6 +637,30 @@ function selectField(fieldId) {
   renderPropertiesPanel();
 }
 
+// Mettre au premier plan
+function bringToFront(fieldId) {
+  const index = formFields.findIndex(f => f.id === fieldId);
+  if (index === -1 || index === formFields.length - 1) return;
+  
+  const field = formFields.splice(index, 1)[0];
+  formFields.push(field);
+  renderFormFields();
+  selectField(fieldId);
+  showToast('Mis au premier plan', 'success');
+}
+
+// Mettre en arrière-plan
+function sendToBack(fieldId) {
+  const index = formFields.findIndex(f => f.id === fieldId);
+  if (index === -1 || index === 0) return;
+  
+  const field = formFields.splice(index, 1)[0];
+  formFields.unshift(field);
+  renderFormFields();
+  selectField(fieldId);
+  showToast('Mis en arrière-plan', 'success');
+}
+
 // Supprimer un champ
 function deleteField(fieldId) {
   formFields = formFields.filter(f => f.id !== fieldId);
@@ -729,6 +753,17 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
+  
+  // Ordre d'affichage (z-index)
+  html += `
+    <div class="property-group">
+      <div class="property-label">Ordre d'affichage</div>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn btn-secondary" id="btn-bring-front" style="flex: 1; padding: 5px 8px; font-size: 0.75em;">⬆️ Premier plan</button>
+        <button class="btn btn-secondary" id="btn-send-back" style="flex: 1; padding: 5px 8px; font-size: 0.75em;">⬇️ Arrière-plan</button>
+      </div>
+    </div>
+  `;
   
   html += `
     <div class="property-group">
@@ -899,6 +934,15 @@ function renderPropertiesPanel() {
     selectedField.bgColor = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
+  });
+  
+  // Ordre d'affichage
+  document.getElementById('btn-bring-front')?.addEventListener('click', () => {
+    bringToFront(selectedField.id);
+  });
+  
+  document.getElementById('btn-send-back')?.addEventListener('click', () => {
+    sendToBack(selectedField.id);
   });
   
   document.getElementById('prop-required')?.addEventListener('change', (e) => {
