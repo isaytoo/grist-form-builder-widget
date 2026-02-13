@@ -128,6 +128,17 @@
     .modal { background: white; border-radius: 12px; padding: 25px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
     .modal-title { font-size: 1.1em; font-weight: 600; margin-bottom: 20px; color: #1e293b; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .confirm-modal { text-align: center; }
+    .confirm-modal-icon { font-size: 3em; margin-bottom: 15px; }
+    .confirm-modal-title { font-size: 1.1em; font-weight: 600; color: #1e293b; margin-bottom: 10px; }
+    .confirm-modal-message { font-size: 0.9em; color: #64748b; margin-bottom: 20px; }
+    .confirm-modal-actions { display: flex; gap: 10px; justify-content: center; }
+    .btn-cancel { background: #f1f5f9; color: #475569; }
+    .btn-cancel:hover { background: #e2e8f0; }
+    .btn-confirm { background: #3b82f6; color: white; }
+    .btn-confirm:hover { background: #2563eb; }
+    .btn-confirm.danger { background: #ef4444; }
+    .btn-confirm.danger:hover { background: #dc2626; }
     .templates-list { max-height: 300px; overflow-y: auto; }
     .template-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
     .template-item:hover { border-color: #3b82f6; background: #eff6ff; }
@@ -232,6 +243,18 @@
   
   <div class="toast" id="toast"></div>
   <div class="loading-overlay" id="loading"><div class="loading-spinner"></div></div>
+  
+  <div class="modal-overlay hidden" id="modal-confirm">
+    <div class="modal confirm-modal">
+      <div class="confirm-modal-icon" id="confirm-icon">⚠️</div>
+      <div class="confirm-modal-title" id="confirm-title">Confirmation</div>
+      <div class="confirm-modal-message" id="confirm-message">Êtes-vous sûr ?</div>
+      <div class="confirm-modal-actions">
+        <button class="btn btn-cancel" id="btn-confirm-cancel">Annuler</button>
+        <button class="btn btn-confirm" id="btn-confirm-ok">Confirmer</button>
+      </div>
+    </div>
+  </div>
   
   <div class="modal-overlay hidden" id="modal-templates">
     <div class="modal">

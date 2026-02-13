@@ -786,9 +786,19 @@ async function saveFormConfig() {
 }
 
 // Vider le formulaire
-function clearForm() {
+async function clearForm() {
   if (formFields.length === 0) return;
-  if (confirm('Voulez-vous vraiment supprimer tous les champs ?')) {
+  
+  const confirmed = await showConfirm({
+    icon: '🗑️',
+    title: 'Vider le formulaire',
+    message: 'Voulez-vous vraiment supprimer tous les champs ?',
+    confirmText: 'Supprimer',
+    cancelText: 'Annuler',
+    danger: true
+  });
+  
+  if (confirmed) {
     formFields = [];
     selectedField = null;
     renderFormFields();
@@ -1264,12 +1274,19 @@ function saveTemplate() {
   showToast('Template sauvegardé', 'success');
 }
 
-function loadTemplate(index) {
+async function loadTemplate(index) {
   const template = templates[index];
   if (!template) return;
   
   if (formFields.length > 0) {
-    if (!confirm('Cela remplacera le formulaire actuel. Continuer ?')) return;
+    const confirmed = await showConfirm({
+      icon: '📄',
+      title: 'Charger le template',
+      message: 'Cela remplacera le formulaire actuel. Continuer ?',
+      confirmText: 'Charger',
+      cancelText: 'Annuler'
+    });
+    if (!confirmed) return;
   }
   
   formFields = JSON.parse(JSON.stringify(template.fields));
@@ -1298,6 +1315,48 @@ function showLoading() {
 function hideLoading() {
   loading.classList.add('hidden');
 }
+
+// Modal de confirmation personnalisée
+let confirmResolve = null;
+const modalConfirm = document.getElementById('modal-confirm');
+const confirmIcon = document.getElementById('confirm-icon');
+const confirmTitle = document.getElementById('confirm-title');
+const confirmMessage = document.getElementById('confirm-message');
+const btnConfirmOk = document.getElementById('btn-confirm-ok');
+const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
+
+function showConfirm(options = {}) {
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+    confirmIcon.textContent = options.icon || '⚠️';
+    confirmTitle.textContent = options.title || 'Confirmation';
+    confirmMessage.textContent = options.message || 'Êtes-vous sûr ?';
+    btnConfirmOk.textContent = options.confirmText || 'Confirmer';
+    btnConfirmCancel.textContent = options.cancelText || 'Annuler';
+    
+    if (options.danger) {
+      btnConfirmOk.classList.add('danger');
+    } else {
+      btnConfirmOk.classList.remove('danger');
+    }
+    
+    modalConfirm.classList.remove('hidden');
+  });
+}
+
+function closeConfirm(result) {
+  modalConfirm.classList.add('hidden');
+  if (confirmResolve) {
+    confirmResolve(result);
+    confirmResolve = null;
+  }
+}
+
+btnConfirmOk.addEventListener('click', () => closeConfirm(true));
+btnConfirmCancel.addEventListener('click', () => closeConfirm(false));
+modalConfirm.addEventListener('click', (e) => {
+  if (e.target === modalConfirm) closeConfirm(false);
+});
 
 // Event listeners
 tableSelect.addEventListener('change', (e) => loadTableColumns(e.target.value));
