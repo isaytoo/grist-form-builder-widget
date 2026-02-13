@@ -98,6 +98,15 @@
     .form-field-view { position: absolute; background: white; }
     .form-field-view .form-label { margin-bottom: 4px; }
     .form-field-view .form-input, .form-field-view .form-select, .form-field-view .form-textarea-input { padding: 8px 10px; font-size: 0.9em; }
+    .form-image { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; cursor: move; }
+    .form-image img { width: 100%; height: 100%; object-fit: contain; }
+    .form-image-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f8fafc; color: #94a3b8; font-size: 2em; }
+    .form-image-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+    .form-image:hover .form-image-delete { display: flex; }
+    .form-title-element { position: absolute; background: transparent; cursor: move; font-size: 1.2em; font-weight: 600; color: #1e293b; padding: 5px; }
+    .form-title-element.selected { outline: 2px solid #3b82f6; }
+    .form-title-element-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+    .form-title-element:hover .form-title-element-delete { display: flex; }
     .form-actions-fixed { position: sticky; bottom: 0; background: white; padding: 15px 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; justify-content: center; }
     .form-title { font-size: 1.3em; font-weight: 600; color: #1e293b; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; }
     .form-section-view { margin-bottom: 25px; padding: 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
@@ -172,7 +181,9 @@
   <div class="main-content editor-view" id="editor-view">
     <div class="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-title">Table source</div>
+        <div class="sidebar-title">Titre du formulaire</div>
+        <input type="text" class="table-select" id="form-title-input" placeholder="Mon formulaire" value="">
+        <div class="sidebar-title" style="margin-top: 10px;">Table source</div>
         <select class="table-select" id="table-select">
           <option value="">Chargement...</option>
         </select>
@@ -205,6 +216,8 @@
             <div class="elements-category-title">Spéciaux</div>
             <div class="element-item" draggable="true" data-element-type="signature"><span class="field-icon">✍️</span><span class="field-name">Signature</span></div>
             <div class="element-item" draggable="true" data-element-type="section"><span class="field-icon">📦</span><span class="field-name">Section</span></div>
+            <div class="element-item" draggable="true" data-element-type="image"><span class="field-icon">🖼️</span><span class="field-name">Image</span></div>
+            <div class="element-item" draggable="true" data-element-type="title"><span class="field-icon">🏷️</span><span class="field-name">Titre/Texte</span></div>
           </div>
         </div>
       </div>

@@ -24,7 +24,7 @@ const propertiesContent = document.getElementById('properties-content');
 const editorView = document.getElementById('editor-view');
 const formView = document.getElementById('form-view');
 const formFieldsView = document.getElementById('form-fields-view');
-const formTitle = document.getElementById('form-title');
+const formTitleInput = document.getElementById('form-title-input');
 const toast = document.getElementById('toast');
 const loading = document.getElementById('loading');
 const modalTemplates = document.getElementById('modal-templates');
@@ -66,6 +66,10 @@ grist.onOptions(async function(options) {
   templates = formConfig.templates || [];
   
   await loadTables();
+  
+  if (formConfig.title) {
+    formTitleInput.value = formConfig.title;
+  }
   
   if (formConfig.fields && formConfig.fields.length > 0) {
     formFields = formConfig.fields;
@@ -283,8 +287,10 @@ formCanvas.addEventListener('drop', (e) => {
       label: getDefaultLabel(draggedData.elementType),
       x: x,
       y: y,
-      width: draggedData.elementType === 'section' ? 400 : 250,
-      height: draggedData.elementType === 'section' ? 150 : null,
+      width: ['section', 'image'].includes(draggedData.elementType) ? 200 : (draggedData.elementType === 'title' ? 300 : 250),
+      height: draggedData.elementType === 'section' ? 150 : (draggedData.elementType === 'image' ? 100 : null),
+      imageData: null,
+      fontSize: draggedData.elementType === 'title' ? 1.2 : null,
       required: false,
       placeholder: '',
       options: draggedData.elementType === 'select' || draggedData.elementType === 'radio' || draggedData.elementType === 'checkbox' 
@@ -304,6 +310,7 @@ function getDefaultLabel(type) {
   const labels = {
     'text': 'Texte', 'textarea': 'Description', 'number': 'Nombre',
     'date': 'Date', 'email': 'Email', 'phone': 'Téléphone',
+    'image': 'Image', 'title': 'Titre',
     'select': 'Sélection', 'radio': 'Choix', 'checkbox': 'Options',
     'signature': 'Signature', 'section': 'Section'
   };
@@ -312,7 +319,7 @@ function getDefaultLabel(type) {
 
 // Afficher les champs sur le formulaire
 function renderFormFields() {
-  const existingFields = formCanvas.querySelectorAll('.form-field, .form-section');
+  const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element');
   existingFields.forEach(f => f.remove());
   
   emptyMessage.style.display = formFields.length === 0 ? 'block' : 'none';
@@ -321,11 +328,80 @@ function renderFormFields() {
     if (field.fieldType === 'section') {
       const sectionEl = createSectionElement(field);
       formCanvas.appendChild(sectionEl);
+    } else if (field.fieldType === 'image') {
+      const imageEl = createImageElement(field);
+      formCanvas.appendChild(imageEl);
+    } else if (field.fieldType === 'title') {
+      const titleEl = createTitleElement(field);
+      formCanvas.appendChild(titleEl);
     } else {
       const fieldEl = createFormFieldElement(field);
       formCanvas.appendChild(fieldEl);
     }
   });
+}
+
+// Créer un élément image
+function createImageElement(field) {
+  const imageEl = document.createElement('div');
+  imageEl.className = 'form-image';
+  imageEl.dataset.fieldId = field.id;
+  imageEl.style.left = field.x + 'px';
+  imageEl.style.top = field.y + 'px';
+  imageEl.style.width = field.width + 'px';
+  imageEl.style.height = (field.height || 100) + 'px';
+  
+  if (field.imageData) {
+    imageEl.innerHTML = `
+      <button class="form-image-delete" title="Supprimer">×</button>
+      <img src="${field.imageData}" alt="${field.label}">
+    `;
+  } else {
+    imageEl.innerHTML = `
+      <button class="form-image-delete" title="Supprimer">×</button>
+      <div class="form-image-placeholder">🖼️</div>
+    `;
+  }
+  
+  imageEl.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('form-image-delete')) return;
+    selectField(field.id);
+    startDragField(e, imageEl, field);
+  });
+  
+  imageEl.querySelector('.form-image-delete').addEventListener('click', () => {
+    deleteField(field.id);
+  });
+  
+  return imageEl;
+}
+
+// Créer un élément titre/texte
+function createTitleElement(field) {
+  const titleEl = document.createElement('div');
+  titleEl.className = 'form-title-element';
+  titleEl.dataset.fieldId = field.id;
+  titleEl.style.left = field.x + 'px';
+  titleEl.style.top = field.y + 'px';
+  titleEl.style.width = field.width + 'px';
+  titleEl.style.fontSize = (field.fontSize || 1.2) + 'em';
+  
+  titleEl.innerHTML = `
+    <button class="form-title-element-delete" title="Supprimer">×</button>
+    <span>${field.label}</span>
+  `;
+  
+  titleEl.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('form-title-element-delete')) return;
+    selectField(field.id);
+    startDragField(e, titleEl, field);
+  });
+  
+  titleEl.querySelector('.form-title-element-delete').addEventListener('click', () => {
+    deleteField(field.id);
+  });
+  
+  return titleEl;
 }
 
 // Créer un élément de champ
@@ -490,7 +566,7 @@ function startResizeField(e, fieldEl, field) {
 
 // Sélectionner un champ
 function selectField(fieldId) {
-  const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected');
+  const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected');
   if (oldSelected) oldSelected.classList.remove('selected');
   
   const fieldEl = formCanvas.querySelector(`[data-field-id="${fieldId}"]`);
@@ -518,16 +594,40 @@ function renderPropertiesPanel() {
   
   const f = selectedField;
   const isSection = f.fieldType === 'section';
+  const isImage = f.fieldType === 'image';
+  const isTitle = f.fieldType === 'title';
   const hasOptions = ['select', 'radio', 'checkbox'].includes(f.fieldType);
+  const isDecorative = isSection || isImage || isTitle;
   
   let html = `
     <div class="property-group">
-      <div class="property-label">Libellé</div>
+      <div class="property-label">${isTitle ? 'Texte' : 'Libellé'}</div>
       <input type="text" class="property-input" id="prop-label" value="${f.label}">
     </div>
   `;
   
-  if (!isSection) {
+  // Image upload
+  if (isImage) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Image</div>
+        <input type="file" id="prop-image-upload" accept="image/*" style="font-size: 0.85em;">
+        ${f.imageData ? '<p style="color: #10b981; font-size: 0.8em; margin-top: 5px;">✓ Image chargée</p>' : ''}
+      </div>
+    `;
+  }
+  
+  // Taille de police pour titre
+  if (isTitle) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Taille de police (em)</div>
+        <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 1.2}" min="0.5" max="4" step="0.1">
+      </div>
+    `;
+  }
+  
+  if (!isDecorative) {
     if (f.columnId) {
       html += `
         <div class="property-group">
@@ -558,20 +658,20 @@ function renderPropertiesPanel() {
   html += `
     <div class="property-group">
       <div class="property-label">Largeur (px)</div>
-      <input type="number" class="property-input" id="prop-width" value="${f.width}" min="100" max="600">
+      <input type="number" class="property-input" id="prop-width" value="${f.width}" min="50" max="800">
     </div>
   `;
   
-  if (isSection) {
+  if (isSection || isImage) {
     html += `
       <div class="property-group">
         <div class="property-label">Hauteur (px)</div>
-        <input type="number" class="property-input" id="prop-height" value="${f.height || 150}" min="50" max="500">
+        <input type="number" class="property-input" id="prop-height" value="${f.height || 100}" min="30" max="500">
       </div>
     `;
   }
   
-  if (!isSection) {
+  if (!isDecorative) {
     html += `
       <div class="property-group">
         <label class="property-checkbox">
@@ -677,6 +777,29 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
+  // Upload image
+  document.getElementById('prop-image-upload')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        selectedField.imageData = event.target.result;
+        renderFormFields();
+        selectField(selectedField.id);
+        renderPropertiesPanel();
+        showToast('Image chargée', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+  
+  // Taille de police
+  document.getElementById('prop-font-size')?.addEventListener('input', (e) => {
+    selectedField.fontSize = parseFloat(e.target.value) || 1.2;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
   document.getElementById('prop-required')?.addEventListener('change', (e) => {
     selectedField.required = e.target.checked;
     renderFormFields();
@@ -778,7 +901,7 @@ async function saveFormConfig() {
   const config = {
     tableId: currentTable,
     fields: formFields,
-    title: 'Formulaire ' + currentTable,
+    title: formTitleInput.value || 'Formulaire ' + currentTable,
     templates: templates
   };
   
@@ -860,6 +983,36 @@ function renderFormView() {
       sectionDiv.style.height = (field.height || 150) + 'px';
       sectionDiv.innerHTML = `<div class="form-section-view-title">${field.label}</div>`;
       formFieldsView.appendChild(sectionDiv);
+      return;
+    }
+    
+    // Image
+    if (field.fieldType === 'image') {
+      const imageDiv = document.createElement('div');
+      imageDiv.style.position = 'absolute';
+      imageDiv.style.left = field.x + 'px';
+      imageDiv.style.top = field.y + 'px';
+      imageDiv.style.width = field.width + 'px';
+      imageDiv.style.height = (field.height || 100) + 'px';
+      if (field.imageData) {
+        imageDiv.innerHTML = `<img src="${field.imageData}" alt="${field.label}" style="width: 100%; height: 100%; object-fit: contain;">`;
+      }
+      formFieldsView.appendChild(imageDiv);
+      return;
+    }
+    
+    // Titre/Texte
+    if (field.fieldType === 'title') {
+      const titleDiv = document.createElement('div');
+      titleDiv.style.position = 'absolute';
+      titleDiv.style.left = field.x + 'px';
+      titleDiv.style.top = field.y + 'px';
+      titleDiv.style.width = field.width + 'px';
+      titleDiv.style.fontSize = (field.fontSize || 1.2) + 'em';
+      titleDiv.style.fontWeight = '600';
+      titleDiv.style.color = '#1e293b';
+      titleDiv.textContent = field.label;
+      formFieldsView.appendChild(titleDiv);
       return;
     }
     
@@ -1431,7 +1584,7 @@ sidebarTabs.forEach(tab => {
 // Clic en dehors pour désélectionner
 formCanvas.addEventListener('click', (e) => {
   if (e.target === formCanvas || e.target === emptyMessage || e.target.closest('.empty-message')) {
-    const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected');
+    const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected');
     if (oldSelected) oldSelected.classList.remove('selected');
     selectedField = null;
     renderPropertiesPanel();
