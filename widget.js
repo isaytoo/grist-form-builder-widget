@@ -137,8 +137,8 @@ grist.onOptions(async function(options) {
   }
   
   // Si pas de config dans les options du widget, essayer de charger depuis la table
-  if ((!formConfig.fields || formConfig.fields.length === 0) && isFormMode) {
-    // En mode form, chercher la config pour la table cible ou la première disponible
+  if (!formConfig.fields || formConfig.fields.length === 0) {
+    // Chercher la config pour la table cible ou la première disponible
     if (targetTable) {
       // Charger la config pour la table spécifiée dans l'URL
       const tableConfig = await loadConfigFromTable(targetTable);
@@ -152,7 +152,8 @@ grist.onOptions(async function(options) {
         if (tables.includes('BM_FormConfig')) {
           const data = await grist.docApi.fetchTable('BM_FormConfig');
           if (data.ConfigData && data.ConfigData.length > 0) {
-            formConfig = JSON.parse(data.ConfigData[0]);
+            // Charger la config la plus récente
+            formConfig = JSON.parse(data.ConfigData[data.ConfigData.length - 1]);
           }
         }
       } catch (e) {
