@@ -1847,6 +1847,8 @@ function renderPropertiesPanel() {
   
   document.getElementById('prop-required')?.addEventListener('change', (e) => {
     selectedField.required = e.target.checked;
+    renderFormFields();
+    selectField(selectedField.id);
   });
   
   // Min/Max for numbers
