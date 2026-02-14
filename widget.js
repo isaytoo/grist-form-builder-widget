@@ -1873,9 +1873,9 @@ function generateRulerMarks() {
   }
   rulerHMarks.innerHTML = hHtml;
   
-  // Règle verticale (29.7 cm - A4)
+  // Règle verticale (30 cm pour couvrir la page A4 de 29.7cm)
   let vHtml = '';
-  for (let i = 0; i <= 29; i++) {
+  for (let i = 0; i <= 30; i++) {
     vHtml += `<div class="ruler-mark" style="top: ${offsetY + i * cmToPx}px;">${i}</div>`;
   }
   rulerVMarks.innerHTML = vHtml;
