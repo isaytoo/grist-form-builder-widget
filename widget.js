@@ -586,12 +586,24 @@ function createFormFieldElement(field) {
       inputHtml = `<input type="${field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}" class="form-field-input" placeholder="${field.placeholder || 'Saisir...'}" readonly>`;
   }
   
-  fieldEl.innerHTML = `
-    <button class="form-field-delete" title="Supprimer">×</button>
-    <div class="form-field-label">${field.label}${field.required ? ' *' : ''}</div>
-    ${inputHtml}
-    <div class="form-field-resize"></div>
-  `;
+  // Appliquer le style selon la position du label
+  if (field.labelPosition === 'left') {
+    fieldEl.innerHTML = `
+      <button class="form-field-delete" title="Supprimer">×</button>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="form-field-label" style="flex-shrink: 0; margin-bottom: 0; min-width: 80px; max-width: 40%;">${field.label}${field.required ? ' *' : ''}</div>
+        <div style="flex: 1;">${inputHtml}</div>
+      </div>
+      <div class="form-field-resize"></div>
+    `;
+  } else {
+    fieldEl.innerHTML = `
+      <button class="form-field-delete" title="Supprimer">×</button>
+      <div class="form-field-label">${field.label}${field.required ? ' *' : ''}</div>
+      ${inputHtml}
+      <div class="form-field-resize"></div>
+    `;
+  }
   
   // Événements
   fieldEl.addEventListener('mousedown', (e) => {
@@ -993,6 +1005,17 @@ function renderPropertiesPanel() {
       </div>
     `;
     
+    // Position du label
+    html += `
+      <div class="property-group">
+        <div class="property-label">Position du libellé</div>
+        <select class="property-select" id="prop-label-position">
+          <option value="top" ${(f.labelPosition || 'top') === 'top' ? 'selected' : ''}>En haut</option>
+          <option value="left" ${f.labelPosition === 'left' ? 'selected' : ''}>À gauche</option>
+        </select>
+      </div>
+    `;
+    
     // Validation rules
     html += `
       <div class="property-group" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
@@ -1258,6 +1281,12 @@ function renderPropertiesPanel() {
   
   document.getElementById('prop-placeholder')?.addEventListener('change', (e) => {
     selectedField.placeholder = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-label-position')?.addEventListener('change', (e) => {
+    selectedField.labelPosition = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
