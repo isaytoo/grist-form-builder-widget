@@ -236,6 +236,7 @@
       <div class="sidebar-tabs">
         <button class="sidebar-tab active" data-tab="fields">Champs</button>
         <button class="sidebar-tab" data-tab="elements">Éléments</button>
+        <button class="sidebar-tab" data-tab="guide">📖 Guide</button>
       </div>
       <div class="sidebar-content">
         <div class="tab-panel active" id="tab-fields">
@@ -266,6 +267,56 @@
             <div class="element-item" draggable="true" data-element-type="qrcode"><span class="field-icon">📱</span><span class="field-name">QR Code</span></div>
             <div class="element-item" draggable="true" data-element-type="lookup"><span class="field-icon">🔍</span><span class="field-name">Lookup</span></div>
             <div class="element-item" draggable="true" data-element-type="calculated"><span class="field-icon">🧮</span><span class="field-name">Champ calculé</span></div>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-guide">
+          <div style="font-size: 0.85em; color: #475569; line-height: 1.6;">
+            <h3 style="font-size: 1em; color: #1e293b; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">📖 Guide d'utilisation</h3>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">🎯 Présentation</h4>
+            <p style="margin-bottom: 10px;">Form Builder Pro permet de créer des formulaires professionnels sur page A4 avec drag & drop, puis de les partager avec vos utilisateurs.</p>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">📝 Créer un formulaire</h4>
+            <ol style="padding-left: 18px; margin-bottom: 10px;">
+              <li>Sélectionnez la <strong>table source</strong></li>
+              <li>Glissez les <strong>champs</strong> ou <strong>éléments</strong> sur la page</li>
+              <li>Positionnez et redimensionnez les champs</li>
+              <li>Configurez les propriétés (label, placeholder, validation...)</li>
+              <li>Cliquez sur <strong>💾 Sauvegarder</strong></li>
+            </ol>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">🔗 Partager le formulaire</h4>
+            <ol style="padding-left: 18px; margin-bottom: 10px;">
+              <li>Sauvegardez votre formulaire</li>
+              <li>Cliquez sur <strong>🔗 Partager</strong></li>
+              <li>L'URL est copiée automatiquement</li>
+              <li>Dans Grist, ajoutez un <strong>nouveau widget personnalisé</strong></li>
+              <li>Collez l'URL copiée</li>
+              <li><strong>Important :</strong> Accordez l'accès complet au widget</li>
+            </ol>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">👥 Plusieurs formulaires</h4>
+            <p style="margin-bottom: 10px;">Chaque formulaire est lié à une table. L'URL de partage contient le paramètre <code style="background:#e2e8f0;padding:1px 4px;border-radius:3px;">table=NomTable</code>.</p>
+            <p style="margin-bottom: 10px;">Exemple :<br>
+            <code style="background:#e2e8f0;padding:2px 6px;border-radius:3px;font-size:0.8em;display:block;margin-top:5px;word-break:break-all;">...?mode=form&table=Clients</code></p>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">⚙️ Fonctionnalités</h4>
+            <ul style="padding-left: 18px; margin-bottom: 10px;">
+              <li><strong>Multi-pages</strong> : Bouton "+ Page"</li>
+              <li><strong>Conditions</strong> : Afficher/masquer selon valeurs</li>
+              <li><strong>Calculs</strong> : Somme, %, formules</li>
+              <li><strong>Lookup</strong> : Autocomplétion depuis table</li>
+              <li><strong>Validation</strong> : Regex, min/max, obligatoire</li>
+              <li><strong>Templates</strong> : Sauvegarder/charger des modèles</li>
+              <li><strong>Historique</strong> : Restaurer versions précédentes</li>
+              <li><strong>Export PDF</strong> : Générer un PDF</li>
+            </ul>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">📋 Mode Saisie</h4>
+            <p style="margin-bottom: 10px;">Cliquez sur <strong>📋 Saisie</strong> pour tester le formulaire. Les données sont enregistrées dans la table source.</p>
+            
+            <h4 style="font-size: 0.9em; color: #3b82f6; margin: 15px 0 8px 0;">❓ Support</h4>
+            <p>Visitez <a href="https://gristup.fr" target="_blank" style="color:#3b82f6;">gristup.fr</a> pour plus d'informations.</p>
           </div>
         </div>
       </div>
