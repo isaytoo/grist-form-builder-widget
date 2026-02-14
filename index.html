@@ -68,13 +68,15 @@
     .page-a4 { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); position: relative; padding: 15mm; background-size: 20px 20px; box-sizing: border-box; overflow: visible; flex-shrink: 0; }
     .page-a4.show-grid { background-image: linear-gradient(to right, #f1f5f9 1px, transparent 1px), linear-gradient(to bottom, #f1f5f9 1px, transparent 1px); }
     .workspace-with-rulers { position: relative; }
-    .ruler { background: #f8fafc; position: sticky; z-index: 15; }
-    .ruler-h { top: 40px; left: 30px; right: 0; height: 20px; border-bottom: 1px solid #e2e8f0; display: none; margin-bottom: -20px; }
-    .ruler-v { top: 60px; left: 0; width: 30px; min-height: calc(297mm + 50px); border-right: 1px solid #e2e8f0; display: none; position: absolute; }
+    .ruler { background: #e2e8f0; position: sticky; z-index: 15; }
+    .ruler-h { top: 40px; left: 30px; right: 0; height: 25px; border-bottom: 1px solid #cbd5e1; display: none; margin-bottom: -25px; }
+    .ruler-v { top: 60px; left: 0; width: 30px; min-height: calc(297mm + 50px); border-right: 1px solid #cbd5e1; display: none; position: absolute; }
     .ruler.show { display: block; }
-    .ruler-marks { position: relative; height: 100%; width: 100%; }
-    .ruler-h .ruler-mark { position: absolute; top: 0; height: 100%; border-left: 2px solid #94a3b8; font-size: 9px; color: #64748b; padding-left: 3px; background: linear-gradient(to bottom, #94a3b8 50%, transparent 50%); background-size: 1px 4px; }
-    .ruler-v .ruler-mark { position: absolute; left: 0; width: 100%; border-top: 1px solid #cbd5e1; font-size: 9px; color: #64748b; writing-mode: vertical-rl; text-orientation: mixed; padding-top: 2px; }
+    .ruler-marks { position: relative; height: 100%; width: 100%; background: #e2e8f0; }
+    .ruler-h .ruler-mark { position: absolute; top: 0; height: 100%; border-left: 1px solid #64748b; font-size: 8px; color: #475569; padding-left: 2px; display: flex; align-items: flex-end; padding-bottom: 2px; }
+    .ruler-h .ruler-mark::before { content: ''; position: absolute; top: 0; left: 0; width: 1px; height: 8px; background: #64748b; }
+    .ruler-v .ruler-mark { position: absolute; left: 0; width: 100%; border-top: 1px solid #64748b; font-size: 8px; color: #475569; writing-mode: vertical-rl; text-orientation: mixed; padding-top: 2px; }
+    .ruler-v .ruler-mark::before { content: ''; position: absolute; top: 0; right: 0; width: 8px; height: 1px; background: #64748b; }
     .ruler-corner { position: absolute; top: 0; left: 0; width: 30px; height: 20px; background: #f8fafc; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; z-index: 11; display: none; }
     .ruler-corner.show { display: block; }
     .workspace.with-rulers .page-a4 { margin-top: 25px; margin-left: 35px; }
