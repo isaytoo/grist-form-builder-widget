@@ -1523,7 +1523,7 @@ function renderPropertiesPanel() {
   });
   
   // Taille de police
-  document.getElementById('prop-font-size')?.addEventListener('input', (e) => {
+  document.getElementById('prop-font-size')?.addEventListener('change', (e) => {
     selectedField.fontSize = parseFloat(e.target.value) || 14;
     renderFormFields();
     selectField(selectedField.id);
