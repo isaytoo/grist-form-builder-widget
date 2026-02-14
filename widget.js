@@ -1391,6 +1391,7 @@ function renderPropertiesPanel() {
           <div class="property-label">Format (regex)</div>
           <select class="property-select" id="prop-pattern-preset">
             <option value="">-- Personnalisé --</option>
+            <option value="email" ${f.patternPreset === 'email' ? 'selected' : ''}>Email</option>
             <option value="phone-fr" ${f.patternPreset === 'phone-fr' ? 'selected' : ''}>Téléphone FR (0X XX XX XX XX)</option>
             <option value="postal-fr" ${f.patternPreset === 'postal-fr' ? 'selected' : ''}>Code postal FR (5 chiffres)</option>
             <option value="siret" ${f.patternPreset === 'siret' ? 'selected' : ''}>SIRET (14 chiffres)</option>
@@ -1872,6 +1873,7 @@ function renderPropertiesPanel() {
     const customGroup = document.getElementById('custom-pattern-group');
     
     const patterns = {
+      'email': '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
       'phone-fr': '^0[1-9]([ .-]?[0-9]{2}){4}$',
       'postal-fr': '^[0-9]{5}$',
       'siret': '^[0-9]{14}$'
