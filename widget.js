@@ -565,7 +565,9 @@ function createTitleElement(field) {
   if (field.textAlign) titleEl.style.textAlign = field.textAlign;
   if (field.lineHeight) titleEl.style.lineHeight = field.lineHeight;
   if (field.textColor) titleEl.style.color = field.textColor;
-  if (field.bgColor) {
+  if (field.transparent) {
+    titleEl.style.backgroundColor = 'transparent';
+  } else if (field.bgColor) {
     titleEl.style.backgroundColor = field.bgColor;
     titleEl.style.padding = '8px 12px';
     titleEl.style.borderRadius = '6px';
@@ -775,7 +777,12 @@ function createSectionElement(field) {
   sectionEl.style.top = field.y + 'px';
   sectionEl.style.width = field.width + 'px';
   sectionEl.style.height = (field.height || 150) + 'px';
-  if (field.bgColor) sectionEl.style.backgroundColor = field.bgColor;
+  if (field.transparent) {
+    sectionEl.style.backgroundColor = 'transparent';
+    sectionEl.style.border = '1px dashed #cbd5e1';
+  } else if (field.bgColor) {
+    sectionEl.style.backgroundColor = field.bgColor;
+  }
   
   sectionEl.innerHTML = `
     <button class="form-section-delete" title="Supprimer">×</button>
@@ -1150,7 +1157,11 @@ function renderPropertiesPanel() {
       </div>
       <div class="property-group">
         <div class="property-label">Couleur de fond</div>
-        <input type="color" id="prop-bg-color" value="${f.bgColor || (isSection ? '#f8fafc' : '#ffffff')}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.85em; cursor: pointer;">
+          <input type="checkbox" id="prop-transparent" ${f.transparent ? 'checked' : ''}>
+          Fond transparent
+        </label>
+        <input type="color" id="prop-bg-color" value="${f.bgColor || (isSection ? '#f8fafc' : '#ffffff')}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; ${f.transparent ? 'opacity: 0.5; pointer-events: none;' : ''}">
       </div>
     `;
   }
@@ -1591,6 +1602,14 @@ function renderPropertiesPanel() {
   // Couleur de fond
   document.getElementById('prop-bg-color')?.addEventListener('input', (e) => {
     selectedField.bgColor = e.target.value;
+    selectedField.transparent = false;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Fond transparent
+  document.getElementById('prop-transparent')?.addEventListener('change', (e) => {
+    selectedField.transparent = e.target.checked;
     renderFormFields();
     selectField(selectedField.id);
   });
@@ -2162,7 +2181,12 @@ function renderFormView() {
       sectionDiv.style.top = field.y + 'px';
       sectionDiv.style.width = field.width + 'px';
       sectionDiv.style.height = (field.height || 150) + 'px';
-      if (field.bgColor) sectionDiv.style.backgroundColor = field.bgColor;
+      if (field.transparent) {
+        sectionDiv.style.backgroundColor = 'transparent';
+        sectionDiv.style.border = '1px dashed #cbd5e1';
+      } else if (field.bgColor) {
+        sectionDiv.style.backgroundColor = field.bgColor;
+      }
       sectionDiv.innerHTML = `<div class="form-section-view-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${field.label}</div>`;
       formFieldsView.appendChild(sectionDiv);
       return;
@@ -2198,7 +2222,9 @@ function renderFormView() {
       if (field.textDecoration) titleDiv.style.textDecoration = field.textDecoration;
       if (field.textAlign) titleDiv.style.textAlign = field.textAlign;
       if (field.lineHeight) titleDiv.style.lineHeight = field.lineHeight;
-      if (field.bgColor) {
+      if (field.transparent) {
+        titleDiv.style.backgroundColor = 'transparent';
+      } else if (field.bgColor) {
         titleDiv.style.backgroundColor = field.bgColor;
         titleDiv.style.padding = '8px 12px';
         titleDiv.style.borderRadius = '6px';
