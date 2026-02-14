@@ -146,6 +146,14 @@
     .form-title-element .resize-handle { position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: se-resize; opacity: 0; transition: opacity 0.15s; }
     .form-title-element .resize-handle::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
     .form-title-element:hover .resize-handle, .form-title-element.selected .resize-handle { opacity: 1; }
+    .form-divider { position: absolute; cursor: move; padding: 5px 0; }
+    .form-divider-line { width: 100%; height: 2px; background: #cbd5e1; }
+    .form-divider.selected { outline: 2px solid #3b82f6; outline-offset: 3px; }
+    .form-divider-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+    .form-divider:hover .form-divider-delete { display: flex; }
+    .form-divider .resize-handle { position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: se-resize; opacity: 0; }
+    .form-divider:hover .resize-handle, .form-divider.selected .resize-handle { opacity: 1; }
+    .form-divider .resize-handle::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
     .form-qrcode { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; cursor: move; }
     .form-qrcode.selected { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
     .form-qrcode-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
@@ -270,6 +278,7 @@
             <div class="element-item" draggable="true" data-element-type="qrcode"><span class="field-icon">📱</span><span class="field-name">QR Code</span></div>
             <div class="element-item" draggable="true" data-element-type="lookup"><span class="field-icon">🔍</span><span class="field-name">Lookup</span></div>
             <div class="element-item" draggable="true" data-element-type="calculated"><span class="field-icon">🧮</span><span class="field-name">Champ calculé</span></div>
+            <div class="element-item" draggable="true" data-element-type="divider"><span class="field-icon">➖</span><span class="field-name">Filet</span></div>
           </div>
         </div>
         </div>

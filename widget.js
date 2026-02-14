@@ -434,14 +434,14 @@ function getDefaultLabel(type) {
     'date': 'Date', 'email': 'Email', 'phone': 'Téléphone',
     'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code', 'lookup': 'Recherche', 'calculated': 'Calcul',
     'select': 'Sélection', 'radio': 'Choix', 'checkbox': 'Options',
-    'signature': 'Signature', 'section': 'Section'
+    'signature': 'Signature', 'section': 'Section', 'divider': 'Filet'
   };
   return labels[type] || 'Champ';
 }
 
 // Afficher les champs sur le formulaire
 function renderFormFields() {
-  const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element, .form-qrcode');
+  const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element, .form-qrcode, .form-divider');
   existingFields.forEach(f => f.remove());
   
   // Filtrer les champs de la page courante
@@ -462,6 +462,9 @@ function renderFormFields() {
     } else if (field.fieldType === 'qrcode') {
       const qrcodeEl = createQRCodeElement(field);
       formCanvas.appendChild(qrcodeEl);
+    } else if (field.fieldType === 'divider') {
+      const dividerEl = createDividerElement(field);
+      formCanvas.appendChild(dividerEl);
     } else {
       const fieldEl = createFormFieldElement(field);
       formCanvas.appendChild(fieldEl);
@@ -646,6 +649,48 @@ function createTitleElement(field) {
   });
   
   return titleEl;
+}
+
+// Créer un élément filet (ligne horizontale)
+function createDividerElement(field) {
+  const dividerEl = document.createElement('div');
+  dividerEl.className = 'form-divider';
+  dividerEl.dataset.fieldId = field.id;
+  dividerEl.style.left = field.x + 'px';
+  dividerEl.style.top = field.y + 'px';
+  dividerEl.style.width = field.width + 'px';
+  
+  const lineStyle = `
+    height: ${field.dividerHeight || 2}px;
+    background: ${field.dividerColor || '#cbd5e1'};
+    ${field.dividerStyle === 'dashed' ? 'border-top: ' + (field.dividerHeight || 2) + 'px dashed ' + (field.dividerColor || '#cbd5e1') + '; background: transparent;' : ''}
+    ${field.dividerStyle === 'dotted' ? 'border-top: ' + (field.dividerHeight || 2) + 'px dotted ' + (field.dividerColor || '#cbd5e1') + '; background: transparent;' : ''}
+  `;
+  
+  dividerEl.innerHTML = `
+    <button class="form-divider-delete" title="Supprimer">×</button>
+    <div class="form-divider-line" style="${lineStyle}"></div>
+    <div class="resize-handle" title="Redimensionner"></div>
+  `;
+  
+  dividerEl.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('form-divider-delete')) return;
+    if (e.target.classList.contains('resize-handle')) return;
+    selectField(field.id);
+    startDragField(e, dividerEl, field);
+  });
+  
+  dividerEl.querySelector('.form-divider-delete').addEventListener('click', () => {
+    deleteField(field.id);
+  });
+  
+  dividerEl.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    selectField(field.id);
+    startResizeField(e, dividerEl, field);
+  });
+  
+  return dividerEl;
 }
 
 // Créer un élément QR Code
@@ -954,7 +999,7 @@ function startResizeField(e, fieldEl, field) {
 
 // Sélectionner un champ
 function selectField(fieldId) {
-  const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected');
+  const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected, .form-divider.selected');
   if (oldSelected) oldSelected.classList.remove('selected');
   
   const fieldEl = formCanvas.querySelector(`[data-field-id="${fieldId}"]`);
@@ -1010,8 +1055,9 @@ function renderPropertiesPanel() {
   const isImage = f.fieldType === 'image';
   const isTitle = f.fieldType === 'title';
   const isQRCode = f.fieldType === 'qrcode';
+  const isDivider = f.fieldType === 'divider';
   const hasOptions = ['select', 'radio', 'checkbox'].includes(f.fieldType);
-  const isDecorative = isSection || isImage || isTitle || isQRCode;
+  const isDecorative = isSection || isImage || isTitle || isQRCode || isDivider;
   
   let html = `
     <div class="property-group">
@@ -1074,6 +1120,28 @@ function renderPropertiesPanel() {
           <option value="1.5" ${!f.lineHeight || f.lineHeight === '1.5' ? 'selected' : ''}>1.5</option>
           <option value="2" ${f.lineHeight === '2' ? 'selected' : ''}>Double</option>
         </select>
+      </div>
+    `;
+  }
+  
+  // Divider (Filet) properties
+  if (isDivider) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Style</div>
+        <select class="property-select" id="prop-divider-style">
+          <option value="solid" ${!f.dividerStyle || f.dividerStyle === 'solid' ? 'selected' : ''}>Continu</option>
+          <option value="dashed" ${f.dividerStyle === 'dashed' ? 'selected' : ''}>Tirets</option>
+          <option value="dotted" ${f.dividerStyle === 'dotted' ? 'selected' : ''}>Pointillés</option>
+        </select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Épaisseur (px)</div>
+        <input type="number" class="property-input" id="prop-divider-height" value="${f.dividerHeight || 2}" min="1" max="10" step="1">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Couleur</div>
+        <input type="color" id="prop-divider-color" value="${f.dividerColor || '#cbd5e1'}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
       </div>
     `;
   }
@@ -1679,6 +1747,26 @@ function renderPropertiesPanel() {
     selectedField.transparent = e.target.checked;
     renderFormFields();
     selectField(selectedField.id);
+  });
+  
+  // Divider (Filet) properties
+  document.getElementById('prop-divider-style')?.addEventListener('change', (e) => {
+    selectedField.dividerStyle = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-divider-height')?.addEventListener('change', (e) => {
+    selectedField.dividerHeight = parseInt(e.target.value) || 2;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-divider-color')?.addEventListener('change', (e) => {
+    selectedField.dividerColor = e.target.value;
+    renderFormFields();
+    const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
+    if (fieldEl) fieldEl.classList.add('selected');
   });
   
   // QR Code properties
@@ -2306,6 +2394,21 @@ function renderFormView() {
       }
       titleDiv.textContent = field.label;
       formFieldsView.appendChild(titleDiv);
+      return;
+    }
+    
+    // Filet (Divider)
+    if (field.fieldType === 'divider') {
+      const dividerDiv = document.createElement('div');
+      dividerDiv.style.position = 'absolute';
+      dividerDiv.style.left = field.x + 'px';
+      dividerDiv.style.top = field.y + 'px';
+      dividerDiv.style.width = field.width + 'px';
+      
+      const lineStyle = field.dividerStyle === 'dashed' ? 'dashed' : (field.dividerStyle === 'dotted' ? 'dotted' : 'solid');
+      dividerDiv.innerHTML = `<div style="width: 100%; height: 0; border-top: ${field.dividerHeight || 2}px ${lineStyle} ${field.dividerColor || '#cbd5e1'};"></div>`;
+      
+      formFieldsView.appendChild(dividerDiv);
       return;
     }
     
@@ -3484,7 +3587,7 @@ sidebarTabs.forEach(tab => {
 // Clic en dehors pour désélectionner
 formCanvas.addEventListener('click', (e) => {
   if (e.target === formCanvas || e.target === emptyMessage || e.target.closest('.empty-message')) {
-    const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected');
+    const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected, .form-divider.selected');
     if (oldSelected) oldSelected.classList.remove('selected');
     selectedField = null;
     renderPropertiesPanel();
