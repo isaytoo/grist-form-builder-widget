@@ -143,6 +143,11 @@
     .form-title-element.selected { outline: 2px solid #3b82f6; }
     .form-title-element-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
     .form-title-element:hover .form-title-element-delete { display: flex; }
+    .form-qrcode { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; cursor: move; }
+    .form-qrcode.selected { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+    .form-qrcode-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+    .form-qrcode:hover .form-qrcode-delete { display: flex; }
+    .form-qrcode canvas, .form-qrcode img { display: block; }
     .form-actions-fixed { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: white; padding: 15px 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; gap: 12px; justify-content: center; z-index: 100; }
     .form-title { font-size: 1.3em; font-weight: 600; color: #1e293b; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; }
     .form-section-view { position: absolute; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; box-sizing: border-box; }
@@ -257,6 +262,7 @@
             <div class="element-item" draggable="true" data-element-type="section"><span class="field-icon">📦</span><span class="field-name">Section</span></div>
             <div class="element-item" draggable="true" data-element-type="image"><span class="field-icon">🖼️</span><span class="field-name">Image</span></div>
             <div class="element-item" draggable="true" data-element-type="title"><span class="field-icon">🏷️</span><span class="field-name">Titre/Texte</span></div>
+            <div class="element-item" draggable="true" data-element-type="qrcode"><span class="field-icon">📱</span><span class="field-name">QR Code</span></div>
           </div>
         </div>
       </div>
@@ -347,6 +353,7 @@
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="widget.js"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>© 2026 Said Hamadou (isaytoo)</span>

@@ -325,7 +325,7 @@ function getDefaultLabel(type) {
   const labels = {
     'text': 'Texte', 'textarea': 'Description', 'number': 'Nombre',
     'date': 'Date', 'email': 'Email', 'phone': 'Téléphone',
-    'image': 'Image', 'title': 'Titre',
+    'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code',
     'select': 'Sélection', 'radio': 'Choix', 'checkbox': 'Options',
     'signature': 'Signature', 'section': 'Section'
   };
@@ -334,7 +334,7 @@ function getDefaultLabel(type) {
 
 // Afficher les champs sur le formulaire
 function renderFormFields() {
-  const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element');
+  const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element, .form-qrcode');
   existingFields.forEach(f => f.remove());
   
   emptyMessage.style.display = formFields.length === 0 ? 'block' : 'none';
@@ -349,6 +349,9 @@ function renderFormFields() {
     } else if (field.fieldType === 'title') {
       const titleEl = createTitleElement(field);
       formCanvas.appendChild(titleEl);
+    } else if (field.fieldType === 'qrcode') {
+      const qrcodeEl = createQRCodeElement(field);
+      formCanvas.appendChild(qrcodeEl);
     } else {
       const fieldEl = createFormFieldElement(field);
       formCanvas.appendChild(fieldEl);
@@ -468,6 +471,51 @@ function createTitleElement(field) {
   });
   
   return titleEl;
+}
+
+// Créer un élément QR Code
+function createQRCodeElement(field) {
+  const qrcodeEl = document.createElement('div');
+  qrcodeEl.className = 'form-qrcode';
+  qrcodeEl.dataset.fieldId = field.id;
+  qrcodeEl.style.left = field.x + 'px';
+  qrcodeEl.style.top = field.y + 'px';
+  
+  const size = field.qrSize || 100;
+  const qrContent = field.qrContent || 'https://gristup.fr';
+  
+  qrcodeEl.innerHTML = `
+    <button class="form-qrcode-delete" title="Supprimer">×</button>
+    <div class="qrcode-container" id="qr-${field.id}"></div>
+  `;
+  
+  // Générer le QR Code après l'ajout au DOM
+  setTimeout(() => {
+    const container = document.getElementById('qr-' + field.id);
+    if (container && typeof QRCode !== 'undefined') {
+      container.innerHTML = '';
+      new QRCode(container, {
+        text: qrContent,
+        width: size,
+        height: size,
+        colorDark: field.qrColor || '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }, 50);
+  
+  qrcodeEl.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('form-qrcode-delete')) return;
+    selectField(field.id);
+    startDragField(e, qrcodeEl, field);
+  });
+  
+  qrcodeEl.querySelector('.form-qrcode-delete').addEventListener('click', () => {
+    deleteField(field.id);
+  });
+  
+  return qrcodeEl;
 }
 
 // Créer un élément de champ
@@ -691,7 +739,7 @@ function startResizeField(e, fieldEl, field) {
 
 // Sélectionner un champ
 function selectField(fieldId) {
-  const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected');
+  const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected');
   if (oldSelected) oldSelected.classList.remove('selected');
   
   const fieldEl = formCanvas.querySelector(`[data-field-id="${fieldId}"]`);
@@ -745,8 +793,9 @@ function renderPropertiesPanel() {
   const isSection = f.fieldType === 'section';
   const isImage = f.fieldType === 'image';
   const isTitle = f.fieldType === 'title';
+  const isQRCode = f.fieldType === 'qrcode';
   const hasOptions = ['select', 'radio', 'checkbox'].includes(f.fieldType);
-  const isDecorative = isSection || isImage || isTitle;
+  const isDecorative = isSection || isImage || isTitle || isQRCode;
   
   let html = `
     <div class="property-group">
@@ -772,6 +821,32 @@ function renderPropertiesPanel() {
       <div class="property-group">
         <div class="property-label">Taille de police (em)</div>
         <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 1.2}" min="0.5" max="4" step="0.1">
+      </div>
+    `;
+  }
+  
+  // QR Code properties
+  if (isQRCode) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Contenu du QR Code</div>
+        <input type="text" class="property-input" id="prop-qr-content" value="${f.qrContent || 'https://gristup.fr'}" placeholder="URL ou texte">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Taille (px)</div>
+        <input type="number" class="property-input" id="prop-qr-size" value="${f.qrSize || 100}" min="50" max="300" step="10">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Couleur</div>
+        <input type="color" id="prop-qr-color" value="${f.qrColor || '#000000'}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer;">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Type de contenu</div>
+        <select class="property-select" id="prop-qr-type">
+          <option value="custom" ${(f.qrType || 'custom') === 'custom' ? 'selected' : ''}>Personnalisé</option>
+          <option value="record" ${f.qrType === 'record' ? 'selected' : ''}>Lien vers l'enregistrement</option>
+          <option value="document" ${f.qrType === 'document' ? 'selected' : ''}>Lien vers le document</option>
+        </select>
       </div>
     `;
   }
@@ -1038,6 +1113,47 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
+  // QR Code properties
+  document.getElementById('prop-qr-content')?.addEventListener('change', (e) => {
+    selectedField.qrContent = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-qr-size')?.addEventListener('change', (e) => {
+    selectedField.qrSize = parseInt(e.target.value) || 100;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-qr-color')?.addEventListener('input', (e) => {
+    selectedField.qrColor = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-qr-type')?.addEventListener('change', async (e) => {
+    selectedField.qrType = e.target.value;
+    if (e.target.value === 'record') {
+      // Générer le lien vers l'enregistrement actuel
+      try {
+        const docId = await grist.docApi.getDocName();
+        selectedField.qrContent = `https://docs.getgrist.com/doc/${docId}`;
+      } catch (err) {
+        selectedField.qrContent = 'Lien enregistrement';
+      }
+    } else if (e.target.value === 'document') {
+      try {
+        const docId = await grist.docApi.getDocName();
+        selectedField.qrContent = `https://docs.getgrist.com/doc/${docId}`;
+      } catch (err) {
+        selectedField.qrContent = 'Lien document';
+      }
+    }
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
   // Ordre d'affichage
   document.getElementById('btn-bring-front')?.addEventListener('click', () => {
     bringToFront(selectedField.id);
@@ -1266,6 +1382,35 @@ function renderFormView() {
       }
       titleDiv.textContent = field.label;
       formFieldsView.appendChild(titleDiv);
+      return;
+    }
+    
+    // QR Code
+    if (field.fieldType === 'qrcode') {
+      const qrcodeDiv = document.createElement('div');
+      qrcodeDiv.style.position = 'absolute';
+      qrcodeDiv.style.left = field.x + 'px';
+      qrcodeDiv.style.top = field.y + 'px';
+      qrcodeDiv.style.padding = '8px';
+      qrcodeDiv.style.background = 'white';
+      qrcodeDiv.id = 'qr-view-' + field.id;
+      formFieldsView.appendChild(qrcodeDiv);
+      
+      // Générer le QR Code après l'ajout au DOM
+      setTimeout(() => {
+        const container = document.getElementById('qr-view-' + field.id);
+        if (container && typeof QRCode !== 'undefined') {
+          container.innerHTML = '';
+          new QRCode(container, {
+            text: field.qrContent || 'https://gristup.fr',
+            width: field.qrSize || 100,
+            height: field.qrSize || 100,
+            colorDark: field.qrColor || '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        }
+      }, 50);
       return;
     }
     
@@ -1939,7 +2084,7 @@ sidebarTabs.forEach(tab => {
 // Clic en dehors pour désélectionner
 formCanvas.addEventListener('click', (e) => {
   if (e.target === formCanvas || e.target === emptyMessage || e.target.closest('.empty-message')) {
-    const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected');
+    const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected');
     if (oldSelected) oldSelected.classList.remove('selected');
     selectedField = null;
     renderPropertiesPanel();
