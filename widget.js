@@ -123,6 +123,18 @@ async function loadTables() {
   }
 }
 
+// Charger les données pour un champ Lookup
+async function loadLookupData(field) {
+  if (!field.lookupTable) return;
+  
+  try {
+    const data = await grist.docApi.fetchTable(field.lookupTable);
+    field.lookupData = data;
+  } catch (error) {
+    console.error('Erreur chargement lookup:', error);
+  }
+}
+
 // Charger les colonnes d'une table
 async function loadTableColumns(tableId) {
   if (!tableId) {
@@ -325,7 +337,7 @@ function getDefaultLabel(type) {
   const labels = {
     'text': 'Texte', 'textarea': 'Description', 'number': 'Nombre',
     'date': 'Date', 'email': 'Email', 'phone': 'Téléphone',
-    'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code',
+    'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code', 'lookup': 'Recherche',
     'select': 'Sélection', 'radio': 'Choix', 'checkbox': 'Options',
     'signature': 'Signature', 'section': 'Section'
   };
@@ -851,6 +863,28 @@ function renderPropertiesPanel() {
     `;
   }
   
+  // Lookup properties
+  const isLookup = f.fieldType === 'lookup';
+  if (isLookup) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Table source</div>
+        <select class="property-select" id="prop-lookup-table">
+          <option value="">-- Sélectionner --</option>
+          ${availableTables.map(t => `<option value="${t}" ${f.lookupTable === t ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Colonne à afficher</div>
+        <input type="text" class="property-input" id="prop-lookup-display" value="${f.lookupDisplayColumn || ''}" placeholder="Nom de la colonne">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Colonne de valeur</div>
+        <input type="text" class="property-input" id="prop-lookup-value" value="${f.lookupValueColumn || ''}" placeholder="ID ou valeur à stocker">
+      </div>
+    `;
+  }
+  
   // Couleurs (pour section, titre et champs)
   if (isSection || isTitle) {
     html += `
@@ -1324,6 +1358,23 @@ function renderPropertiesPanel() {
     selectedField.errorMessage = e.target.value;
   });
   
+  // Lookup properties
+  document.getElementById('prop-lookup-table')?.addEventListener('change', (e) => {
+    selectedField.lookupTable = e.target.value;
+    // Charger les données de la table pour l'autocomplétion
+    if (e.target.value) {
+      loadLookupData(selectedField);
+    }
+  });
+  
+  document.getElementById('prop-lookup-display')?.addEventListener('change', (e) => {
+    selectedField.lookupDisplayColumn = e.target.value;
+  });
+  
+  document.getElementById('prop-lookup-value')?.addEventListener('change', (e) => {
+    selectedField.lookupValueColumn = e.target.value;
+  });
+  
   // Conditional display
   document.getElementById('prop-has-condition')?.addEventListener('change', (e) => {
     const conditionOptions = document.getElementById('condition-options');
@@ -1732,6 +1783,15 @@ function renderFormView() {
       case 'phone':
         inputHtml = `<input type="tel" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
         break;
+      case 'lookup':
+        inputHtml = `
+          <div class="lookup-container" style="position: relative;">
+            <input type="text" id="input-${field.id}" class="form-input lookup-input" placeholder="${field.placeholder || 'Rechercher...'}" autocomplete="off" ${field.required ? 'required' : ''}>
+            <input type="hidden" id="input-${field.id}-value">
+            <div class="lookup-dropdown" id="dropdown-${field.id}" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 0 0 6px 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100;"></div>
+          </div>
+        `;
+        break;
       default:
         inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
     }
@@ -1748,8 +1808,94 @@ function renderFormView() {
   // Initialiser les signatures
   initSignatureCanvases();
   
+  // Initialiser les lookups
+  initLookupFields();
+  
   // Initialiser les conditions
   initConditions();
+}
+
+// Initialiser les champs Lookup avec autocomplétion
+async function initLookupFields() {
+  if (!formConfig || !formConfig.fields) return;
+  
+  for (const field of formConfig.fields) {
+    if (field.fieldType !== 'lookup' || !field.lookupTable) continue;
+    
+    const input = document.getElementById(`input-${field.id}`);
+    const hiddenInput = document.getElementById(`input-${field.id}-value`);
+    const dropdown = document.getElementById(`dropdown-${field.id}`);
+    
+    if (!input || !dropdown) continue;
+    
+    // Charger les données si pas encore fait
+    if (!field.lookupData) {
+      try {
+        const data = await grist.docApi.fetchTable(field.lookupTable);
+        field.lookupData = data;
+      } catch (error) {
+        console.error('Erreur chargement lookup:', error);
+        continue;
+      }
+    }
+    
+    const displayCol = field.lookupDisplayColumn || 'id';
+    const valueCol = field.lookupValueColumn || 'id';
+    
+    // Préparer les options
+    const options = [];
+    if (field.lookupData && field.lookupData.id) {
+      for (let i = 0; i < field.lookupData.id.length; i++) {
+        options.push({
+          display: field.lookupData[displayCol] ? field.lookupData[displayCol][i] : field.lookupData.id[i],
+          value: field.lookupData[valueCol] ? field.lookupData[valueCol][i] : field.lookupData.id[i]
+        });
+      }
+    }
+    
+    // Filtrer et afficher les résultats
+    function filterOptions(query) {
+      const filtered = options.filter(opt => 
+        String(opt.display).toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 10);
+      
+      if (filtered.length === 0 || query === '') {
+        dropdown.style.display = 'none';
+        return;
+      }
+      
+      dropdown.innerHTML = filtered.map(opt => `
+        <div class="lookup-option" data-value="${opt.value}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;">
+          ${opt.display}
+        </div>
+      `).join('');
+      
+      dropdown.style.display = 'block';
+      
+      // Ajouter les event listeners
+      dropdown.querySelectorAll('.lookup-option').forEach(optEl => {
+        optEl.addEventListener('mouseenter', () => optEl.style.background = '#eff6ff');
+        optEl.addEventListener('mouseleave', () => optEl.style.background = 'white');
+        optEl.addEventListener('click', () => {
+          input.value = optEl.textContent.trim();
+          if (hiddenInput) hiddenInput.value = optEl.dataset.value;
+          dropdown.style.display = 'none';
+        });
+      });
+    }
+    
+    input.addEventListener('input', (e) => filterOptions(e.target.value));
+    input.addEventListener('focus', (e) => {
+      if (e.target.value) filterOptions(e.target.value);
+    });
+    
+    // Fermer le dropdown quand on clique ailleurs
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest(`#input-${field.id}`) && !e.target.closest(`#dropdown-${field.id}`)) {
+        dropdown.style.display = 'none';
+      }
+    });
+  }
 }
 
 // Initialiser les canvas de signature
