@@ -558,6 +558,12 @@ function createTitleElement(field) {
   titleEl.style.top = field.y + 'px';
   titleEl.style.width = field.width + 'px';
   titleEl.style.fontSize = (field.fontSize || 1.2) + 'em';
+  if (field.fontFamily) titleEl.style.fontFamily = field.fontFamily;
+  if (field.fontWeight) titleEl.style.fontWeight = field.fontWeight;
+  if (field.fontStyle) titleEl.style.fontStyle = field.fontStyle;
+  if (field.textDecoration) titleEl.style.textDecoration = field.textDecoration;
+  if (field.textAlign) titleEl.style.textAlign = field.textAlign;
+  if (field.lineHeight) titleEl.style.lineHeight = field.lineHeight;
   if (field.textColor) titleEl.style.color = field.textColor;
   if (field.bgColor) {
     titleEl.style.backgroundColor = field.bgColor;
@@ -938,12 +944,49 @@ function renderPropertiesPanel() {
     `;
   }
   
-  // Taille de police pour titre
+  // Options de formatage pour titre/texte
   if (isTitle) {
     html += `
       <div class="property-group">
-        <div class="property-label">Taille de police (em)</div>
-        <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 1.2}" min="0.5" max="4" step="0.1">
+        <div class="property-label">Police</div>
+        <select class="property-select" id="prop-font-family">
+          <option value="" ${!f.fontFamily ? 'selected' : ''}>Par défaut</option>
+          <option value="Arial, sans-serif" ${f.fontFamily === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option>
+          <option value="'Times New Roman', serif" ${f.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option>
+          <option value="Georgia, serif" ${f.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option>
+          <option value="'Courier New', monospace" ${f.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option>
+          <option value="Verdana, sans-serif" ${f.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option>
+          <option value="'Trebuchet MS', sans-serif" ${f.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option>
+          <option value="Impact, sans-serif" ${f.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option>
+        </select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Taille (em)</div>
+        <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 1.2}" min="0.5" max="5" step="0.1">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Style</div>
+        <div style="display: flex; gap: 5px;">
+          <button type="button" class="toolbar-btn ${f.fontWeight === 'bold' ? 'active' : ''}" id="prop-bold" title="Gras" style="flex: 1; font-weight: bold;">G</button>
+          <button type="button" class="toolbar-btn ${f.fontStyle === 'italic' ? 'active' : ''}" id="prop-italic" title="Italique" style="flex: 1; font-style: italic;">I</button>
+          <button type="button" class="toolbar-btn ${f.textDecoration === 'underline' ? 'active' : ''}" id="prop-underline" title="Souligné" style="flex: 1; text-decoration: underline;">S</button>
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Alignement</div>
+        <div style="display: flex; gap: 5px;">
+          <button type="button" class="toolbar-btn ${!f.textAlign || f.textAlign === 'left' ? 'active' : ''}" id="prop-align-left" title="Gauche" style="flex: 1;">⬅</button>
+          <button type="button" class="toolbar-btn ${f.textAlign === 'center' ? 'active' : ''}" id="prop-align-center" title="Centre" style="flex: 1;">⬌</button>
+          <button type="button" class="toolbar-btn ${f.textAlign === 'right' ? 'active' : ''}" id="prop-align-right" title="Droite" style="flex: 1;">➡</button>
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Interligne</div>
+        <select class="property-select" id="prop-line-height">
+          <option value="1" ${f.lineHeight === '1' ? 'selected' : ''}>Simple</option>
+          <option value="1.5" ${!f.lineHeight || f.lineHeight === '1.5' ? 'selected' : ''}>1.5</option>
+          <option value="2" ${f.lineHeight === '2' ? 'selected' : ''}>Double</option>
+        </select>
       </div>
     `;
   }
@@ -1433,6 +1476,58 @@ function renderPropertiesPanel() {
   // Taille de police
   document.getElementById('prop-font-size')?.addEventListener('input', (e) => {
     selectedField.fontSize = parseFloat(e.target.value) || 1.2;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Police
+  document.getElementById('prop-font-family')?.addEventListener('change', (e) => {
+    selectedField.fontFamily = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Gras
+  document.getElementById('prop-bold')?.addEventListener('click', () => {
+    selectedField.fontWeight = selectedField.fontWeight === 'bold' ? '' : 'bold';
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Italique
+  document.getElementById('prop-italic')?.addEventListener('click', () => {
+    selectedField.fontStyle = selectedField.fontStyle === 'italic' ? '' : 'italic';
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Souligné
+  document.getElementById('prop-underline')?.addEventListener('click', () => {
+    selectedField.textDecoration = selectedField.textDecoration === 'underline' ? '' : 'underline';
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Alignement
+  document.getElementById('prop-align-left')?.addEventListener('click', () => {
+    selectedField.textAlign = 'left';
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  document.getElementById('prop-align-center')?.addEventListener('click', () => {
+    selectedField.textAlign = 'center';
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  document.getElementById('prop-align-right')?.addEventListener('click', () => {
+    selectedField.textAlign = 'right';
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  // Interligne
+  document.getElementById('prop-line-height')?.addEventListener('change', (e) => {
+    selectedField.lineHeight = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
@@ -2047,8 +2142,13 @@ function renderFormView() {
       titleDiv.style.top = field.y + 'px';
       titleDiv.style.width = field.width + 'px';
       titleDiv.style.fontSize = (field.fontSize || 1.2) + 'em';
-      titleDiv.style.fontWeight = '600';
+      titleDiv.style.fontWeight = field.fontWeight || '600';
       titleDiv.style.color = field.textColor || '#1e293b';
+      if (field.fontFamily) titleDiv.style.fontFamily = field.fontFamily;
+      if (field.fontStyle) titleDiv.style.fontStyle = field.fontStyle;
+      if (field.textDecoration) titleDiv.style.textDecoration = field.textDecoration;
+      if (field.textAlign) titleDiv.style.textAlign = field.textAlign;
+      if (field.lineHeight) titleDiv.style.lineHeight = field.lineHeight;
       if (field.bgColor) {
         titleDiv.style.backgroundColor = field.bgColor;
         titleDiv.style.padding = '8px 12px';
