@@ -123,6 +123,12 @@ grist.onOptions(async function(options) {
     await loadTables();
   } catch (e) {
     console.error('Erreur loadTables:', e);
+    // Si erreur d'accès, afficher un message
+    if (e.message && e.message.includes('Access not granted')) {
+      hideLoading();
+      showToast('Veuillez accorder l\'accès complet au widget dans les paramètres Grist', 'error');
+      return;
+    }
   }
   
   // Si pas de config dans les options du widget, essayer de charger depuis la table
