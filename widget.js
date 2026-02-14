@@ -2156,6 +2156,31 @@ async function loadConfigFromTable(tableId) {
   return null;
 }
 
+// Créer un nouveau formulaire
+async function newForm() {
+  const confirmed = await showConfirm({
+    icon: '📝',
+    title: 'Nouveau formulaire',
+    message: 'Créer un nouveau formulaire ? Le formulaire actuel sera perdu si non sauvegardé.',
+    confirmText: 'Nouveau',
+    cancelText: 'Annuler'
+  });
+  
+  if (confirmed) {
+    formFields = [];
+    selectedField = null;
+    totalPages = 1;
+    currentPage = 1;
+    formTitleInput.value = 'Nouveau formulaire';
+    tableSelect.value = '';
+    currentTable = null;
+    updatePageIndicator();
+    renderFormFields();
+    renderPropertiesPanel();
+    showToast('Nouveau formulaire créé', 'success');
+  }
+}
+
 // Vider le formulaire
 async function clearForm() {
   if (formFields.length === 0) return;
@@ -3351,6 +3376,7 @@ btnModeEdit.addEventListener('click', () => switchMode('edit'));
 btnModeFill.addEventListener('click', () => switchMode('fill'));
 document.getElementById('btn-mode-guide')?.addEventListener('click', () => switchMode('guide'));
 btnSave.addEventListener('click', saveFormConfig);
+document.getElementById('btn-new-form')?.addEventListener('click', newForm);
 btnClear.addEventListener('click', clearForm);
 btnSubmit.addEventListener('click', submitForm);
 btnResetForm.addEventListener('click', resetFormInputs);
