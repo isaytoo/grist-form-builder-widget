@@ -3108,9 +3108,9 @@ function renderTemplatesList() {
           fields: JSON.parse(JSON.stringify(formFields)),
           tableId: currentTable
         };
-        renderTemplatesList();
         saveFormConfig();
-        showToast('Template mis à jour', 'success');
+        closeTemplatesModal();
+        showToast('Template "' + templateName + '" mis à jour', 'success');
       }
     });
   });
