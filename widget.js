@@ -752,8 +752,15 @@ function createFormFieldElement(field) {
       inputHtml = `<input type="${field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}" class="form-field-input" placeholder="${field.placeholder || 'Saisir...'}" readonly>`;
   }
   
-  // Appliquer le style selon la position du label
-  if (field.labelPosition === 'left') {
+  // Appliquer le style selon la position du label et si le label est masqué
+  if (field.hideLabel) {
+    // Label masqué - afficher uniquement le champ
+    fieldEl.innerHTML = `
+      <button class="form-field-delete" title="Supprimer">×</button>
+      ${inputHtml}
+      <div class="form-field-resize"></div>
+    `;
+  } else if (field.labelPosition === 'left') {
     fieldEl.innerHTML = `
       <button class="form-field-delete" title="Supprimer">×</button>
       <div style="display: flex; align-items: center; gap: 10px;">
@@ -1231,16 +1238,28 @@ function renderPropertiesPanel() {
       </div>
     `;
     
-    // Position du label
+    // Masquer le label
     html += `
       <div class="property-group">
-        <div class="property-label">Position du libellé</div>
-        <select class="property-select" id="prop-label-position">
-          <option value="top" ${(f.labelPosition || 'top') === 'top' ? 'selected' : ''}>En haut</option>
-          <option value="left" ${f.labelPosition === 'left' ? 'selected' : ''}>À gauche</option>
-        </select>
+        <label class="property-checkbox">
+          <input type="checkbox" id="prop-hide-label" ${f.hideLabel ? 'checked' : ''}>
+          Masquer le libellé
+        </label>
       </div>
     `;
+    
+    // Position du label (seulement si le label n'est pas masqué)
+    if (!f.hideLabel) {
+      html += `
+        <div class="property-group">
+          <div class="property-label">Position du libellé</div>
+          <select class="property-select" id="prop-label-position">
+            <option value="top" ${(f.labelPosition || 'top') === 'top' ? 'selected' : ''}>En haut</option>
+            <option value="left" ${f.labelPosition === 'left' ? 'selected' : ''}>À gauche</option>
+          </select>
+        </div>
+      `;
+    }
     
     // Validation rules
     html += `
@@ -1507,6 +1526,12 @@ function renderPropertiesPanel() {
   
   document.getElementById('prop-placeholder')?.addEventListener('change', (e) => {
     selectedField.placeholder = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+  
+  document.getElementById('prop-hide-label')?.addEventListener('change', (e) => {
+    selectedField.hideLabel = e.target.checked;
     renderFormFields();
     selectField(selectedField.id);
   });
@@ -2412,8 +2437,14 @@ function renderFormView() {
         inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
     }
     
-    // Appliquer le style selon la position du label
-    if (field.labelPosition === 'left') {
+    // Appliquer le style selon la position du label et si le label est masqué
+    if (field.hideLabel) {
+      // Label masqué - afficher uniquement le champ
+      group.innerHTML = `
+        ${inputHtml}
+        <div class="form-error" id="error-${field.id}"></div>
+      `;
+    } else if (field.labelPosition === 'left') {
       group.innerHTML = `
         <div style="display: flex; align-items: flex-start; gap: 10px;">
           <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 80px; max-width: 40%; padding-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${field.label}</label>
