@@ -80,37 +80,16 @@ grist.ready({
 });
 
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
+// Note: Pour activer la restriction par rôle, définir isOwner = false pour les non-propriétaires
 async function detectUserRole() {
-  try {
-    // Méthode 1: Essayer de sauvegarder les options du widget
-    // Seuls les Owners peuvent modifier les options du widget
-    const testConfig = { _roleTest: Date.now() };
-    await grist.setOptions(testConfig);
-    // Si on arrive ici, l'utilisateur peut modifier les options = Owner
-    isOwner = true;
-    // Restaurer la config originale
-    if (formConfig) {
-      await grist.setOptions(formConfig);
-    }
-  } catch (error) {
-    console.log('Détection rôle - Non propriétaire:', error.message);
-    isOwner = false;
-  }
-  
-  console.log('Rôle détecté:', isOwner ? 'Owner' : 'Editor/Viewer');
+  // Par défaut, tous les utilisateurs ont accès complet
+  // La gestion des rôles peut être activée via les règles d'accès Grist
+  isOwner = true;
   applyRoleRestrictions();
 }
 
 // Appliquer les restrictions selon le rôle
 function applyRoleRestrictions() {
-  const editElements = [
-    btnModeEdit,
-    document.querySelector('.sidebar'),
-    btnSave,
-    btnClear,
-    btnTemplates
-  ];
-  
   if (!isOwner) {
     // Masquer les éléments d'édition pour les non-propriétaires
     btnModeEdit.style.display = 'none';
@@ -122,14 +101,6 @@ function applyRoleRestrictions() {
     
     // Forcer le mode Saisie
     switchMode('fill');
-  } else {
-    // Afficher tous les éléments pour les propriétaires
-    btnModeEdit.style.display = '';
-    document.querySelector('.sidebar')?.classList.remove('hidden');
-    document.querySelector('.properties-panel')?.classList.remove('hidden');
-    btnSave.style.display = '';
-    btnClear.style.display = '';
-    btnTemplates.style.display = '';
   }
 }
 
@@ -143,7 +114,6 @@ grist.onOptions(async function(options) {
   updatePageIndicator();
   
   await loadTables();
-  await detectUserRole();
   
   if (formConfig.title) {
     formTitleInput.value = formConfig.title;
