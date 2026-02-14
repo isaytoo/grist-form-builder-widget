@@ -1631,14 +1631,14 @@ function renderPropertiesPanel() {
   });
   
   // Couleur du texte
-  document.getElementById('prop-text-color')?.addEventListener('input', (e) => {
+  document.getElementById('prop-text-color')?.addEventListener('change', (e) => {
     selectedField.textColor = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
   
   // Couleur de fond
-  document.getElementById('prop-bg-color')?.addEventListener('input', (e) => {
+  document.getElementById('prop-bg-color')?.addEventListener('change', (e) => {
     selectedField.bgColor = e.target.value;
     selectedField.transparent = false;
     renderFormFields();
