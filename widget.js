@@ -337,7 +337,7 @@ function getDefaultLabel(type) {
   const labels = {
     'text': 'Texte', 'textarea': 'Description', 'number': 'Nombre',
     'date': 'Date', 'email': 'Email', 'phone': 'Téléphone',
-    'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code', 'lookup': 'Recherche',
+    'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code', 'lookup': 'Recherche', 'calculated': 'Calcul',
     'select': 'Sélection', 'radio': 'Choix', 'checkbox': 'Options',
     'signature': 'Signature', 'section': 'Section'
   };
@@ -863,6 +863,59 @@ function renderPropertiesPanel() {
     `;
   }
   
+  // Calculated field properties
+  const isCalculated = f.fieldType === 'calculated';
+  if (isCalculated) {
+    const numberFields = formFields.filter(field => 
+      field.id !== f.id && field.fieldType === 'number'
+    );
+    
+    html += `
+      <div class="property-group">
+        <div class="property-label">Type de calcul</div>
+        <select class="property-select" id="prop-calc-type">
+          <option value="sum" ${(f.calcType || 'sum') === 'sum' ? 'selected' : ''}>Somme (A + B)</option>
+          <option value="subtract" ${f.calcType === 'subtract' ? 'selected' : ''}>Soustraction (A - B)</option>
+          <option value="multiply" ${f.calcType === 'multiply' ? 'selected' : ''}>Multiplication (A × B)</option>
+          <option value="divide" ${f.calcType === 'divide' ? 'selected' : ''}>Division (A ÷ B)</option>
+          <option value="percentage" ${f.calcType === 'percentage' ? 'selected' : ''}>Pourcentage (A × B%)</option>
+          <option value="custom" ${f.calcType === 'custom' ? 'selected' : ''}>Formule personnalisée</option>
+        </select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Champ A</div>
+        <select class="property-select" id="prop-calc-field-a">
+          <option value="">-- Sélectionner --</option>
+          ${numberFields.map(field => `<option value="${field.id}" ${f.calcFieldA === field.id ? 'selected' : ''}>${field.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Champ B</div>
+        <select class="property-select" id="prop-calc-field-b">
+          <option value="">-- Sélectionner --</option>
+          <option value="_constant" ${f.calcFieldB === '_constant' ? 'selected' : ''}>Valeur fixe</option>
+          ${numberFields.map(field => `<option value="${field.id}" ${f.calcFieldB === field.id ? 'selected' : ''}>${field.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="property-group" id="calc-constant-group" style="${f.calcFieldB === '_constant' ? '' : 'display: none;'}">
+        <div class="property-label">Valeur fixe</div>
+        <input type="number" class="property-input" id="prop-calc-constant" value="${f.calcConstant || 0}" step="any">
+      </div>
+      <div class="property-group" id="calc-formula-group" style="${f.calcType === 'custom' ? '' : 'display: none;'}">
+        <div class="property-label">Formule (ex: A * B / 100)</div>
+        <input type="text" class="property-input" id="prop-calc-formula" value="${f.calcFormula || ''}" placeholder="A * B">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Décimales</div>
+        <input type="number" class="property-input" id="prop-calc-decimals" value="${f.calcDecimals !== undefined ? f.calcDecimals : 2}" min="0" max="6">
+      </div>
+      <div class="property-group">
+        <div class="property-label">Suffixe (ex: €, %)</div>
+        <input type="text" class="property-input" id="prop-calc-suffix" value="${f.calcSuffix || ''}" placeholder="€">
+      </div>
+    `;
+  }
+  
   // Lookup properties
   const isLookup = f.fieldType === 'lookup';
   if (isLookup) {
@@ -1358,6 +1411,47 @@ function renderPropertiesPanel() {
     selectedField.errorMessage = e.target.value;
   });
   
+  // Calculated field properties
+  document.getElementById('prop-calc-type')?.addEventListener('change', (e) => {
+    selectedField.calcType = e.target.value;
+    const formulaGroup = document.getElementById('calc-formula-group');
+    if (e.target.value === 'custom') {
+      if (formulaGroup) formulaGroup.style.display = '';
+    } else {
+      if (formulaGroup) formulaGroup.style.display = 'none';
+    }
+  });
+  
+  document.getElementById('prop-calc-field-a')?.addEventListener('change', (e) => {
+    selectedField.calcFieldA = e.target.value;
+  });
+  
+  document.getElementById('prop-calc-field-b')?.addEventListener('change', (e) => {
+    selectedField.calcFieldB = e.target.value;
+    const constantGroup = document.getElementById('calc-constant-group');
+    if (e.target.value === '_constant') {
+      if (constantGroup) constantGroup.style.display = '';
+    } else {
+      if (constantGroup) constantGroup.style.display = 'none';
+    }
+  });
+  
+  document.getElementById('prop-calc-constant')?.addEventListener('change', (e) => {
+    selectedField.calcConstant = parseFloat(e.target.value) || 0;
+  });
+  
+  document.getElementById('prop-calc-formula')?.addEventListener('change', (e) => {
+    selectedField.calcFormula = e.target.value;
+  });
+  
+  document.getElementById('prop-calc-decimals')?.addEventListener('change', (e) => {
+    selectedField.calcDecimals = parseInt(e.target.value) || 0;
+  });
+  
+  document.getElementById('prop-calc-suffix')?.addEventListener('change', (e) => {
+    selectedField.calcSuffix = e.target.value;
+  });
+  
   // Lookup properties
   document.getElementById('prop-lookup-table')?.addEventListener('change', (e) => {
     selectedField.lookupTable = e.target.value;
@@ -1792,6 +1886,13 @@ function renderFormView() {
           </div>
         `;
         break;
+      case 'calculated':
+        inputHtml = `
+          <div class="calculated-field" style="padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 1.1em; font-weight: 600; color: #1e293b;">
+            <span id="input-${field.id}">0</span><span class="calc-suffix">${field.calcSuffix || ''}</span>
+          </div>
+        `;
+        break;
       default:
         inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
     }
@@ -1811,8 +1912,91 @@ function renderFormView() {
   // Initialiser les lookups
   initLookupFields();
   
+  // Initialiser les champs calculés
+  initCalculatedFields();
+  
   // Initialiser les conditions
   initConditions();
+}
+
+// Initialiser les champs calculés
+function initCalculatedFields() {
+  if (!formConfig || !formConfig.fields) return;
+  
+  const calculatedFields = formConfig.fields.filter(f => f.fieldType === 'calculated');
+  if (calculatedFields.length === 0) return;
+  
+  // Fonction pour recalculer tous les champs calculés
+  function recalculateAll() {
+    calculatedFields.forEach(field => {
+      const resultEl = document.getElementById(`input-${field.id}`);
+      if (!resultEl) return;
+      
+      let valueA = 0;
+      let valueB = 0;
+      
+      // Obtenir valeur A
+      if (field.calcFieldA) {
+        const inputA = document.getElementById(`input-${field.calcFieldA}`);
+        if (inputA) valueA = parseFloat(inputA.value) || 0;
+      }
+      
+      // Obtenir valeur B
+      if (field.calcFieldB === '_constant') {
+        valueB = field.calcConstant || 0;
+      } else if (field.calcFieldB) {
+        const inputB = document.getElementById(`input-${field.calcFieldB}`);
+        if (inputB) valueB = parseFloat(inputB.value) || 0;
+      }
+      
+      let result = 0;
+      
+      switch (field.calcType || 'sum') {
+        case 'sum':
+          result = valueA + valueB;
+          break;
+        case 'subtract':
+          result = valueA - valueB;
+          break;
+        case 'multiply':
+          result = valueA * valueB;
+          break;
+        case 'divide':
+          result = valueB !== 0 ? valueA / valueB : 0;
+          break;
+        case 'percentage':
+          result = valueA * (valueB / 100);
+          break;
+        case 'custom':
+          try {
+            const formula = (field.calcFormula || 'A + B')
+              .replace(/A/gi, valueA)
+              .replace(/B/gi, valueB);
+            result = eval(formula);
+          } catch (e) {
+            result = 0;
+          }
+          break;
+      }
+      
+      const decimals = field.calcDecimals !== undefined ? field.calcDecimals : 2;
+      resultEl.textContent = result.toFixed(decimals);
+    });
+  }
+  
+  // Écouter les changements sur tous les champs numériques
+  formConfig.fields.forEach(field => {
+    if (field.fieldType === 'number') {
+      const input = document.getElementById(`input-${field.id}`);
+      if (input) {
+        input.addEventListener('input', recalculateAll);
+        input.addEventListener('change', recalculateAll);
+      }
+    }
+  });
+  
+  // Calculer au chargement
+  recalculateAll();
 }
 
 // Initialiser les champs Lookup avec autocomplétion
