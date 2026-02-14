@@ -822,7 +822,7 @@ function createFormFieldElement(field) {
     fieldEl.innerHTML = `
       <button class="form-field-delete" title="Supprimer">×</button>
       <div style="display: flex; align-items: center; gap: 10px;">
-        <div class="form-field-label" style="flex-shrink: 0; margin-bottom: 0; min-width: 80px; max-width: 40%;">${field.label}${field.required ? ' *' : ''}</div>
+        <div class="form-field-label" style="flex-shrink: 0; margin-bottom: 0; min-width: 80px; max-width: 40%;">${field.label}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
         <div style="flex: 1;">${inputHtml}</div>
       </div>
       <div class="form-field-resize"></div>
@@ -830,7 +830,7 @@ function createFormFieldElement(field) {
   } else {
     fieldEl.innerHTML = `
       <button class="form-field-delete" title="Supprimer">×</button>
-      <div class="form-field-label">${field.label}${field.required ? ' *' : ''}</div>
+      <div class="form-field-label">${field.label}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
       ${inputHtml}
       <div class="form-field-resize"></div>
     `;
