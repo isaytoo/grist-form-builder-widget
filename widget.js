@@ -2904,7 +2904,7 @@ function renderTemplatesList() {
   });
 }
 
-function saveTemplate() {
+async function saveTemplate() {
   const name = templateNameInput.value.trim();
   if (!name) {
     showToast('Veuillez entrer un nom', 'error');
@@ -2916,17 +2916,43 @@ function saveTemplate() {
     return;
   }
   
-  templates.push({
-    name: name,
-    date: new Date().toLocaleDateString('fr-FR'),
-    fields: JSON.parse(JSON.stringify(formFields)),
-    tableId: currentTable
-  });
+  // Vérifier si un template avec ce nom existe déjà
+  const existingIndex = templates.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
+  
+  if (existingIndex >= 0) {
+    // Demander confirmation pour écraser
+    const confirmed = await showConfirm(
+      `Le template "${name}" existe déjà. Voulez-vous le remplacer ?`,
+      '📁',
+      'Remplacer'
+    );
+    
+    if (confirmed) {
+      // Remplacer le template existant
+      templates[existingIndex] = {
+        name: name,
+        date: new Date().toLocaleDateString('fr-FR'),
+        fields: JSON.parse(JSON.stringify(formFields)),
+        tableId: currentTable
+      };
+      showToast('Template mis à jour', 'success');
+    } else {
+      return;
+    }
+  } else {
+    // Ajouter un nouveau template
+    templates.push({
+      name: name,
+      date: new Date().toLocaleDateString('fr-FR'),
+      fields: JSON.parse(JSON.stringify(formFields)),
+      tableId: currentTable
+    });
+    showToast('Template sauvegardé', 'success');
+  }
   
   templateNameInput.value = '';
   renderTemplatesList();
   saveFormConfig();
-  showToast('Template sauvegardé', 'success');
 }
 
 // Sauvegarder une version dans l'historique
