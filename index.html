@@ -139,10 +139,13 @@
     .form-image:hover .form-field-resize { opacity: 1; }
     .form-image .form-field-resize::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
     .form-image.selected { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-    .form-title-element { position: absolute; background: transparent; cursor: move; font-size: 1.2em; font-weight: 600; color: #1e293b; padding: 5px; }
+    .form-title-element { position: absolute; background: transparent; cursor: move; font-size: 1.2em; font-weight: 600; color: #1e293b; padding: 5px; min-height: 30px; }
     .form-title-element.selected { outline: 2px solid #3b82f6; }
     .form-title-element-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }
     .form-title-element:hover .form-title-element-delete { display: flex; }
+    .form-title-element .resize-handle { position: absolute; bottom: 0; right: 0; width: 14px; height: 14px; cursor: se-resize; opacity: 0; transition: opacity 0.15s; }
+    .form-title-element .resize-handle::after { content: ''; position: absolute; bottom: 3px; right: 3px; width: 6px; height: 6px; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; }
+    .form-title-element:hover .resize-handle, .form-title-element.selected .resize-handle { opacity: 1; }
     .form-qrcode { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; cursor: move; }
     .form-qrcode.selected { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
     .form-qrcode-delete { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: none; align-items: center; justify-content: center; }

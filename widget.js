@@ -574,16 +574,25 @@ function createTitleElement(field) {
   titleEl.innerHTML = `
     <button class="form-title-element-delete" title="Supprimer">×</button>
     <span>${field.label}</span>
+    <div class="resize-handle" title="Redimensionner"></div>
   `;
   
   titleEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-title-element-delete')) return;
+    if (e.target.classList.contains('resize-handle')) return;
     selectField(field.id);
     startDragField(e, titleEl, field);
   });
   
   titleEl.querySelector('.form-title-element-delete').addEventListener('click', () => {
     deleteField(field.id);
+  });
+  
+  // Resize handle
+  titleEl.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    selectField(field.id);
+    startResizeField(e, titleEl, field);
   });
   
   return titleEl;
