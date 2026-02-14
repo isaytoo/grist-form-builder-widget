@@ -3093,11 +3093,13 @@ function renderTemplatesList() {
         return;
       }
       
-      const confirmed = await showConfirm(
-        `Écraser le template "${templateName}" avec le formulaire actuel ?`,
-        '💾',
-        'Écraser'
-      );
+      const confirmed = await showConfirm({
+        icon: '💾',
+        title: 'Écraser le template',
+        message: `Écraser "${templateName}" avec le formulaire actuel ?`,
+        confirmText: 'Écraser',
+        cancelText: 'Annuler'
+      });
       
       if (confirmed) {
         templates[index] = {
