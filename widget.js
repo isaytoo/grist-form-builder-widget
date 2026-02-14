@@ -2925,10 +2925,18 @@ function updatePageIndicator() {
 // Toggle panneaux latéraux
 sidebarToggle.addEventListener('click', () => {
   sidebar.classList.toggle('collapsed');
+  // Recalculer les règles après la transition
+  if (showRulers) {
+    setTimeout(generateRulerMarks, 350);
+  }
 });
 
 propertiesToggle.addEventListener('click', () => {
   propertiesPanel.classList.toggle('collapsed');
+  // Recalculer les règles après la transition
+  if (showRulers) {
+    setTimeout(generateRulerMarks, 350);
+  }
 });
 
 // Tabs sidebar
