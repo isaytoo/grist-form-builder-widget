@@ -479,6 +479,14 @@ function createImageElement(field) {
   imageEl.style.width = field.width + 'px';
   imageEl.style.height = (field.height || 100) + 'px';
   
+  // Appliquer la couleur de fond
+  if (field.transparent) {
+    imageEl.style.backgroundColor = 'transparent';
+    imageEl.style.border = '1px dashed #cbd5e1';
+  } else if (field.bgColor) {
+    imageEl.style.backgroundColor = field.bgColor;
+  }
+  
   if (field.imageData) {
     imageEl.innerHTML = `
       <button class="form-image-delete" title="Supprimer">×</button>
@@ -647,6 +655,14 @@ function createQRCodeElement(field) {
   qrcodeEl.dataset.fieldId = field.id;
   qrcodeEl.style.left = field.x + 'px';
   qrcodeEl.style.top = field.y + 'px';
+  
+  // Appliquer la couleur de fond
+  if (field.transparent) {
+    qrcodeEl.style.backgroundColor = 'transparent';
+    qrcodeEl.style.border = '1px dashed #cbd5e1';
+  } else if (field.bgColor) {
+    qrcodeEl.style.backgroundColor = field.bgColor;
+  }
   
   const size = field.qrSize || 100;
   const qrContent = field.qrContent || 'https://gristup.fr';
@@ -1174,8 +1190,8 @@ function renderPropertiesPanel() {
     `;
   }
   
-  // Couleur de fond pour les champs de saisie
-  if (!isDecorative) {
+  // Couleur de fond pour les champs de saisie (sauf Section et Titre qui l'ont déjà)
+  if (!isSection && !isTitle) {
     html += `
       <div class="property-group">
         <div class="property-label">Couleur de fond</div>
@@ -2222,6 +2238,12 @@ function renderFormView() {
       imageDiv.style.top = field.y + 'px';
       imageDiv.style.width = field.width + 'px';
       imageDiv.style.height = (field.height || 100) + 'px';
+      // Appliquer la couleur de fond
+      if (field.transparent) {
+        imageDiv.style.backgroundColor = 'transparent';
+      } else if (field.bgColor) {
+        imageDiv.style.backgroundColor = field.bgColor;
+      }
       if (field.imageData) {
         imageDiv.innerHTML = `<img src="${field.imageData}" alt="${field.label}" style="width: 100%; height: 100%; object-fit: contain;">`;
       }
@@ -2263,7 +2285,14 @@ function renderFormView() {
       qrcodeDiv.style.left = field.x + 'px';
       qrcodeDiv.style.top = field.y + 'px';
       qrcodeDiv.style.padding = '8px';
-      qrcodeDiv.style.background = 'white';
+      // Appliquer la couleur de fond
+      if (field.transparent) {
+        qrcodeDiv.style.background = 'transparent';
+      } else if (field.bgColor) {
+        qrcodeDiv.style.background = field.bgColor;
+      } else {
+        qrcodeDiv.style.background = 'white';
+      }
       qrcodeDiv.id = 'qr-view-' + field.id;
       formFieldsView.appendChild(qrcodeDiv);
       
