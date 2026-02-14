@@ -107,6 +107,10 @@ function applyRoleRestrictions() {
 // Flag pour éviter les appels multiples
 let isInitialized = false;
 
+// Vérifier si on est en mode formulaire public (paramètre URL ?mode=form)
+const urlParams = new URLSearchParams(window.location.search);
+const isFormMode = urlParams.get('mode') === 'form';
+
 // Charger les données au démarrage
 grist.onOptions(async function(options) {
   if (isInitialized) return;
@@ -142,6 +146,12 @@ grist.onOptions(async function(options) {
   }
   
   hideLoading();
+  
+  // Si mode formulaire public, forcer le mode saisie et masquer l'édition
+  if (isFormMode) {
+    isOwner = false;
+    applyRoleRestrictions();
+  }
 });
 
 // Charger la liste des tables
@@ -2759,14 +2769,14 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   // Sauvegarder d'abord la configuration
   await saveFormConfig();
   
-  // Générer l'URL du formulaire public
-  const baseUrl = window.location.href.replace('index.html', 'form.html').split('?')[0];
-  const formUrl = baseUrl.endsWith('/') ? baseUrl + 'form.html' : baseUrl.replace(/\/[^\/]*$/, '/form.html');
+  // Générer l'URL du formulaire public (même widget avec ?mode=form)
+  const baseUrl = window.location.href.split('?')[0];
+  const formUrl = baseUrl + '?mode=form';
   
   // Copier dans le presse-papier
   try {
     await navigator.clipboard.writeText(formUrl);
-    showToast('Lien copié ! Partagez-le avec vos utilisateurs.', 'success');
+    showToast('Lien copié ! Ajoutez ce widget dans Grist pour vos utilisateurs.', 'success');
   } catch (e) {
     // Fallback: afficher l'URL dans une alerte
     prompt('Copiez ce lien pour partager le formulaire:', formUrl);
