@@ -110,6 +110,7 @@ let isInitialized = false;
 // Vérifier si on est en mode formulaire public (paramètre URL ?mode=form)
 const urlParams = new URLSearchParams(window.location.search);
 const isFormMode = urlParams.get('mode') === 'form';
+const targetTable = urlParams.get('table'); // Table cible pour le formulaire
 
 // Charger les données au démarrage
 grist.onOptions(async function(options) {
@@ -126,12 +127,15 @@ grist.onOptions(async function(options) {
   
   // Si pas de config dans les options du widget, essayer de charger depuis la table
   if ((!formConfig.fields || formConfig.fields.length === 0) && isFormMode) {
-    // En mode form, chercher la première config disponible dans la table
-    const tableConfig = await loadConfigFromTable('default');
-    if (tableConfig) {
-      formConfig = tableConfig;
+    // En mode form, chercher la config pour la table cible ou la première disponible
+    if (targetTable) {
+      // Charger la config pour la table spécifiée dans l'URL
+      const tableConfig = await loadConfigFromTable(targetTable);
+      if (tableConfig) {
+        formConfig = tableConfig;
+      }
     } else {
-      // Essayer de charger toutes les configs
+      // Pas de table spécifiée, charger la première config disponible
       try {
         const tables = await grist.docApi.listTables();
         if (tables.includes('BM_FormConfig')) {
@@ -2858,17 +2862,22 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     return;
   }
   
+  if (!currentTable) {
+    showToast('Veuillez sélectionner une table', 'error');
+    return;
+  }
+  
   // Sauvegarder d'abord la configuration
   await saveFormConfig();
   
-  // Générer l'URL du formulaire public (même widget avec ?mode=form)
+  // Générer l'URL du formulaire public avec le paramètre table
   const baseUrl = window.location.href.split('?')[0];
-  const formUrl = baseUrl + '?mode=form';
+  const formUrl = `${baseUrl}?mode=form&table=${encodeURIComponent(currentTable)}`;
   
   // Copier dans le presse-papier
   try {
     await navigator.clipboard.writeText(formUrl);
-    showToast('Lien copié ! Ajoutez ce widget dans Grist pour vos utilisateurs.', 'success');
+    showToast(`Lien copié pour "${currentTable}" !`, 'success');
   } catch (e) {
     // Fallback: afficher l'URL dans une alerte
     prompt('Copiez ce lien pour partager le formulaire:', formUrl);
