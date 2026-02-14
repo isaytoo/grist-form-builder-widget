@@ -18,6 +18,8 @@ let draggedData = null;
 let formConfig = null;
 let templates = [];
 let versionHistory = [];
+let currentPage = 1;
+let totalPages = 1;
 let snapToGrid = true;
 let showGrid = true;
 let zoomLevel = 100;
@@ -80,6 +82,10 @@ grist.ready({
 grist.onOptions(async function(options) {
   formConfig = options || {};
   templates = formConfig.templates || [];
+  totalPages = formConfig.totalPages || 1;
+  versionHistory = formConfig.versionHistory || [];
+  currentPage = 1;
+  updatePageIndicator();
   
   await loadTables();
   
@@ -301,6 +307,7 @@ formCanvas.addEventListener('drop', (e) => {
       x: x,
       y: y,
       width: 250,
+      page: currentPage,
       required: false,
       placeholder: '',
       options: [],
@@ -317,6 +324,7 @@ formCanvas.addEventListener('drop', (e) => {
       y: y,
       width: ['section', 'image'].includes(draggedData.elementType) ? 200 : (draggedData.elementType === 'title' ? 300 : 250),
       height: draggedData.elementType === 'section' ? 150 : (draggedData.elementType === 'image' ? 100 : null),
+      page: currentPage,
       imageData: null,
       fontSize: draggedData.elementType === 'title' ? 1.2 : null,
       required: false,
@@ -351,9 +359,12 @@ function renderFormFields() {
   const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element, .form-qrcode');
   existingFields.forEach(f => f.remove());
   
-  emptyMessage.style.display = formFields.length === 0 ? 'block' : 'none';
+  // Filtrer les champs de la page courante
+  const pageFields = formFields.filter(f => (f.page || 1) === currentPage);
   
-  formFields.forEach(field => {
+  emptyMessage.style.display = pageFields.length === 0 ? 'block' : 'none';
+  
+  pageFields.forEach(field => {
     if (field.fieldType === 'section') {
       const sectionEl = createSectionElement(field);
       formCanvas.appendChild(sectionEl);
@@ -1093,6 +1104,19 @@ function renderPropertiesPanel() {
     }
   }
   
+  // Page du champ
+  if (totalPages > 1) {
+    const pageOptions = Array.from({length: totalPages}, (_, i) => i + 1)
+      .map(p => `<option value="${p}" ${(f.page || 1) === p ? 'selected' : ''}>Page ${p}</option>`)
+      .join('');
+    html += `
+      <div class="property-group">
+        <div class="property-label">Page</div>
+        <select class="property-select" id="prop-page">${pageOptions}</select>
+      </div>
+    `;
+  }
+  
   // Ordre d'affichage (z-index)
   html += `
     <div class="property-group">
@@ -1354,6 +1378,15 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
+  // Changer de page
+  document.getElementById('prop-page')?.addEventListener('change', (e) => {
+    selectedField.page = parseInt(e.target.value);
+    renderFormFields();
+    selectedField = null;
+    renderPropertiesPanel();
+    showToast('Champ déplacé vers la page ' + e.target.value, 'success');
+  });
+  
   // Ordre d'affichage
   document.getElementById('btn-bring-front')?.addEventListener('click', () => {
     bringToFront(selectedField.id);
@@ -1604,7 +1637,9 @@ async function saveFormConfig() {
     tableId: currentTable,
     fields: formFields,
     title: formTitleInput.value || 'Formulaire ' + currentTable,
-    templates: templates
+    templates: templates,
+    totalPages: totalPages,
+    versionHistory: versionHistory.slice(0, 10) // Garder les 10 dernières versions
   };
   
   try {
@@ -2752,6 +2787,38 @@ btnZoomFit.addEventListener('click', () => {
     generateRulerMarks();
   }
 });
+
+// Gestion des pages
+document.getElementById('btn-prev-page')?.addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage--;
+    updatePageIndicator();
+    renderFormFields();
+  }
+});
+
+document.getElementById('btn-next-page')?.addEventListener('click', () => {
+  if (currentPage < totalPages) {
+    currentPage++;
+    updatePageIndicator();
+    renderFormFields();
+  }
+});
+
+document.getElementById('btn-add-page')?.addEventListener('click', () => {
+  totalPages++;
+  currentPage = totalPages;
+  updatePageIndicator();
+  renderFormFields();
+  showToast(`Page ${totalPages} ajoutée`, 'success');
+});
+
+function updatePageIndicator() {
+  const indicator = document.getElementById('page-indicator');
+  if (indicator) {
+    indicator.textContent = `${currentPage} / ${totalPages}`;
+  }
+}
 
 // Toggle panneaux latéraux
 sidebarToggle.addEventListener('click', () => {
