@@ -136,30 +136,42 @@ grist.onOptions(async function(options) {
     }
   }
   
-  // Si pas de config dans les options du widget, essayer de charger depuis la table
-  if (!formConfig.fields || formConfig.fields.length === 0) {
-    // Chercher la config pour la table cible ou la première disponible
-    if (targetTable) {
-      // Charger la config pour la table spécifiée dans l'URL
-      const tableConfig = await loadConfigFromTable(targetTable);
-      if (tableConfig) {
-        formConfig = tableConfig;
-      }
-    } else {
-      // Pas de table spécifiée, charger la première config disponible
-      try {
-        const tables = await grist.docApi.listTables();
-        if (tables.includes('BM_FormConfig')) {
-          const data = await grist.docApi.fetchTable('BM_FormConfig');
-          if (data.ConfigData && data.ConfigData.length > 0) {
-            // Charger la config la plus récente
+  // Toujours essayer de charger depuis la table BM_FormConfig (source de vérité)
+  try {
+    const tables = await grist.docApi.listTables();
+    if (tables.includes('BM_FormConfig')) {
+      const data = await grist.docApi.fetchTable('BM_FormConfig');
+      if (data.ConfigData && data.ConfigData.length > 0) {
+        // Si une table cible est spécifiée, chercher sa config
+        if (targetTable) {
+          const configKey = 'form_' + targetTable;
+          const index = data.ConfigKey?.findIndex(k => k === configKey);
+          if (index !== undefined && index >= 0) {
+            formConfig = JSON.parse(data.ConfigData[index]);
+          }
+        } else {
+          // Sinon, charger la config la plus récente ou celle des options
+          const optionsTableId = formConfig.tableId;
+          if (optionsTableId) {
+            const configKey = 'form_' + optionsTableId;
+            const index = data.ConfigKey?.findIndex(k => k === configKey);
+            if (index !== undefined && index >= 0) {
+              formConfig = JSON.parse(data.ConfigData[index]);
+            }
+          } else {
+            // Charger la dernière config disponible
             formConfig = JSON.parse(data.ConfigData[data.ConfigData.length - 1]);
           }
         }
-      } catch (e) {
-        console.log('Pas de config trouvée dans la table');
       }
     }
+  } catch (e) {
+    console.log('Pas de config trouvée dans la table BM_FormConfig');
+  }
+  
+  // Fallback sur les options du widget si pas de config dans la table
+  if ((!formConfig.fields || formConfig.fields.length === 0) && options && options.fields) {
+    formConfig = options;
   }
   
   templates = formConfig.templates || [];
