@@ -1854,17 +1854,27 @@ async function clearForm() {
 
 // Basculer entre les modes
 function switchMode(mode) {
+  const guideView = document.getElementById('guide-view');
+  const btnModeGuide = document.getElementById('btn-mode-guide');
+  
+  // Réinitialiser tous les états
+  editorView.classList.add('hidden');
+  formView.classList.remove('active');
+  guideView?.classList.remove('active');
+  btnModeEdit.classList.remove('active');
+  btnModeFill.classList.remove('active');
+  btnModeGuide?.classList.remove('active');
+  
   if (mode === 'edit') {
     editorView.classList.remove('hidden');
-    formView.classList.remove('active');
     btnModeEdit.classList.add('active');
-    btnModeFill.classList.remove('active');
-  } else {
-    editorView.classList.add('hidden');
+  } else if (mode === 'fill') {
     formView.classList.add('active');
-    btnModeEdit.classList.remove('active');
     btnModeFill.classList.add('active');
     renderFormView();
+  } else if (mode === 'guide') {
+    guideView?.classList.add('active');
+    btnModeGuide?.classList.add('active');
   }
 }
 
@@ -2855,6 +2865,7 @@ tableSelect.addEventListener('change', (e) => loadTableColumns(e.target.value));
 
 btnModeEdit.addEventListener('click', () => switchMode('edit'));
 btnModeFill.addEventListener('click', () => switchMode('fill'));
+document.getElementById('btn-mode-guide')?.addEventListener('click', () => switchMode('guide'));
 btnSave.addEventListener('click', saveFormConfig);
 btnClear.addEventListener('click', clearForm);
 btnSubmit.addEventListener('click', submitForm);
