@@ -3065,11 +3065,12 @@ function renderTemplatesList() {
   }
   
   templatesList.innerHTML = templates.map((t, i) => `
-    <div class="template-item" data-index="${i}" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="template-item" data-index="${i}" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
       <div style="cursor: pointer; flex: 1;" class="template-load">
         <div class="template-name">${t.name}</div>
         <div class="template-date">${t.date}</div>
       </div>
+      <button class="template-overwrite" data-index="${i}" title="Écraser avec le formulaire actuel" style="background: #dbeafe; color: #2563eb; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8em;">💾</button>
       <button class="template-delete" data-index="${i}" title="Supprimer" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8em;">🗑️</button>
     </div>
   `).join('');
@@ -3078,6 +3079,37 @@ function renderTemplatesList() {
     item.addEventListener('click', () => {
       const index = parseInt(item.parentElement.dataset.index);
       loadTemplate(index);
+    });
+  });
+  
+  templatesList.querySelectorAll('.template-overwrite').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.dataset.index);
+      const templateName = templates[index].name;
+      
+      if (formFields.length === 0) {
+        showToast('Aucun champ à sauvegarder', 'error');
+        return;
+      }
+      
+      const confirmed = await showConfirm(
+        `Écraser le template "${templateName}" avec le formulaire actuel ?`,
+        '💾',
+        'Écraser'
+      );
+      
+      if (confirmed) {
+        templates[index] = {
+          name: templateName,
+          date: new Date().toLocaleDateString('fr-FR'),
+          fields: JSON.parse(JSON.stringify(formFields)),
+          tableId: currentTable
+        };
+        renderTemplatesList();
+        saveFormConfig();
+        showToast('Template mis à jour', 'success');
+      }
     });
   });
   
