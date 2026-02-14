@@ -3,7 +3,7 @@
 
 /**
  * Grist Form Builder Pro Widget
- * Copyright 2026 Said Hamadou
+ * Copyright 2026 Said Hamadou (isaytoo)
  * Licensed under the Apache License, Version 2.0
  * https://github.com/isaytoo/grist-form-builder-widget
  */
