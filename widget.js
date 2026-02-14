@@ -20,6 +20,7 @@ let templates = [];
 let versionHistory = [];
 let currentPage = 1;
 let totalPages = 1;
+let isOwner = false;
 let snapToGrid = true;
 let showGrid = true;
 let zoomLevel = 100;
@@ -78,6 +79,60 @@ grist.ready({
   allowSelectBy: true
 });
 
+// Détecter si l'utilisateur est propriétaire (peut modifier la structure)
+async function detectUserRole() {
+  try {
+    // Méthode 1: Essayer de sauvegarder les options du widget
+    // Seuls les Owners peuvent modifier les options du widget
+    const testConfig = { _roleTest: Date.now() };
+    await grist.setOptions(testConfig);
+    // Si on arrive ici, l'utilisateur peut modifier les options = Owner
+    isOwner = true;
+    // Restaurer la config originale
+    if (formConfig) {
+      await grist.setOptions(formConfig);
+    }
+  } catch (error) {
+    console.log('Détection rôle - Non propriétaire:', error.message);
+    isOwner = false;
+  }
+  
+  console.log('Rôle détecté:', isOwner ? 'Owner' : 'Editor/Viewer');
+  applyRoleRestrictions();
+}
+
+// Appliquer les restrictions selon le rôle
+function applyRoleRestrictions() {
+  const editElements = [
+    btnModeEdit,
+    document.querySelector('.sidebar'),
+    btnSave,
+    btnClear,
+    btnTemplates
+  ];
+  
+  if (!isOwner) {
+    // Masquer les éléments d'édition pour les non-propriétaires
+    btnModeEdit.style.display = 'none';
+    document.querySelector('.sidebar')?.classList.add('hidden');
+    document.querySelector('.properties-panel')?.classList.add('hidden');
+    btnSave.style.display = 'none';
+    btnClear.style.display = 'none';
+    btnTemplates.style.display = 'none';
+    
+    // Forcer le mode Saisie
+    switchMode('fill');
+  } else {
+    // Afficher tous les éléments pour les propriétaires
+    btnModeEdit.style.display = '';
+    document.querySelector('.sidebar')?.classList.remove('hidden');
+    document.querySelector('.properties-panel')?.classList.remove('hidden');
+    btnSave.style.display = '';
+    btnClear.style.display = '';
+    btnTemplates.style.display = '';
+  }
+}
+
 // Charger les données au démarrage
 grist.onOptions(async function(options) {
   formConfig = options || {};
@@ -88,6 +143,7 @@ grist.onOptions(async function(options) {
   updatePageIndicator();
   
   await loadTables();
+  await detectUserRole();
   
   if (formConfig.title) {
     formTitleInput.value = formConfig.title;
