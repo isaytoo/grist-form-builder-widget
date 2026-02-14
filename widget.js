@@ -1964,11 +1964,24 @@ function renderFormView() {
         inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
     }
     
-    group.innerHTML = `
-      <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${field.label}</label>
-      ${inputHtml}
-      <div class="form-error" id="error-${field.id}"></div>
-    `;
+    // Appliquer le style selon la position du label
+    if (field.labelPosition === 'left') {
+      group.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+          <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 80px; max-width: 40%; padding-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${field.label}</label>
+          <div style="flex: 1;">
+            ${inputHtml}
+            <div class="form-error" id="error-${field.id}"></div>
+          </div>
+        </div>
+      `;
+    } else {
+      group.innerHTML = `
+        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${field.label}</label>
+        ${inputHtml}
+        <div class="form-error" id="error-${field.id}"></div>
+      `;
+    }
     
     formFieldsView.appendChild(group);
   });
