@@ -389,6 +389,46 @@
     </div>
   </div>
   
+  <div class="modal-overlay hidden" id="modal-share">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-title">🔗 Partager le formulaire</div>
+      <div style="text-align: center; padding: 15px 0;">
+        <div style="font-size: 3em; margin-bottom: 10px;">🎉</div>
+        <p style="font-size: 1em; color: #1e293b; font-weight: 600; margin-bottom: 5px;">Votre formulaire est prêt à être partagé !</p>
+        <p style="font-size: 0.85em; color: #64748b; margin-bottom: 20px;">Suivez les étapes ci-dessous pour le mettre à disposition de vos utilisateurs.</p>
+      </div>
+      
+      <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">📋 Étape 1 : Copiez le lien</div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="share-url" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8em; background: white; font-family: monospace;">
+          <button class="btn btn-primary" id="btn-copy-url" style="padding: 10px 15px;">📋 Copier</button>
+        </div>
+      </div>
+      
+      <div style="background: #eff6ff; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">🔧 Étape 2 : Ajoutez le widget dans Grist</div>
+        <ol style="font-size: 0.85em; color: #475569; padding-left: 18px; margin: 0; line-height: 1.8;">
+          <li>Ouvrez votre document Grist</li>
+          <li>Cliquez sur <strong>+ Ajouter un widget</strong></li>
+          <li>Choisissez <strong>Widget personnalisé</strong></li>
+          <li>Collez l'URL copiée ci-dessus</li>
+          <li>Dans le panneau de droite, accordez <strong>l'accès complet</strong></li>
+        </ol>
+      </div>
+      
+      <div style="background: #fef3c7; border-radius: 8px; padding: 12px 15px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+        <div style="font-size: 0.85em; color: #92400e;">
+          <strong>💡 Astuce :</strong> Les utilisateurs ne verront que le formulaire de saisie, sans accès à l'édition.
+        </div>
+      </div>
+      
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btn-close-share">Fermer</button>
+      </div>
+    </div>
+  </div>
+  
   <div class="modal-overlay hidden" id="modal-templates">
     <div class="modal">
       <div class="modal-title">📁 Templates</div>

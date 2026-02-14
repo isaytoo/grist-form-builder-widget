@@ -2880,13 +2880,46 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   const baseUrl = window.location.href.split('?')[0];
   const formUrl = `${baseUrl}?mode=form&table=${encodeURIComponent(currentTable)}`;
   
-  // Copier dans le presse-papier
-  try {
-    await navigator.clipboard.writeText(formUrl);
-    showToast(`Lien copié pour "${currentTable}" !`, 'success');
-  } catch (e) {
-    // Fallback: afficher l'URL dans une alerte
-    prompt('Copiez ce lien pour partager le formulaire:', formUrl);
+  // Afficher la modale de partage
+  const shareModal = document.getElementById('modal-share');
+  const shareUrlInput = document.getElementById('share-url');
+  
+  if (shareModal && shareUrlInput) {
+    shareUrlInput.value = formUrl;
+    shareModal.classList.remove('hidden');
+  }
+});
+
+// Copier l'URL de partage
+document.getElementById('btn-copy-url')?.addEventListener('click', async () => {
+  const shareUrlInput = document.getElementById('share-url');
+  if (shareUrlInput) {
+    try {
+      await navigator.clipboard.writeText(shareUrlInput.value);
+      const btn = document.getElementById('btn-copy-url');
+      btn.innerHTML = '✅ Copié !';
+      btn.style.background = '#10b981';
+      setTimeout(() => {
+        btn.innerHTML = '📋 Copier';
+        btn.style.background = '';
+      }, 2000);
+    } catch (e) {
+      shareUrlInput.select();
+      document.execCommand('copy');
+      showToast('Lien copié !', 'success');
+    }
+  }
+});
+
+// Fermer la modale de partage
+document.getElementById('btn-close-share')?.addEventListener('click', () => {
+  document.getElementById('modal-share')?.classList.add('hidden');
+});
+
+// Fermer la modale en cliquant sur l'overlay
+document.getElementById('modal-share')?.addEventListener('click', (e) => {
+  if (e.target.id === 'modal-share') {
+    e.target.classList.add('hidden');
   }
 });
 
