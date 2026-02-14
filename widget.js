@@ -1883,6 +1883,45 @@ function switchMode(mode) {
   }
 }
 
+// Afficher la navigation entre pages dans le mode saisie
+function renderFormViewPageNav() {
+  // Supprimer l'ancienne navigation si elle existe
+  const existingNav = document.getElementById('form-view-page-nav');
+  if (existingNav) existingNav.remove();
+  
+  // Ne pas afficher si une seule page
+  if (totalPages <= 1) return;
+  
+  const nav = document.createElement('div');
+  nav.id = 'form-view-page-nav';
+  nav.style.cssText = 'display: flex; justify-content: center; align-items: center; gap: 15px; padding: 15px; background: white; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);';
+  
+  nav.innerHTML = `
+    <button id="form-view-prev" class="btn btn-secondary" style="padding: 8px 16px;" ${currentPage === 1 ? 'disabled' : ''}>◀ Précédent</button>
+    <span style="font-weight: 600; color: #475569;">Page ${currentPage} / ${totalPages}</span>
+    <button id="form-view-next" class="btn btn-primary" style="padding: 8px 16px;" ${currentPage === totalPages ? 'disabled' : ''}>Suivant ▶</button>
+  `;
+  
+  // Insérer avant le canvas
+  const canvasView = document.getElementById('form-canvas-view');
+  canvasView.parentNode.insertBefore(nav, canvasView);
+  
+  // Event listeners
+  document.getElementById('form-view-prev')?.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderFormView();
+    }
+  });
+  
+  document.getElementById('form-view-next')?.addEventListener('click', () => {
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderFormView();
+    }
+  });
+}
+
 // Évaluer et appliquer les conditions d'affichage
 function evaluateConditions() {
   if (!formConfig || !formConfig.fields) return;
@@ -1954,9 +1993,12 @@ function renderFormView() {
   
   formFieldsView.innerHTML = '';
   
+  // Filtrer les champs de la page courante
+  const pageFields = formConfig.fields.filter(f => (f.page || 1) === currentPage);
+  
   // Calculer la hauteur minimale du canvas
   let maxY = 297; // A4 height in mm (converted to approximate px later)
-  formConfig.fields.forEach(field => {
+  pageFields.forEach(field => {
     const fieldBottom = field.y + (field.height || 80);
     if (fieldBottom > maxY) maxY = fieldBottom;
   });
@@ -1964,7 +2006,10 @@ function renderFormView() {
   const canvasView = document.getElementById('form-canvas-view');
   canvasView.style.minHeight = Math.max(maxY + 100, 800) + 'px';
   
-  formConfig.fields.forEach(field => {
+  // Afficher la navigation si plusieurs pages
+  renderFormViewPageNav();
+  
+  pageFields.forEach(field => {
     if (field.fieldType === 'section') {
       const sectionDiv = document.createElement('div');
       sectionDiv.className = 'form-section-view';
