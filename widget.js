@@ -891,6 +891,71 @@ function renderPropertiesPanel() {
         <input type="text" class="property-input" id="prop-placeholder" value="${f.placeholder || ''}">
       </div>
     `;
+    
+    // Validation rules
+    html += `
+      <div class="property-group" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
+        <div class="property-label" style="font-weight: 600; color: #1e293b;">Validation</div>
+      </div>
+      <div class="property-group">
+        <label class="property-checkbox">
+          <input type="checkbox" id="prop-required" ${f.required ? 'checked' : ''}>
+          Champ obligatoire
+        </label>
+      </div>
+    `;
+    
+    // Min/Max for number fields
+    if (f.fieldType === 'number') {
+      html += `
+        <div class="property-group">
+          <div class="property-label">Valeur minimum</div>
+          <input type="number" class="property-input" id="prop-min" value="${f.minValue !== undefined ? f.minValue : ''}">
+        </div>
+        <div class="property-group">
+          <div class="property-label">Valeur maximum</div>
+          <input type="number" class="property-input" id="prop-max" value="${f.maxValue !== undefined ? f.maxValue : ''}">
+        </div>
+      `;
+    }
+    
+    // Min/Max length for text fields
+    if (['text', 'textarea', 'email', 'phone'].includes(f.fieldType)) {
+      html += `
+        <div class="property-group">
+          <div class="property-label">Longueur min</div>
+          <input type="number" class="property-input" id="prop-min-length" value="${f.minLength || ''}" min="0">
+        </div>
+        <div class="property-group">
+          <div class="property-label">Longueur max</div>
+          <input type="number" class="property-input" id="prop-max-length" value="${f.maxLength || ''}" min="0">
+        </div>
+      `;
+    }
+    
+    // Regex pattern
+    if (['text', 'phone'].includes(f.fieldType)) {
+      html += `
+        <div class="property-group">
+          <div class="property-label">Format (regex)</div>
+          <select class="property-select" id="prop-pattern-preset">
+            <option value="">-- Personnalisé --</option>
+            <option value="phone-fr" ${f.patternPreset === 'phone-fr' ? 'selected' : ''}>Téléphone FR (0X XX XX XX XX)</option>
+            <option value="postal-fr" ${f.patternPreset === 'postal-fr' ? 'selected' : ''}>Code postal FR (5 chiffres)</option>
+            <option value="siret" ${f.patternPreset === 'siret' ? 'selected' : ''}>SIRET (14 chiffres)</option>
+            <option value="custom" ${f.patternPreset === 'custom' ? 'selected' : ''}>Regex personnalisé</option>
+          </select>
+        </div>
+        <div class="property-group" id="custom-pattern-group" style="${f.patternPreset === 'custom' ? '' : 'display: none;'}">
+          <div class="property-label">Regex personnalisé</div>
+          <input type="text" class="property-input" id="prop-pattern" value="${f.pattern || ''}" placeholder="^[A-Z]{2}[0-9]{3}$">
+        </div>
+        <div class="property-group">
+          <div class="property-label">Message d'erreur</div>
+          <input type="text" class="property-input" id="prop-error-message" value="${f.errorMessage || ''}" placeholder="Format invalide">
+        </div>
+      `;
+    }
   }
   
   // Ordre d'affichage (z-index)
@@ -1165,8 +1230,53 @@ function renderPropertiesPanel() {
   
   document.getElementById('prop-required')?.addEventListener('change', (e) => {
     selectedField.required = e.target.checked;
-    renderFormFields();
-    selectField(selectedField.id);
+  });
+  
+  // Min/Max for numbers
+  document.getElementById('prop-min')?.addEventListener('change', (e) => {
+    selectedField.minValue = e.target.value !== '' ? parseFloat(e.target.value) : undefined;
+  });
+  
+  document.getElementById('prop-max')?.addEventListener('change', (e) => {
+    selectedField.maxValue = e.target.value !== '' ? parseFloat(e.target.value) : undefined;
+  });
+  
+  // Min/Max length for text
+  document.getElementById('prop-min-length')?.addEventListener('change', (e) => {
+    selectedField.minLength = e.target.value !== '' ? parseInt(e.target.value) : undefined;
+  });
+  
+  document.getElementById('prop-max-length')?.addEventListener('change', (e) => {
+    selectedField.maxLength = e.target.value !== '' ? parseInt(e.target.value) : undefined;
+  });
+  
+  // Pattern preset
+  document.getElementById('prop-pattern-preset')?.addEventListener('change', (e) => {
+    selectedField.patternPreset = e.target.value;
+    const customGroup = document.getElementById('custom-pattern-group');
+    
+    const patterns = {
+      'phone-fr': '^0[1-9]([ .-]?[0-9]{2}){4}$',
+      'postal-fr': '^[0-9]{5}$',
+      'siret': '^[0-9]{14}$'
+    };
+    
+    if (e.target.value === 'custom') {
+      if (customGroup) customGroup.style.display = '';
+    } else {
+      if (customGroup) customGroup.style.display = 'none';
+      selectedField.pattern = patterns[e.target.value] || '';
+    }
+  });
+  
+  // Custom pattern
+  document.getElementById('prop-pattern')?.addEventListener('change', (e) => {
+    selectedField.pattern = e.target.value;
+  });
+  
+  // Error message
+  document.getElementById('prop-error-message')?.addEventListener('change', (e) => {
+    selectedField.errorMessage = e.target.value;
   });
   
   document.getElementById('prop-column')?.addEventListener('change', (e) => {
@@ -1659,40 +1769,47 @@ async function submitForm() {
       }
     }
     
-    // Validation personnalisée
-    if (value && field.validation?.type) {
-      let isValid = true;
-      let errorMsg = '';
-      
-      switch (field.validation.type) {
-        case 'email':
-          isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-          errorMsg = 'Email invalide';
-          break;
-        case 'phone':
-          isValid = /^[\d\s\+\-\(\)]{10,}$/.test(value);
-          errorMsg = 'Téléphone invalide';
-          break;
-        case 'min':
-          isValid = parseFloat(value) >= parseFloat(field.validation.value);
-          errorMsg = `Valeur minimum: ${field.validation.value}`;
-          break;
-        case 'max':
-          isValid = parseFloat(value) <= parseFloat(field.validation.value);
-          errorMsg = `Valeur maximum: ${field.validation.value}`;
-          break;
-        case 'regex':
-          try {
-            isValid = new RegExp(field.validation.value).test(value);
-            errorMsg = 'Format invalide';
-          } catch (e) {
-            isValid = true;
-          }
-          break;
+    // Validation min/max pour les nombres
+    if (value !== null && field.fieldType === 'number') {
+      if (field.minValue !== undefined && parseFloat(value) < field.minValue) {
+        if (errorEl) errorEl.textContent = `Valeur minimum: ${field.minValue}`;
+        hasError = true;
       }
-      
-      if (!isValid) {
-        if (errorEl) errorEl.textContent = errorMsg;
+      if (field.maxValue !== undefined && parseFloat(value) > field.maxValue) {
+        if (errorEl) errorEl.textContent = `Valeur maximum: ${field.maxValue}`;
+        hasError = true;
+      }
+    }
+    
+    // Validation longueur pour les textes
+    if (value && typeof value === 'string') {
+      if (field.minLength && value.length < field.minLength) {
+        if (errorEl) errorEl.textContent = `Minimum ${field.minLength} caractères`;
+        hasError = true;
+      }
+      if (field.maxLength && value.length > field.maxLength) {
+        if (errorEl) errorEl.textContent = `Maximum ${field.maxLength} caractères`;
+        hasError = true;
+      }
+    }
+    
+    // Validation regex/pattern
+    if (value && field.pattern) {
+      try {
+        const regex = new RegExp(field.pattern);
+        if (!regex.test(value)) {
+          if (errorEl) errorEl.textContent = field.errorMessage || 'Format invalide';
+          hasError = true;
+        }
+      } catch (e) {
+        // Regex invalide, ignorer
+      }
+    }
+    
+    // Validation email
+    if (value && field.fieldType === 'email') {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        if (errorEl) errorEl.textContent = 'Email invalide';
         hasError = true;
       }
     }
