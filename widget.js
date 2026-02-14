@@ -1900,3 +1900,10 @@ workspace.addEventListener('scroll', () => {
     generateRulerMarks();
   }
 });
+
+// Mettre à jour les règles lors du redimensionnement de la fenêtre
+window.addEventListener('resize', () => {
+  if (showRulers) {
+    generateRulerMarks();
+  }
+});
