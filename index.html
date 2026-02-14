@@ -332,6 +332,11 @@
         <input type="text" class="property-input" id="template-name" placeholder="Mon formulaire">
       </div>
       <button class="btn btn-primary" id="btn-save-template" style="width: 100%; margin-bottom: 20px;">💾 Sauvegarder</button>
+      <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <button class="btn btn-secondary" id="btn-export-template" style="flex: 1;">📤 Exporter JSON</button>
+        <button class="btn btn-secondary" id="btn-import-template" style="flex: 1;">📥 Importer JSON</button>
+        <input type="file" id="import-file" accept=".json" style="display: none;">
+      </div>
       <div class="property-label">Templates enregistrés</div>
       <div class="templates-list" id="templates-list"><p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun template</p></div>
       <div class="modal-actions"><button class="btn btn-secondary" id="btn-close-templates">Fermer</button></div>

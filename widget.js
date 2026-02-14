@@ -57,6 +57,9 @@ const propertiesPanel = document.getElementById('properties-panel');
 const btnTemplates = document.getElementById('btn-templates');
 const btnExportPdf = document.getElementById('btn-export-pdf');
 const btnSaveTemplate = document.getElementById('btn-save-template');
+const btnExportTemplate = document.getElementById('btn-export-template');
+const btnImportTemplate = document.getElementById('btn-import-template');
+const importFile = document.getElementById('import-file');
 const btnCloseTemplates = document.getElementById('btn-close-templates');
 
 // Tabs sidebar
@@ -1791,6 +1794,72 @@ btnExportPdf.addEventListener('click', exportPdf);
 btnTemplates.addEventListener('click', openTemplatesModal);
 btnSaveTemplate.addEventListener('click', saveTemplate);
 btnCloseTemplates.addEventListener('click', closeTemplatesModal);
+
+// Export template JSON
+btnExportTemplate.addEventListener('click', () => {
+  const templateData = {
+    name: formConfig.title || 'Mon formulaire',
+    version: '1.0',
+    exportDate: new Date().toISOString(),
+    fields: formFields,
+    config: {
+      title: formConfig.title,
+      tableId: selectedTableId
+    }
+  };
+  
+  const jsonStr = JSON.stringify(templateData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${formConfig.title || 'template'}_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  showToast('Template exporté !', 'success');
+});
+
+// Import template JSON
+btnImportTemplate.addEventListener('click', () => {
+  importFile.click();
+});
+
+importFile.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const templateData = JSON.parse(event.target.result);
+      
+      if (!templateData.fields || !Array.isArray(templateData.fields)) {
+        showToast('Format de template invalide', 'error');
+        return;
+      }
+      
+      formFields = templateData.fields;
+      if (templateData.config) {
+        formConfig.title = templateData.config.title || '';
+        document.getElementById('form-title-input').value = formConfig.title;
+      }
+      
+      renderFormFields();
+      showToast(`Template "${templateData.name}" importé !`, 'success');
+      closeTemplatesModal();
+    } catch (err) {
+      showToast('Erreur lors de l\'import: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  
+  // Reset input pour permettre de réimporter le même fichier
+  importFile.value = '';
+});
 
 // Grille et snap
 btnGrid.addEventListener('click', () => {
