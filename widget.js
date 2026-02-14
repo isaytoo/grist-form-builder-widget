@@ -573,15 +573,55 @@ function createTitleElement(field) {
   
   titleEl.innerHTML = `
     <button class="form-title-element-delete" title="Supprimer">×</button>
-    <span>${field.label}</span>
+    <span contenteditable="true" spellcheck="false">${field.label}</span>
     <div class="resize-handle" title="Redimensionner"></div>
   `;
+  
+  const textSpan = titleEl.querySelector('span');
   
   titleEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-title-element-delete')) return;
     if (e.target.classList.contains('resize-handle')) return;
+    if (e.target === textSpan && titleEl.classList.contains('selected')) return; // Allow text editing when selected
     selectField(field.id);
-    startDragField(e, titleEl, field);
+    if (e.target !== textSpan) {
+      startDragField(e, titleEl, field);
+    }
+  });
+  
+  // Double-click to edit text
+  titleEl.addEventListener('dblclick', (e) => {
+    if (e.target === textSpan || e.target.closest('span[contenteditable]')) {
+      textSpan.focus();
+      // Select all text
+      const range = document.createRange();
+      range.selectNodeContents(textSpan);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  });
+  
+  // Save text on blur
+  textSpan.addEventListener('blur', () => {
+    field.label = textSpan.textContent || 'Texte';
+    // Update properties panel if this field is selected
+    if (selectedField && selectedField.id === field.id) {
+      const labelInput = document.getElementById('prop-label');
+      if (labelInput) labelInput.value = field.label;
+    }
+  });
+  
+  // Prevent Enter from creating new lines, save instead
+  textSpan.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      textSpan.blur();
+    }
+    if (e.key === 'Escape') {
+      textSpan.textContent = field.label;
+      textSpan.blur();
+    }
   });
   
   titleEl.querySelector('.form-title-element-delete').addEventListener('click', () => {
