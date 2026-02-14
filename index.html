@@ -58,9 +58,9 @@
     .field-type { font-size: 0.7em; color: #94a3b8; background: #f1f5f9; padding: 2px 5px; border-radius: 3px; }
     .elements-category { margin-bottom: 12px; }
     .elements-category-title { font-size: 0.7em; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px; padding-left: 2px; }
-    .workspace { flex: 1; padding: 20px; overflow: auto; background: #e2e8f0; position: relative; }
-    .workspace-inner { display: flex; justify-content: center; min-width: fit-content; padding: 0 50px 50px 50px; }
-    .workspace-toolbar { position: sticky; top: 0; left: 0; right: 0; background: white; border-radius: 0; padding: 8px 15px; display: flex; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 10; justify-content: center; margin: -20px -20px 20px -20px; width: calc(100% + 40px); }
+    .workspace { flex: 1; padding: 0; overflow: auto; background: #e2e8f0; position: relative; display: flex; flex-direction: column; }
+    .workspace-inner { display: flex; justify-content: center; min-width: fit-content; padding: 20px 50px 50px 50px; flex: 1; }
+    .workspace-toolbar { position: sticky; top: 0; background: white; padding: 8px 15px; display: flex; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 20; justify-content: center; flex-shrink: 0; border-bottom: 1px solid #e2e8f0; }
     .toolbar-btn { padding: 5px 10px; border: 1px solid #e2e8f0; background: white; border-radius: 4px; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
     .toolbar-btn:hover { background: #f1f5f9; }
     .toolbar-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
