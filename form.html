@@ -264,14 +264,41 @@ const pageNav = document.getElementById('page-nav');
 const pageIndicator = document.getElementById('page-indicator');
 const toast = document.getElementById('toast');
 
+// Vérifier si on est dans Grist
+let isInGrist = false;
+let gristTimeout = null;
+
 // Initialisation Grist
-grist.ready({
-  requiredAccess: 'full',
-  allowSelectBy: true
-});
+try {
+  grist.ready({
+    requiredAccess: 'full',
+    allowSelectBy: true
+  });
+  isInGrist = true;
+} catch (e) {
+  console.log('Grist API non disponible');
+}
+
+// Timeout si pas de réponse de Grist après 3 secondes
+gristTimeout = setTimeout(() => {
+  if (!formConfig) {
+    loading.style.display = 'none';
+    noForm.innerHTML = `
+      <div class="no-form-icon">⚠️</div>
+      <p><strong>Ce formulaire doit être ouvert dans Grist</strong></p>
+      <p style="margin-top: 10px; font-size: 0.9em;">
+        Pour utiliser ce formulaire, ajoutez-le comme widget personnalisé<br>
+        dans votre document Grist avec l'URL :<br>
+        <code style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; margin-top: 8px; display: inline-block;">${window.location.href}</code>
+      </p>
+    `;
+    noForm.style.display = 'block';
+  }
+}, 3000);
 
 // Charger la configuration
 grist.onOptions(async function(options) {
+  clearTimeout(gristTimeout);
   formConfig = options || {};
   
   loading.style.display = 'none';
