@@ -2974,9 +2974,12 @@ function generateRulerMarks() {
   // Obtenir la position de la page A4 par rapport au workspace
   const pageRect = formCanvas.getBoundingClientRect();
   const workspaceRect = workspace.getBoundingClientRect();
+  const rulerHRect = document.getElementById('ruler-h').getBoundingClientRect();
+  const rulerVRect = document.getElementById('ruler-v').getBoundingClientRect();
   
-  const offsetX = pageRect.left - workspaceRect.left - 30; // -30 pour la largeur de la règle verticale
-  const offsetY = pageRect.top - workspaceRect.top - 20; // -20 pour la hauteur de la règle horizontale
+  // Calculer l'offset pour que le 0 soit à l'angle de la page
+  const offsetX = pageRect.left - rulerHRect.left;
+  const offsetY = pageRect.top - rulerVRect.top;
   
   // A4 = 21cm x 29.7cm, 1cm = 37.8px
   const cmToPx = 37.8;
