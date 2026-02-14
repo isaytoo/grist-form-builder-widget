@@ -1229,7 +1229,7 @@ function renderPropertiesPanel() {
     }
   });
   
-  document.getElementById('prop-placeholder')?.addEventListener('input', (e) => {
+  document.getElementById('prop-placeholder')?.addEventListener('change', (e) => {
     selectedField.placeholder = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
