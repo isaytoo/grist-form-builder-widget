@@ -411,7 +411,7 @@ formCanvas.addEventListener('drop', (e) => {
       height: draggedData.elementType === 'section' ? 150 : (draggedData.elementType === 'image' ? 100 : null),
       page: currentPage,
       imageData: null,
-      fontSize: draggedData.elementType === 'title' ? 1.2 : null,
+      fontSize: draggedData.elementType === 'title' ? 14 : null,
       required: false,
       placeholder: '',
       options: draggedData.elementType === 'select' || draggedData.elementType === 'radio' || draggedData.elementType === 'checkbox' 
