@@ -1291,11 +1291,12 @@ function renderPropertiesPanel() {
     } else {
       html += `
         <div class="property-group">
-          <div class="property-label">Lier à une colonne</div>
-          <select class="property-select" id="prop-column">
-            <option value="">-- Aucune --</option>
+          <div class="property-label" style="color: #f59e0b;">⚠️ Lier à une colonne</div>
+          <select class="property-select" id="prop-column" style="border-color: #f59e0b;">
+            <option value="">-- Non lié (données non sauvées) --</option>
             ${tableColumns.map(c => `<option value="${c.id}" ${f.columnId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
           </select>
+          <button class="btn btn-secondary" id="btn-create-column" style="margin-top: 8px; font-size: 0.8em; padding: 4px 8px;">➕ Créer colonne "${f.label}"</button>
         </div>
       `;
     }
@@ -1984,6 +1985,46 @@ function renderPropertiesPanel() {
       document.getElementById('prop-label').value = e.target.value;
       renderFormFields();
       selectField(selectedField.id);
+    }
+  });
+  
+  // Créer une nouvelle colonne dans Grist
+  document.getElementById('btn-create-column')?.addEventListener('click', async () => {
+    if (!currentTable) {
+      showToast('Veuillez sélectionner une table', 'error');
+      return;
+    }
+    
+    const columnName = selectedField.label.replace(/[^a-zA-Z0-9_àâäéèêëïîôùûüç]/gi, '_');
+    
+    // Déterminer le type de colonne Grist selon le type de champ
+    let gristType = 'Text';
+    if (selectedField.fieldType === 'number') gristType = 'Numeric';
+    else if (selectedField.fieldType === 'date') gristType = 'Date';
+    else if (selectedField.fieldType === 'email') gristType = 'Text';
+    else if (selectedField.fieldType === 'checkbox') gristType = 'ChoiceList';
+    else if (selectedField.fieldType === 'select' || selectedField.fieldType === 'radio') gristType = 'Choice';
+    
+    try {
+      showLoading();
+      await grist.docApi.applyUserActions([
+        ['AddColumn', currentTable, columnName, { type: gristType }]
+      ]);
+      
+      // Lier le champ à la nouvelle colonne
+      selectedField.columnId = columnName;
+      
+      // Recharger les colonnes
+      await loadTableColumns(currentTable);
+      
+      hideLoading();
+      renderFormFields();
+      selectField(selectedField.id);
+      showToast(`Colonne "${columnName}" créée et liée`, 'success');
+    } catch (error) {
+      hideLoading();
+      console.error('Erreur création colonne:', error);
+      showToast('Erreur lors de la création de la colonne', 'error');
     }
   });
   
