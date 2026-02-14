@@ -99,6 +99,11 @@ function applyRoleRestrictions() {
     btnClear.style.display = 'none';
     btnTemplates.style.display = 'none';
     
+    // Masquer aussi Partager, Guide et PDF en mode formulaire
+    document.getElementById('btn-share-form').style.display = 'none';
+    document.getElementById('btn-mode-guide').style.display = 'none';
+    document.getElementById('btn-export-pdf').style.display = 'none';
+    
     // Forcer le mode Saisie
     switchMode('fill');
   }
