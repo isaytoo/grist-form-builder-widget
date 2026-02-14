@@ -557,7 +557,7 @@ function createTitleElement(field) {
   titleEl.style.left = field.x + 'px';
   titleEl.style.top = field.y + 'px';
   titleEl.style.width = field.width + 'px';
-  titleEl.style.fontSize = (field.fontSize || 1.2) + 'em';
+  titleEl.style.fontSize = (field.fontSize || 14) + 'pt';
   if (field.fontFamily) titleEl.style.fontFamily = field.fontFamily;
   if (field.fontWeight) titleEl.style.fontWeight = field.fontWeight;
   if (field.fontStyle) titleEl.style.fontStyle = field.fontStyle;
@@ -961,8 +961,8 @@ function renderPropertiesPanel() {
         </select>
       </div>
       <div class="property-group">
-        <div class="property-label">Taille (em)</div>
-        <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 1.2}" min="0.5" max="5" step="0.1">
+        <div class="property-label">Taille (pt)</div>
+        <input type="number" class="property-input" id="prop-font-size" value="${f.fontSize || 14}" min="8" max="72" step="1">
       </div>
       <div class="property-group">
         <div class="property-label">Style</div>
@@ -1475,7 +1475,7 @@ function renderPropertiesPanel() {
   
   // Taille de police
   document.getElementById('prop-font-size')?.addEventListener('input', (e) => {
-    selectedField.fontSize = parseFloat(e.target.value) || 1.2;
+    selectedField.fontSize = parseFloat(e.target.value) || 14;
     renderFormFields();
     selectField(selectedField.id);
   });
@@ -2141,7 +2141,7 @@ function renderFormView() {
       titleDiv.style.left = field.x + 'px';
       titleDiv.style.top = field.y + 'px';
       titleDiv.style.width = field.width + 'px';
-      titleDiv.style.fontSize = (field.fontSize || 1.2) + 'em';
+      titleDiv.style.fontSize = (field.fontSize || 14) + 'pt';
       titleDiv.style.fontWeight = field.fontWeight || '600';
       titleDiv.style.color = field.textColor || '#1e293b';
       if (field.fontFamily) titleDiv.style.fontFamily = field.fontFamily;
