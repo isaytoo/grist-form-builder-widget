@@ -117,16 +117,39 @@ grist.onOptions(async function(options) {
   isInitialized = true;
   
   formConfig = options || {};
-  templates = formConfig.templates || [];
-  totalPages = formConfig.totalPages || 1;
-  versionHistory = formConfig.versionHistory || [];
-  currentPage = 1;
   
   try {
     await loadTables();
   } catch (e) {
     console.error('Erreur loadTables:', e);
   }
+  
+  // Si pas de config dans les options du widget, essayer de charger depuis la table
+  if ((!formConfig.fields || formConfig.fields.length === 0) && isFormMode) {
+    // En mode form, chercher la première config disponible dans la table
+    const tableConfig = await loadConfigFromTable('default');
+    if (tableConfig) {
+      formConfig = tableConfig;
+    } else {
+      // Essayer de charger toutes les configs
+      try {
+        const tables = await grist.docApi.listTables();
+        if (tables.includes('BM_FormConfig')) {
+          const data = await grist.docApi.fetchTable('BM_FormConfig');
+          if (data.ConfigData && data.ConfigData.length > 0) {
+            formConfig = JSON.parse(data.ConfigData[0]);
+          }
+        }
+      } catch (e) {
+        console.log('Pas de config trouvée dans la table');
+      }
+    }
+  }
+  
+  templates = formConfig.templates || [];
+  totalPages = formConfig.totalPages || 1;
+  versionHistory = formConfig.versionHistory || [];
+  currentPage = 1;
   
   updatePageIndicator();
   
@@ -1721,11 +1744,80 @@ async function saveFormConfig() {
   try {
     await grist.setOptions(config);
     formConfig = config;
+    
+    // Aussi sauvegarder dans une table BM_FormConfig pour partage entre widgets
+    await saveConfigToTable(config);
+    
     showToast('Configuration sauvegardée', 'success');
   } catch (error) {
     console.error('Erreur sauvegarde:', error);
     showToast('Erreur lors de la sauvegarde', 'error');
   }
+}
+
+// Sauvegarder la config dans une table Grist pour partage
+async function saveConfigToTable(config) {
+  try {
+    const tables = await grist.docApi.listTables();
+    const configTableName = 'BM_FormConfig';
+    
+    // Créer la table si elle n'existe pas
+    if (!tables.includes(configTableName)) {
+      await grist.docApi.applyUserActions([
+        ['AddTable', configTableName, [
+          { id: 'ConfigKey', type: 'Text' },
+          { id: 'ConfigData', type: 'Text' }
+        ]]
+      ]);
+    }
+    
+    // Chercher si une config existe déjà
+    const existingData = await grist.docApi.fetchTable(configTableName);
+    const configJson = JSON.stringify(config);
+    const configKey = 'form_' + (config.tableId || 'default');
+    
+    const existingIndex = existingData.ConfigKey?.findIndex(k => k === configKey);
+    
+    if (existingIndex !== undefined && existingIndex >= 0) {
+      // Mettre à jour
+      const rowId = existingData.id[existingIndex];
+      await grist.docApi.applyUserActions([
+        ['UpdateRecord', configTableName, rowId, { ConfigData: configJson }]
+      ]);
+    } else {
+      // Créer
+      await grist.docApi.applyUserActions([
+        ['AddRecord', configTableName, null, { ConfigKey: configKey, ConfigData: configJson }]
+      ]);
+    }
+  } catch (error) {
+    console.log('Erreur sauvegarde table config:', error);
+    // Ne pas bloquer si la sauvegarde dans la table échoue
+  }
+}
+
+// Charger la config depuis la table Grist
+async function loadConfigFromTable(tableId) {
+  try {
+    const tables = await grist.docApi.listTables();
+    const configTableName = 'BM_FormConfig';
+    
+    if (!tables.includes(configTableName)) {
+      return null;
+    }
+    
+    const data = await grist.docApi.fetchTable(configTableName);
+    const configKey = 'form_' + (tableId || 'default');
+    
+    const index = data.ConfigKey?.findIndex(k => k === configKey);
+    
+    if (index !== undefined && index >= 0) {
+      return JSON.parse(data.ConfigData[index]);
+    }
+  } catch (error) {
+    console.log('Erreur chargement config table:', error);
+  }
+  return null;
 }
 
 // Vider le formulaire
