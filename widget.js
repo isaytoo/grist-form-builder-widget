@@ -104,16 +104,27 @@ function applyRoleRestrictions() {
   }
 }
 
+// Flag pour éviter les appels multiples
+let isInitialized = false;
+
 // Charger les données au démarrage
 grist.onOptions(async function(options) {
+  if (isInitialized) return;
+  isInitialized = true;
+  
   formConfig = options || {};
   templates = formConfig.templates || [];
   totalPages = formConfig.totalPages || 1;
   versionHistory = formConfig.versionHistory || [];
   currentPage = 1;
-  updatePageIndicator();
   
-  await loadTables();
+  try {
+    await loadTables();
+  } catch (e) {
+    console.error('Erreur loadTables:', e);
+  }
+  
+  updatePageIndicator();
   
   if (formConfig.title) {
     formTitleInput.value = formConfig.title;
