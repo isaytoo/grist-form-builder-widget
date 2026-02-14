@@ -68,9 +68,9 @@
     .page-a4 { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); position: relative; padding: 15mm; background-size: 20px 20px; box-sizing: border-box; overflow: visible; flex-shrink: 0; }
     .page-a4.show-grid { background-image: linear-gradient(to right, #f1f5f9 1px, transparent 1px), linear-gradient(to bottom, #f1f5f9 1px, transparent 1px); }
     .workspace-with-rulers { position: relative; }
-    .ruler { background: #f8fafc; position: absolute; z-index: 10; }
-    .ruler-h { top: 0; left: 30px; right: 0; height: 20px; border-bottom: 1px solid #e2e8f0; display: none; }
-    .ruler-v { top: 20px; left: 0; width: 30px; min-height: calc(297mm + 50px); border-right: 1px solid #e2e8f0; display: none; }
+    .ruler { background: #f8fafc; position: sticky; z-index: 15; }
+    .ruler-h { top: 40px; left: 30px; right: 0; height: 20px; border-bottom: 1px solid #e2e8f0; display: none; margin-bottom: -20px; }
+    .ruler-v { top: 60px; left: 0; width: 30px; min-height: calc(297mm + 50px); border-right: 1px solid #e2e8f0; display: none; position: absolute; }
     .ruler.show { display: block; }
     .ruler-marks { position: relative; height: 100%; width: 100%; }
     .ruler-h .ruler-mark { position: absolute; top: 0; height: 100%; border-left: 1px solid #cbd5e1; font-size: 9px; color: #64748b; padding-left: 2px; }
