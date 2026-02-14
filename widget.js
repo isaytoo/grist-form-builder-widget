@@ -694,6 +694,14 @@ function createFormFieldElement(field) {
   fieldEl.style.top = field.y + 'px';
   fieldEl.style.width = field.width + 'px';
   
+  // Appliquer la couleur de fond
+  if (field.transparent) {
+    fieldEl.style.backgroundColor = 'transparent';
+    fieldEl.style.border = '1px dashed #cbd5e1';
+  } else if (field.bgColor) {
+    fieldEl.style.backgroundColor = field.bgColor;
+  }
+  
   let inputHtml = '';
   
   switch (field.fieldType) {
@@ -1162,6 +1170,20 @@ function renderPropertiesPanel() {
           Fond transparent
         </label>
         <input type="color" id="prop-bg-color" value="${f.bgColor || (isSection ? '#f8fafc' : '#ffffff')}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; ${f.transparent ? 'opacity: 0.5; pointer-events: none;' : ''}">
+      </div>
+    `;
+  }
+  
+  // Couleur de fond pour les champs de saisie
+  if (!isDecorative) {
+    html += `
+      <div class="property-group">
+        <div class="property-label">Couleur de fond</div>
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.85em; cursor: pointer;">
+          <input type="checkbox" id="prop-transparent" ${f.transparent ? 'checked' : ''}>
+          Fond transparent
+        </label>
+        <input type="color" id="prop-bg-color" value="${f.bgColor || '#ffffff'}" style="width: 100%; height: 32px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; ${f.transparent ? 'opacity: 0.5; pointer-events: none;' : ''}">
       </div>
     `;
   }
@@ -2269,6 +2291,13 @@ function renderFormView() {
     group.style.left = field.x + 'px';
     group.style.top = field.y + 'px';
     group.style.width = field.width + 'px';
+    
+    // Appliquer la couleur de fond
+    if (field.transparent) {
+      group.style.backgroundColor = 'transparent';
+    } else if (field.bgColor) {
+      group.style.backgroundColor = field.bgColor;
+    }
     
     if (field.condition) {
       group.dataset.conditionFieldId = field.condition.fieldId;
