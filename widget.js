@@ -1634,7 +1634,9 @@ function renderPropertiesPanel() {
   document.getElementById('prop-text-color')?.addEventListener('change', (e) => {
     selectedField.textColor = e.target.value;
     renderFormFields();
-    selectField(selectedField.id);
+    // Ne pas re-render le panneau pour éviter de fermer la palette
+    const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
+    if (fieldEl) fieldEl.classList.add('selected');
   });
   
   // Couleur de fond
@@ -1642,7 +1644,9 @@ function renderPropertiesPanel() {
     selectedField.bgColor = e.target.value;
     selectedField.transparent = false;
     renderFormFields();
-    selectField(selectedField.id);
+    // Ne pas re-render le panneau pour éviter de fermer la palette
+    const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
+    if (fieldEl) fieldEl.classList.add('selected');
   });
   
   // Fond transparent
@@ -1665,10 +1669,12 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
   });
   
-  document.getElementById('prop-qr-color')?.addEventListener('input', (e) => {
+  document.getElementById('prop-qr-color')?.addEventListener('change', (e) => {
     selectedField.qrColor = e.target.value;
     renderFormFields();
-    selectField(selectedField.id);
+    // Ne pas re-render le panneau pour éviter de fermer la palette
+    const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
+    if (fieldEl) fieldEl.classList.add('selected');
   });
   
   document.getElementById('prop-qr-type')?.addEventListener('change', async (e) => {
