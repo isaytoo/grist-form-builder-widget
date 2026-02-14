@@ -958,6 +958,51 @@ function renderPropertiesPanel() {
     }
   }
   
+  // Conditions d'affichage (pour tous les champs sauf section)
+  if (!isSection && !isImage && !isQRCode) {
+    const otherFields = formFields.filter(field => 
+      field.id !== f.id && 
+      ['select', 'radio', 'checkbox', 'text', 'number'].includes(field.fieldType)
+    );
+    
+    if (otherFields.length > 0) {
+      html += `
+        <div class="property-group" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
+          <div class="property-label" style="font-weight: 600; color: #1e293b;">Affichage conditionnel</div>
+        </div>
+        <div class="property-group">
+          <label class="property-checkbox">
+            <input type="checkbox" id="prop-has-condition" ${f.condition ? 'checked' : ''}>
+            Afficher si condition
+          </label>
+        </div>
+        <div id="condition-options" style="${f.condition ? '' : 'display: none;'}">
+          <div class="property-group">
+            <div class="property-label">Champ de référence</div>
+            <select class="property-select" id="prop-condition-field">
+              <option value="">-- Sélectionner --</option>
+              ${otherFields.map(field => `<option value="${field.id}" ${f.condition?.fieldId === field.id ? 'selected' : ''}>${field.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="property-group">
+            <div class="property-label">Opérateur</div>
+            <select class="property-select" id="prop-condition-operator">
+              <option value="equals" ${(f.condition?.operator || 'equals') === 'equals' ? 'selected' : ''}>Est égal à</option>
+              <option value="not-equals" ${f.condition?.operator === 'not-equals' ? 'selected' : ''}>N'est pas égal à</option>
+              <option value="contains" ${f.condition?.operator === 'contains' ? 'selected' : ''}>Contient</option>
+              <option value="not-empty" ${f.condition?.operator === 'not-empty' ? 'selected' : ''}>N'est pas vide</option>
+              <option value="empty" ${f.condition?.operator === 'empty' ? 'selected' : ''}>Est vide</option>
+            </select>
+          </div>
+          <div class="property-group" id="condition-value-group" style="${['not-empty', 'empty'].includes(f.condition?.operator) ? 'display: none;' : ''}">
+            <div class="property-label">Valeur</div>
+            <input type="text" class="property-input" id="prop-condition-value" value="${f.condition?.value || ''}" placeholder="Valeur attendue">
+          </div>
+        </div>
+      `;
+    }
+  }
+  
   // Ordre d'affichage (z-index)
   html += `
     <div class="property-group">
@@ -1279,6 +1324,42 @@ function renderPropertiesPanel() {
     selectedField.errorMessage = e.target.value;
   });
   
+  // Conditional display
+  document.getElementById('prop-has-condition')?.addEventListener('change', (e) => {
+    const conditionOptions = document.getElementById('condition-options');
+    if (e.target.checked) {
+      selectedField.condition = { fieldId: '', operator: 'equals', value: '' };
+      if (conditionOptions) conditionOptions.style.display = '';
+    } else {
+      selectedField.condition = null;
+      if (conditionOptions) conditionOptions.style.display = 'none';
+    }
+  });
+  
+  document.getElementById('prop-condition-field')?.addEventListener('change', (e) => {
+    if (selectedField.condition) {
+      selectedField.condition.fieldId = e.target.value;
+    }
+  });
+  
+  document.getElementById('prop-condition-operator')?.addEventListener('change', (e) => {
+    if (selectedField.condition) {
+      selectedField.condition.operator = e.target.value;
+      const valueGroup = document.getElementById('condition-value-group');
+      if (['not-empty', 'empty'].includes(e.target.value)) {
+        if (valueGroup) valueGroup.style.display = 'none';
+      } else {
+        if (valueGroup) valueGroup.style.display = '';
+      }
+    }
+  });
+  
+  document.getElementById('prop-condition-value')?.addEventListener('change', (e) => {
+    if (selectedField.condition) {
+      selectedField.condition.value = e.target.value;
+    }
+  });
+  
   document.getElementById('prop-column')?.addEventListener('change', (e) => {
     selectedField.columnId = e.target.value || null;
     // Mettre à jour le libellé avec le nom de la colonne
@@ -1424,6 +1505,68 @@ function switchMode(mode) {
     btnModeFill.classList.add('active');
     renderFormView();
   }
+}
+
+// Évaluer et appliquer les conditions d'affichage
+function evaluateConditions() {
+  if (!formConfig || !formConfig.fields) return;
+  
+  formConfig.fields.forEach(field => {
+    if (!field.condition || !field.condition.fieldId) return;
+    
+    const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
+    if (!group) return;
+    
+    const refField = formConfig.fields.find(f => f.id === field.condition.fieldId);
+    if (!refField) return;
+    
+    // Obtenir la valeur du champ de référence
+    let refValue = '';
+    if (refField.fieldType === 'radio') {
+      const container = document.getElementById(`input-${refField.id}`);
+      const checked = container?.querySelector('input:checked');
+      refValue = checked ? checked.value : '';
+    } else if (refField.fieldType === 'checkbox') {
+      const container = document.getElementById(`input-${refField.id}`);
+      const checked = container?.querySelectorAll('input:checked');
+      refValue = checked ? Array.from(checked).map(c => c.value).join(',') : '';
+    } else if (refField.fieldType === 'select') {
+      const select = document.getElementById(`input-${refField.id}`);
+      refValue = select ? select.value : '';
+    } else {
+      const input = document.getElementById(`input-${refField.id}`);
+      refValue = input ? input.value : '';
+    }
+    
+    // Évaluer la condition
+    let conditionMet = false;
+    const condValue = field.condition.value || '';
+    
+    switch (field.condition.operator) {
+      case 'equals':
+        conditionMet = refValue === condValue;
+        break;
+      case 'not-equals':
+        conditionMet = refValue !== condValue;
+        break;
+      case 'contains':
+        conditionMet = refValue.toLowerCase().includes(condValue.toLowerCase());
+        break;
+      case 'not-empty':
+        conditionMet = refValue !== '' && refValue !== null;
+        break;
+      case 'empty':
+        conditionMet = refValue === '' || refValue === null;
+        break;
+    }
+    
+    // Afficher ou masquer le champ
+    if (conditionMet) {
+      group.classList.remove('hidden');
+    } else {
+      group.classList.add('hidden');
+    }
+  });
 }
 
 // Afficher le formulaire de saisie
@@ -1655,15 +1798,19 @@ function initSignatureCanvases() {
 
 // Initialiser les conditions d'affichage
 function initConditions() {
-  document.querySelectorAll('.form-field-view[data-condition-field-id]').forEach(group => {
-    const conditionFieldId = group.dataset.conditionFieldId;
-    const operator = group.dataset.conditionOperator;
-    const value = group.dataset.conditionValue;
+  if (!formConfig || !formConfig.fields) return;
+  
+  // Trouver tous les champs avec des conditions
+  formConfig.fields.forEach(field => {
+    if (!field.condition || !field.condition.fieldId) return;
     
-    const sourceField = formConfig.fields.find(f => f.id === conditionFieldId);
+    const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
+    if (!group) return;
+    
+    const sourceField = formConfig.fields.find(f => f.id === field.condition.fieldId);
     if (!sourceField) return;
     
-    const sourceInput = document.getElementById(`input-${conditionFieldId}`);
+    const sourceInput = document.getElementById(`input-${field.condition.fieldId}`);
     if (!sourceInput) return;
     
     function checkCondition() {
@@ -1675,24 +1822,30 @@ function initConditions() {
       } else if (sourceField.fieldType === 'checkbox') {
         const checked = sourceInput.querySelectorAll('input:checked');
         sourceValue = Array.from(checked).map(c => c.value).join(',');
+      } else if (sourceField.fieldType === 'select') {
+        sourceValue = sourceInput.value || '';
       } else {
         sourceValue = sourceInput.value || '';
       }
       
       let visible = false;
+      const condValue = field.condition.value || '';
       
-      switch (operator) {
+      switch (field.condition.operator) {
         case 'equals':
-          visible = sourceValue === value;
+          visible = sourceValue === condValue;
           break;
-        case 'not_equals':
-          visible = sourceValue !== value;
+        case 'not-equals':
+          visible = sourceValue !== condValue;
           break;
         case 'contains':
-          visible = sourceValue.includes(value);
+          visible = sourceValue.toLowerCase().includes(condValue.toLowerCase());
           break;
-        case 'not_empty':
+        case 'not-empty':
           visible = sourceValue !== '';
+          break;
+        case 'empty':
+          visible = sourceValue === '';
           break;
       }
       
