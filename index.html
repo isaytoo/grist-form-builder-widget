@@ -33,7 +33,13 @@
     .btn-warning { background: #f59e0b; color: white; }
     .btn-warning:hover { background: #d97706; }
     .main-content { display: flex; flex: 1; overflow: hidden; }
-    .sidebar { width: 260px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar { width: 260px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; position: relative; transition: width 0.3s, margin 0.3s; }
+    .sidebar.collapsed { width: 0; overflow: hidden; border-right: none; }
+    .panel-toggle { position: absolute; top: 50%; width: 20px; height: 40px; background: white; border: 1px solid #e2e8f0; border-radius: 0 6px 6px 0; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 20; transition: all 0.3s; }
+    .panel-toggle:hover { background: #f1f5f9; }
+    .panel-toggle svg { width: 12px; height: 12px; fill: #64748b; transition: transform 0.3s; }
+    .sidebar .panel-toggle { right: -20px; transform: translateY(-50%); }
+    .sidebar.collapsed .panel-toggle svg { transform: rotate(180deg); }
     .sidebar-header { padding: 12px; border-bottom: 1px solid #e2e8f0; }
     .sidebar-title { font-size: 0.75em; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .table-select { width: 100%; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85em; font-family: inherit; }
@@ -94,7 +100,10 @@
     .signature-pad { border: 1px solid #e2e8f0; border-radius: 4px; background: #fafafa; height: 80px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.8em; }
     .options-preview { display: flex; flex-direction: column; gap: 4px; }
     .option-item { display: flex; align-items: center; gap: 6px; font-size: 0.8em; color: #64748b; }
-    .properties-panel { width: 280px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
+    .properties-panel { width: 280px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; position: relative; transition: width 0.3s; }
+    .properties-panel.collapsed { width: 0; overflow: hidden; border-left: none; }
+    .properties-panel .panel-toggle { left: -20px; transform: translateY(-50%); border-radius: 6px 0 0 6px; }
+    .properties-panel.collapsed .panel-toggle svg { transform: rotate(180deg); }
     .properties-header { padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-size: 0.85em; font-weight: 600; color: #1e293b; }
     .properties-content { flex: 1; overflow-y: auto; padding: 12px; }
     .property-group { margin-bottom: 14px; }
@@ -204,7 +213,10 @@
   </div>
   
   <div class="main-content editor-view" id="editor-view">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
+      <button class="panel-toggle" id="sidebar-toggle" title="Fermer/Ouvrir">
+        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
       <div class="sidebar-header">
         <div class="sidebar-title">Titre du formulaire</div>
         <input type="text" class="table-select" id="form-title-input" placeholder="Mon formulaire" value="">
@@ -273,6 +285,9 @@
     </div>
     
     <div class="properties-panel" id="properties-panel">
+      <button class="panel-toggle" id="properties-toggle" title="Fermer/Ouvrir">
+        <svg viewBox="0 0 24 24"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+      </button>
       <div class="properties-header">Propriétés</div>
       <div class="properties-content" id="properties-content">
         <p style="color: #94a3b8; font-size: 0.85em;">Sélectionnez un champ</p>

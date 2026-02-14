@@ -50,6 +50,10 @@ const btnSnap = document.getElementById('btn-snap');
 const btnZoomIn = document.getElementById('btn-zoom-in');
 const btnZoomOut = document.getElementById('btn-zoom-out');
 const btnZoomFit = document.getElementById('btn-zoom-fit');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const propertiesToggle = document.getElementById('properties-toggle');
+const sidebar = document.getElementById('sidebar');
+const propertiesPanel = document.getElementById('properties-panel');
 const btnTemplates = document.getElementById('btn-templates');
 const btnExportPdf = document.getElementById('btn-export-pdf');
 const btnSaveTemplate = document.getElementById('btn-save-template');
@@ -1842,6 +1846,15 @@ btnZoomFit.addEventListener('click', () => {
   if (showRulers) {
     generateRulerMarks();
   }
+});
+
+// Toggle panneaux latéraux
+sidebarToggle.addEventListener('click', () => {
+  sidebar.classList.toggle('collapsed');
+});
+
+propertiesToggle.addEventListener('click', () => {
+  propertiesPanel.classList.toggle('collapsed');
 });
 
 // Tabs sidebar
