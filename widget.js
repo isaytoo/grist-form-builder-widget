@@ -49,6 +49,7 @@ const btnGrid = document.getElementById('btn-grid');
 const btnSnap = document.getElementById('btn-snap');
 const btnZoomIn = document.getElementById('btn-zoom-in');
 const btnZoomOut = document.getElementById('btn-zoom-out');
+const btnZoomFit = document.getElementById('btn-zoom-fit');
 const btnTemplates = document.getElementById('btn-templates');
 const btnExportPdf = document.getElementById('btn-export-pdf');
 const btnSaveTemplate = document.getElementById('btn-save-template');
@@ -1813,6 +1814,33 @@ btnZoomOut.addEventListener('click', () => {
     zoomLevel -= 10;
     formCanvas.style.transform = `scale(${zoomLevel / 100})`;
     document.getElementById('zoom-level').textContent = zoomLevel + '%';
+  }
+});
+
+// Zoom fit to screen
+btnZoomFit.addEventListener('click', () => {
+  const workspaceRect = workspace.getBoundingClientRect();
+  const pageWidth = 210 * 3.78; // 210mm en pixels (1mm ≈ 3.78px)
+  const pageHeight = 297 * 3.78; // 297mm en pixels
+  
+  // Calculer le zoom pour que la page tienne dans l'espace disponible
+  const availableWidth = workspaceRect.width - 80; // Marge
+  const availableHeight = workspaceRect.height - 80;
+  
+  const scaleX = availableWidth / pageWidth;
+  const scaleY = availableHeight / pageHeight;
+  const fitScale = Math.min(scaleX, scaleY);
+  
+  // Arrondir à 10% près
+  zoomLevel = Math.round(fitScale * 100 / 10) * 10;
+  zoomLevel = Math.max(50, Math.min(150, zoomLevel)); // Limiter entre 50% et 150%
+  
+  formCanvas.style.transform = `scale(${zoomLevel / 100})`;
+  document.getElementById('zoom-level').textContent = zoomLevel + '%';
+  
+  // Mettre à jour les règles si elles sont affichées
+  if (showRulers) {
+    generateRulerMarks();
   }
 });
 
