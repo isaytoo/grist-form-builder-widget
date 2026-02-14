@@ -2441,16 +2441,39 @@ function renderTemplatesList() {
   }
   
   templatesList.innerHTML = templates.map((t, i) => `
-    <div class="template-item" data-index="${i}">
-      <div class="template-name">${t.name}</div>
-      <div class="template-date">${t.date}</div>
+    <div class="template-item" data-index="${i}" style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="cursor: pointer; flex: 1;" class="template-load">
+        <div class="template-name">${t.name}</div>
+        <div class="template-date">${t.date}</div>
+      </div>
+      <button class="template-delete" data-index="${i}" title="Supprimer" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8em;">🗑️</button>
     </div>
   `).join('');
   
-  templatesList.querySelectorAll('.template-item').forEach(item => {
+  templatesList.querySelectorAll('.template-load').forEach(item => {
     item.addEventListener('click', () => {
-      const index = parseInt(item.dataset.index);
+      const index = parseInt(item.parentElement.dataset.index);
       loadTemplate(index);
+    });
+  });
+  
+  templatesList.querySelectorAll('.template-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const index = parseInt(btn.dataset.index);
+      const confirmed = await showConfirm({
+        icon: '🗑️',
+        title: 'Supprimer le template',
+        message: `Supprimer "${templates[index].name}" ?`,
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler'
+      });
+      if (confirmed) {
+        templates.splice(index, 1);
+        renderTemplatesList();
+        saveFormConfig();
+        showToast('Template supprimé', 'success');
+      }
     });
   });
 }
