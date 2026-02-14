@@ -2748,6 +2748,31 @@ btnClear.addEventListener('click', clearForm);
 btnSubmit.addEventListener('click', submitForm);
 btnResetForm.addEventListener('click', resetFormInputs);
 btnExportPdf.addEventListener('click', exportPdf);
+
+// Partager le formulaire
+document.getElementById('btn-share-form')?.addEventListener('click', async () => {
+  if (formFields.length === 0) {
+    showToast('Aucun formulaire à partager', 'error');
+    return;
+  }
+  
+  // Sauvegarder d'abord la configuration
+  await saveFormConfig();
+  
+  // Générer l'URL du formulaire public
+  const baseUrl = window.location.href.replace('index.html', 'form.html').split('?')[0];
+  const formUrl = baseUrl.endsWith('/') ? baseUrl + 'form.html' : baseUrl.replace(/\/[^\/]*$/, '/form.html');
+  
+  // Copier dans le presse-papier
+  try {
+    await navigator.clipboard.writeText(formUrl);
+    showToast('Lien copié ! Partagez-le avec vos utilisateurs.', 'success');
+  } catch (e) {
+    // Fallback: afficher l'URL dans une alerte
+    prompt('Copiez ce lien pour partager le formulaire:', formUrl);
+  }
+});
+
 btnTemplates.addEventListener('click', openTemplatesModal);
 btnSaveTemplate.addEventListener('click', saveTemplate);
 btnCloseTemplates.addEventListener('click', closeTemplatesModal);

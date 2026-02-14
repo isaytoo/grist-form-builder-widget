@@ -1,0 +1,812 @@
+<!--
+  Grist Form Builder Widget - Public Form
+  Copyright 2026 Said Hamadou (isaytoo)
+  Licensed under the Apache License, Version 2.0
+  https://github.com/isaytoo/grist-form-builder-widget
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulaire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f1f5f9; color: #334155; min-height: 100vh; padding: 20px; padding-bottom: 80px; }
+    
+    .form-container { max-width: 800px; margin: 0 auto; }
+    .form-header { background: white; border-radius: 12px 12px 0 0; padding: 25px 30px; border-bottom: 3px solid #3b82f6; }
+    .form-title { font-size: 1.5em; font-weight: 700; color: #1e293b; margin-bottom: 5px; }
+    .form-subtitle { font-size: 0.9em; color: #64748b; }
+    
+    .form-body { background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    
+    .form-page { display: none; }
+    .form-page.active { display: block; }
+    
+    .form-field-group { margin-bottom: 20px; }
+    .form-field-group.hidden { display: none; }
+    
+    .form-label { display: block; font-size: 0.9em; font-weight: 500; color: #475569; margin-bottom: 8px; }
+    .form-label.required::after { content: ' *'; color: #ef4444; }
+    
+    .form-input, .form-select, .form-textarea { 
+      width: 100%; 
+      padding: 12px 14px; 
+      border: 1px solid #e2e8f0; 
+      border-radius: 8px; 
+      font-size: 1em; 
+      font-family: inherit; 
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: white;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { 
+      outline: none; 
+      border-color: #3b82f6; 
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    .form-textarea { min-height: 120px; resize: vertical; }
+    
+    .form-radio-group, .form-checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+    .form-radio-item, .form-checkbox-item { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      font-size: 0.95em;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .form-radio-item:hover, .form-checkbox-item:hover { background: #eff6ff; }
+    .form-radio-item input, .form-checkbox-item input { width: 18px; height: 18px; cursor: pointer; }
+    
+    .form-error { color: #ef4444; font-size: 0.85em; margin-top: 6px; display: none; }
+    .form-error.show { display: block; }
+    
+    .form-section { 
+      background: #f8fafc; 
+      border-radius: 8px; 
+      padding: 20px; 
+      margin-bottom: 25px;
+      border-left: 4px solid #3b82f6;
+    }
+    .form-section-title { font-size: 1.1em; font-weight: 600; color: #1e293b; margin-bottom: 15px; }
+    
+    .signature-container { 
+      border: 2px dashed #e2e8f0; 
+      border-radius: 8px; 
+      background: white; 
+      position: relative;
+      overflow: hidden;
+    }
+    .signature-canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
+    .signature-clear { 
+      position: absolute; 
+      top: 10px; 
+      right: 10px; 
+      padding: 6px 12px; 
+      font-size: 0.8em; 
+      background: white; 
+      border: 1px solid #e2e8f0; 
+      border-radius: 6px; 
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .signature-clear:hover { background: #f1f5f9; }
+    
+    .form-actions { 
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      padding: 15px 30px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      z-index: 100;
+    }
+    
+    .btn { 
+      padding: 12px 30px; 
+      border: none; 
+      border-radius: 8px; 
+      font-size: 1em; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+    .btn-secondary { background: #e2e8f0; color: #475569; }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-success { background: #10b981; color: white; }
+    .btn-success:hover { background: #059669; }
+    
+    .page-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .page-indicator { font-size: 0.9em; color: #64748b; }
+    
+    .loading { 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 300px;
+      color: #64748b;
+    }
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .success-message {
+      text-align: center;
+      padding: 60px 30px;
+    }
+    .success-icon { font-size: 4em; margin-bottom: 20px; }
+    .success-title { font-size: 1.5em; font-weight: 600; color: #10b981; margin-bottom: 10px; }
+    .success-text { color: #64748b; margin-bottom: 25px; }
+    
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.9em;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error { background: #ef4444; }
+    .toast.success { background: #10b981; }
+    
+    .no-form {
+      text-align: center;
+      padding: 60px 30px;
+      color: #64748b;
+    }
+    .no-form-icon { font-size: 3em; margin-bottom: 15px; opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <div id="loading" class="loading">
+      <div class="loading-spinner"></div>
+    </div>
+    
+    <div id="no-form" class="no-form" style="display: none;">
+      <div class="no-form-icon">📋</div>
+      <p>Aucun formulaire configuré.<br>Veuillez contacter l'administrateur.</p>
+    </div>
+    
+    <div id="form-content" style="display: none;">
+      <div class="form-header">
+        <h1 class="form-title" id="form-title">Formulaire</h1>
+        <p class="form-subtitle" id="form-subtitle"></p>
+      </div>
+      
+      <div class="form-body">
+        <div id="form-fields"></div>
+        
+        <div class="page-navigation" id="page-nav" style="display: none;">
+          <button class="btn btn-secondary" id="btn-prev-page">← Précédent</button>
+          <span class="page-indicator" id="page-indicator">Page 1 / 1</span>
+          <button class="btn btn-primary" id="btn-next-page">Suivant →</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="success-view" class="success-message" style="display: none;">
+      <div class="success-icon">✅</div>
+      <h2 class="success-title">Formulaire envoyé !</h2>
+      <p class="success-text">Votre réponse a été enregistrée avec succès.</p>
+      <button class="btn btn-primary" id="btn-new-form">Nouveau formulaire</button>
+    </div>
+  </div>
+  
+  <div class="form-actions" id="form-actions" style="display: none;">
+    <button class="btn btn-secondary" id="btn-reset">↺ Réinitialiser</button>
+    <button class="btn btn-success" id="btn-submit">✓ Envoyer</button>
+  </div>
+  
+  <div class="toast" id="toast"></div>
+
+<footer style="position: fixed; bottom: 60px; left: 0; right: 0; background: transparent; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: center; z-index: 50;">
+  <span>© 2026 Said Hamadou (isaytoo) • <a href="https://gristup.fr" target="_blank" style="color: #3b82f6; text-decoration: none;">gristup.fr</a></span>
+</footer>
+
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script>
+/**
+ * Grist Form Builder Widget - Public Form
+ * Copyright 2026 Said Hamadou (isaytoo)
+ * Licensed under the Apache License, Version 2.0
+ * https://github.com/isaytoo/grist-form-builder-widget
+ */
+
+let formConfig = null;
+let currentPage = 1;
+let totalPages = 1;
+
+// Éléments DOM
+const loading = document.getElementById('loading');
+const noForm = document.getElementById('no-form');
+const formContent = document.getElementById('form-content');
+const formFields = document.getElementById('form-fields');
+const formActions = document.getElementById('form-actions');
+const successView = document.getElementById('success-view');
+const formTitle = document.getElementById('form-title');
+const pageNav = document.getElementById('page-nav');
+const pageIndicator = document.getElementById('page-indicator');
+const toast = document.getElementById('toast');
+
+// Initialisation Grist
+grist.ready({
+  requiredAccess: 'full',
+  allowSelectBy: true
+});
+
+// Charger la configuration
+grist.onOptions(async function(options) {
+  formConfig = options || {};
+  
+  loading.style.display = 'none';
+  
+  if (!formConfig.fields || formConfig.fields.length === 0) {
+    noForm.style.display = 'block';
+    return;
+  }
+  
+  totalPages = formConfig.totalPages || 1;
+  
+  formTitle.textContent = formConfig.title || 'Formulaire';
+  formContent.style.display = 'block';
+  formActions.style.display = 'flex';
+  
+  if (totalPages > 1) {
+    pageNav.style.display = 'flex';
+  }
+  
+  renderForm();
+});
+
+function renderForm() {
+  formFields.innerHTML = '';
+  
+  // Filtrer les champs de la page courante
+  const pageFields = formConfig.fields.filter(f => (f.page || 1) === currentPage);
+  
+  pageFields.forEach(field => {
+    if (field.fieldType === 'section') {
+      renderSection(field);
+    } else if (field.fieldType === 'title') {
+      renderTitle(field);
+    } else if (field.fieldType === 'image') {
+      renderImage(field);
+    } else if (field.fieldType === 'qrcode') {
+      // Skip QR codes in form view
+    } else {
+      renderField(field);
+    }
+  });
+  
+  // Initialiser les signatures
+  initSignatures();
+  
+  // Initialiser les conditions
+  initConditions();
+  
+  // Initialiser les calculs
+  initCalculations();
+  
+  updatePageIndicator();
+}
+
+function renderSection(field) {
+  const section = document.createElement('div');
+  section.className = 'form-section';
+  section.innerHTML = `<div class="form-section-title">${field.label}</div>`;
+  formFields.appendChild(section);
+}
+
+function renderTitle(field) {
+  const title = document.createElement('div');
+  title.style.cssText = `font-size: ${field.fontSize || 1.2}em; font-weight: 600; color: ${field.textColor || '#1e293b'}; margin-bottom: 15px;`;
+  title.textContent = field.label;
+  formFields.appendChild(title);
+}
+
+function renderImage(field) {
+  if (field.imageData) {
+    const img = document.createElement('img');
+    img.src = field.imageData;
+    img.style.cssText = 'max-width: 100%; height: auto; margin-bottom: 20px; border-radius: 8px;';
+    formFields.appendChild(img);
+  }
+}
+
+function renderField(field) {
+  const group = document.createElement('div');
+  group.className = 'form-field-group';
+  group.dataset.fieldId = field.id;
+  
+  let inputHtml = '';
+  
+  switch (field.fieldType) {
+    case 'textarea':
+      inputHtml = `<textarea id="input-${field.id}" class="form-textarea" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}></textarea>`;
+      break;
+    case 'select':
+      inputHtml = `<select id="input-${field.id}" class="form-select" ${field.required ? 'required' : ''}>
+        <option value="">${field.placeholder || 'Sélectionner...'}</option>
+        ${field.options.map(o => `<option value="${o}">${o}</option>`).join('')}
+      </select>`;
+      break;
+    case 'radio':
+      inputHtml = `<div class="form-radio-group" id="input-${field.id}">
+        ${field.options.map(o => `
+          <label class="form-radio-item">
+            <input type="radio" name="radio-${field.id}" value="${o}">
+            <span>${o}</span>
+          </label>
+        `).join('')}
+      </div>`;
+      break;
+    case 'checkbox':
+      inputHtml = `<div class="form-checkbox-group" id="input-${field.id}">
+        ${field.options.map(o => `
+          <label class="form-checkbox-item">
+            <input type="checkbox" value="${o}">
+            <span>${o}</span>
+          </label>
+        `).join('')}
+      </div>`;
+      break;
+    case 'signature':
+      inputHtml = `
+        <div class="signature-container">
+          <canvas id="input-${field.id}" class="signature-canvas"></canvas>
+          <button type="button" class="signature-clear" data-canvas="input-${field.id}">Effacer</button>
+        </div>
+      `;
+      break;
+    case 'date':
+      inputHtml = `<input type="date" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
+      break;
+    case 'number':
+      inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      break;
+    case 'email':
+      inputHtml = `<input type="email" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      break;
+    case 'phone':
+      inputHtml = `<input type="tel" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      break;
+    case 'calculated':
+      inputHtml = `
+        <div style="padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 1.1em; font-weight: 600; color: #1e293b;">
+          <span id="input-${field.id}">0</span><span>${field.calcSuffix || ''}</span>
+        </div>
+      `;
+      break;
+    default:
+      inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+  }
+  
+  // Layout selon position du label
+  if (field.labelPosition === 'left') {
+    group.innerHTML = `
+      <div style="display: flex; align-items: flex-start; gap: 15px;">
+        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 120px; padding-top: 12px;">${field.label}</label>
+        <div style="flex: 1;">
+          ${inputHtml}
+          <div class="form-error" id="error-${field.id}"></div>
+        </div>
+      </div>
+    `;
+  } else {
+    group.innerHTML = `
+      <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${field.label}</label>
+      ${inputHtml}
+      <div class="form-error" id="error-${field.id}"></div>
+    `;
+  }
+  
+  formFields.appendChild(group);
+}
+
+function initSignatures() {
+  document.querySelectorAll('.signature-canvas').forEach(canvas => {
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+    
+    canvas.addEventListener('mousedown', (e) => {
+      isDrawing = true;
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+    });
+    
+    canvas.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('mouseout', () => isDrawing = false);
+    
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      isDrawing = true;
+      [lastX, lastY] = [touch.clientX - rect.left, touch.clientY - rect.top];
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      [lastX, lastY] = [touch.clientX - rect.left, touch.clientY - rect.top];
+    });
+    
+    canvas.addEventListener('touchend', () => isDrawing = false);
+  });
+  
+  document.querySelectorAll('.signature-clear').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const canvasId = btn.dataset.canvas;
+      const canvas = document.getElementById(canvasId);
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    });
+  });
+}
+
+function initConditions() {
+  if (!formConfig || !formConfig.fields) return;
+  
+  formConfig.fields.forEach(field => {
+    if (!field.condition || !field.condition.fieldId) return;
+    
+    const group = document.querySelector(`.form-field-group[data-field-id="${field.id}"]`);
+    if (!group) return;
+    
+    const sourceField = formConfig.fields.find(f => f.id === field.condition.fieldId);
+    if (!sourceField) return;
+    
+    const sourceInput = document.getElementById(`input-${field.condition.fieldId}`);
+    if (!sourceInput) return;
+    
+    function checkCondition() {
+      let sourceValue = '';
+      
+      if (sourceField.fieldType === 'radio') {
+        const checked = sourceInput.querySelector('input:checked');
+        sourceValue = checked ? checked.value : '';
+      } else if (sourceField.fieldType === 'checkbox') {
+        const checked = sourceInput.querySelectorAll('input:checked');
+        sourceValue = Array.from(checked).map(c => c.value).join(',');
+      } else {
+        sourceValue = sourceInput.value || '';
+      }
+      
+      let visible = false;
+      const condValue = field.condition.value || '';
+      
+      switch (field.condition.operator) {
+        case 'equals':
+          visible = sourceValue === condValue;
+          break;
+        case 'not-equals':
+          visible = sourceValue !== condValue;
+          break;
+        case 'contains':
+          visible = sourceValue.toLowerCase().includes(condValue.toLowerCase());
+          break;
+        case 'not-empty':
+          visible = sourceValue !== '';
+          break;
+        case 'empty':
+          visible = sourceValue === '';
+          break;
+      }
+      
+      group.classList.toggle('hidden', !visible);
+    }
+    
+    if (sourceField.fieldType === 'radio' || sourceField.fieldType === 'checkbox') {
+      sourceInput.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', checkCondition);
+      });
+    } else {
+      sourceInput.addEventListener('input', checkCondition);
+      sourceInput.addEventListener('change', checkCondition);
+    }
+    
+    checkCondition();
+  });
+}
+
+function initCalculations() {
+  if (!formConfig || !formConfig.fields) return;
+  
+  const calculatedFields = formConfig.fields.filter(f => f.fieldType === 'calculated');
+  if (calculatedFields.length === 0) return;
+  
+  function recalculateAll() {
+    calculatedFields.forEach(field => {
+      const resultEl = document.getElementById(`input-${field.id}`);
+      if (!resultEl) return;
+      
+      let valueA = 0;
+      let valueB = 0;
+      
+      if (field.calcFieldA) {
+        const inputA = document.getElementById(`input-${field.calcFieldA}`);
+        if (inputA) valueA = parseFloat(inputA.value) || 0;
+      }
+      
+      if (field.calcFieldB === '_constant') {
+        valueB = field.calcConstant || 0;
+      } else if (field.calcFieldB) {
+        const inputB = document.getElementById(`input-${field.calcFieldB}`);
+        if (inputB) valueB = parseFloat(inputB.value) || 0;
+      }
+      
+      let result = 0;
+      
+      switch (field.calcType || 'sum') {
+        case 'sum': result = valueA + valueB; break;
+        case 'subtract': result = valueA - valueB; break;
+        case 'multiply': result = valueA * valueB; break;
+        case 'divide': result = valueB !== 0 ? valueA / valueB : 0; break;
+        case 'percentage': result = valueA * (valueB / 100); break;
+        case 'custom':
+          try {
+            const formula = (field.calcFormula || 'A + B').replace(/A/gi, valueA).replace(/B/gi, valueB);
+            result = eval(formula);
+          } catch (e) { result = 0; }
+          break;
+      }
+      
+      const decimals = field.calcDecimals !== undefined ? field.calcDecimals : 2;
+      resultEl.textContent = result.toFixed(decimals);
+    });
+  }
+  
+  formConfig.fields.forEach(field => {
+    if (field.fieldType === 'number') {
+      const input = document.getElementById(`input-${field.id}`);
+      if (input) {
+        input.addEventListener('input', recalculateAll);
+        input.addEventListener('change', recalculateAll);
+      }
+    }
+  });
+  
+  recalculateAll();
+}
+
+function updatePageIndicator() {
+  pageIndicator.textContent = `Page ${currentPage} / ${totalPages}`;
+  document.getElementById('btn-prev-page').disabled = currentPage === 1;
+  document.getElementById('btn-next-page').textContent = currentPage === totalPages ? 'Envoyer →' : 'Suivant →';
+}
+
+function showToast(message, type = 'info') {
+  toast.textContent = message;
+  toast.className = 'toast show ' + type;
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function submitForm() {
+  if (!formConfig || !formConfig.tableId) {
+    showToast('Configuration invalide', 'error');
+    return;
+  }
+  
+  const record = {};
+  let hasError = false;
+  
+  formConfig.fields.forEach(field => {
+    if (field.fieldType === 'section' || field.fieldType === 'title' || field.fieldType === 'image' || field.fieldType === 'qrcode') return;
+    if (!field.columnId) return;
+    
+    const group = document.querySelector(`.form-field-group[data-field-id="${field.id}"]`);
+    if (group && group.classList.contains('hidden')) return;
+    
+    const errorEl = document.getElementById(`error-${field.id}`);
+    if (errorEl) {
+      errorEl.textContent = '';
+      errorEl.classList.remove('show');
+    }
+    
+    let value = null;
+    
+    if (field.fieldType === 'radio') {
+      const container = document.getElementById(`input-${field.id}`);
+      const checked = container?.querySelector('input:checked');
+      value = checked ? checked.value : null;
+    } else if (field.fieldType === 'checkbox') {
+      const container = document.getElementById(`input-${field.id}`);
+      const checked = container?.querySelectorAll('input:checked');
+      value = checked ? Array.from(checked).map(c => c.value) : [];
+    } else if (field.fieldType === 'signature') {
+      const canvas = document.getElementById(`input-${field.id}`);
+      if (canvas) {
+        value = canvas.toDataURL('image/png');
+      }
+    } else if (field.fieldType === 'calculated') {
+      const el = document.getElementById(`input-${field.id}`);
+      value = el ? parseFloat(el.textContent) : 0;
+    } else {
+      const input = document.getElementById(`input-${field.id}`);
+      value = input ? input.value : null;
+    }
+    
+    // Validation
+    if (field.required && (value === null || value === '' || (Array.isArray(value) && value.length === 0))) {
+      if (errorEl) {
+        errorEl.textContent = field.errorMessage || 'Ce champ est obligatoire';
+        errorEl.classList.add('show');
+      }
+      hasError = true;
+      return;
+    }
+    
+    if (value !== null && value !== '') {
+      if (field.fieldType === 'number') {
+        value = parseFloat(value);
+        if (field.minValue !== undefined && value < field.minValue) {
+          if (errorEl) {
+            errorEl.textContent = `Valeur minimum: ${field.minValue}`;
+            errorEl.classList.add('show');
+          }
+          hasError = true;
+          return;
+        }
+        if (field.maxValue !== undefined && value > field.maxValue) {
+          if (errorEl) {
+            errorEl.textContent = `Valeur maximum: ${field.maxValue}`;
+            errorEl.classList.add('show');
+          }
+          hasError = true;
+          return;
+        }
+      }
+      
+      if (field.pattern && typeof value === 'string') {
+        const regex = new RegExp(field.pattern);
+        if (!regex.test(value)) {
+          if (errorEl) {
+            errorEl.textContent = field.errorMessage || 'Format invalide';
+            errorEl.classList.add('show');
+          }
+          hasError = true;
+          return;
+        }
+      }
+    }
+    
+    if (Array.isArray(value)) {
+      value = value.join(', ');
+    }
+    
+    record[field.columnId] = value;
+  });
+  
+  if (hasError) {
+    showToast('Veuillez corriger les erreurs', 'error');
+    return;
+  }
+  
+  try {
+    await grist.docApi.applyUserActions([
+      ['AddRecord', formConfig.tableId, null, record]
+    ]);
+    
+    formContent.style.display = 'none';
+    formActions.style.display = 'none';
+    successView.style.display = 'block';
+    
+  } catch (error) {
+    console.error('Erreur soumission:', error);
+    showToast('Erreur lors de l\'envoi', 'error');
+  }
+}
+
+function resetForm() {
+  document.querySelectorAll('.form-input, .form-textarea, .form-select').forEach(input => {
+    input.value = '';
+  });
+  document.querySelectorAll('.form-radio-group input, .form-checkbox-group input').forEach(input => {
+    input.checked = false;
+  });
+  document.querySelectorAll('.signature-canvas').forEach(canvas => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
+  document.querySelectorAll('.form-error').forEach(el => {
+    el.textContent = '';
+    el.classList.remove('show');
+  });
+  currentPage = 1;
+  renderForm();
+}
+
+// Event listeners
+document.getElementById('btn-submit').addEventListener('click', submitForm);
+document.getElementById('btn-reset').addEventListener('click', resetForm);
+document.getElementById('btn-new-form').addEventListener('click', () => {
+  successView.style.display = 'none';
+  formContent.style.display = 'block';
+  formActions.style.display = 'flex';
+  resetForm();
+});
+
+document.getElementById('btn-prev-page').addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage--;
+    renderForm();
+    window.scrollTo(0, 0);
+  }
+});
+
+document.getElementById('btn-next-page').addEventListener('click', () => {
+  if (currentPage < totalPages) {
+    currentPage++;
+    renderForm();
+    window.scrollTo(0, 0);
+  } else {
+    submitForm();
+  }
+});
+</script>
+</body>
+</html>
