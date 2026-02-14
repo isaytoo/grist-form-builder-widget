@@ -17,6 +17,7 @@ let selectedField = null;
 let draggedData = null;
 let formConfig = null;
 let templates = [];
+let versionHistory = [];
 let snapToGrid = true;
 let showGrid = true;
 let zoomLevel = 100;
@@ -328,6 +329,7 @@ formCanvas.addEventListener('drop', (e) => {
   }
   
   formFields.push(newField);
+  saveVersion('Ajout de champ');
   renderFormFields();
   selectField(newField.id);
   showToast('Champ ajouté', 'success');
@@ -787,6 +789,7 @@ function sendToBack(fieldId) {
 
 // Supprimer un champ
 function deleteField(fieldId) {
+  saveVersion('Suppression de champ');
   formFields = formFields.filter(f => f.id !== fieldId);
   selectedField = null;
   renderFormFields();
@@ -2442,6 +2445,78 @@ function saveTemplate() {
   showToast('Template sauvegardé', 'success');
 }
 
+// Sauvegarder une version dans l'historique
+function saveVersion(action = 'Modification') {
+  if (formFields.length === 0) return;
+  
+  const now = new Date();
+  versionHistory.unshift({
+    action: action,
+    date: now.toLocaleDateString('fr-FR'),
+    time: now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    timestamp: now.getTime(),
+    fields: JSON.parse(JSON.stringify(formFields)),
+    tableId: currentTable,
+    title: formConfig?.title || ''
+  });
+  
+  // Garder max 20 versions
+  if (versionHistory.length > 20) {
+    versionHistory = versionHistory.slice(0, 20);
+  }
+  
+  renderHistoryList();
+}
+
+// Afficher la liste de l'historique
+function renderHistoryList() {
+  const historyList = document.getElementById('history-list');
+  if (!historyList) return;
+  
+  if (versionHistory.length === 0) {
+    historyList.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun historique</p>';
+    return;
+  }
+  
+  historyList.innerHTML = versionHistory.map((version, index) => `
+    <div class="template-item" style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div class="template-name">${version.action}</div>
+        <div class="template-date">${version.date} à ${version.time} • ${version.fields.length} champs</div>
+      </div>
+      <button class="btn btn-secondary" onclick="restoreVersion(${index})" style="padding: 4px 10px; font-size: 0.75em;">↩️ Restaurer</button>
+    </div>
+  `).join('');
+}
+
+// Restaurer une version
+async function restoreVersion(index) {
+  const version = versionHistory[index];
+  if (!version) return;
+  
+  const confirmed = await showConfirm({
+    icon: '📜',
+    title: 'Restaurer cette version',
+    message: `Restaurer la version du ${version.date} à ${version.time} ?`,
+    confirmText: 'Restaurer',
+    cancelText: 'Annuler'
+  });
+  
+  if (!confirmed) return;
+  
+  // Sauvegarder l'état actuel avant restauration
+  saveVersion('Avant restauration');
+  
+  formFields = JSON.parse(JSON.stringify(version.fields));
+  if (version.title) {
+    formConfig.title = version.title;
+    document.getElementById('form-title-input').value = version.title;
+  }
+  
+  renderFormFields();
+  showToast('Version restaurée', 'success');
+}
+
 async function loadTemplate(index) {
   const template = templates[index];
   if (!template) return;
@@ -2539,6 +2614,22 @@ btnExportPdf.addEventListener('click', exportPdf);
 btnTemplates.addEventListener('click', openTemplatesModal);
 btnSaveTemplate.addEventListener('click', saveTemplate);
 btnCloseTemplates.addEventListener('click', closeTemplatesModal);
+
+// Onglets Templates / Historique
+document.getElementById('btn-show-templates')?.addEventListener('click', () => {
+  document.getElementById('templates-tab').style.display = '';
+  document.getElementById('history-tab').style.display = 'none';
+  document.getElementById('btn-show-templates').classList.add('active');
+  document.getElementById('btn-show-history').classList.remove('active');
+});
+
+document.getElementById('btn-show-history')?.addEventListener('click', () => {
+  document.getElementById('templates-tab').style.display = 'none';
+  document.getElementById('history-tab').style.display = '';
+  document.getElementById('btn-show-templates').classList.remove('active');
+  document.getElementById('btn-show-history').classList.add('active');
+  renderHistoryList();
+});
 
 // Export template JSON
 btnExportTemplate.addEventListener('click', () => {

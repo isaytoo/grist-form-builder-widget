@@ -345,8 +345,18 @@
         <button class="btn btn-secondary" id="btn-import-template" style="flex: 1;">📥 Importer JSON</button>
         <input type="file" id="import-file" accept=".json" style="display: none;">
       </div>
-      <div class="property-label">Templates enregistrés</div>
-      <div class="templates-list" id="templates-list"><p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun template</p></div>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <button class="btn btn-secondary" id="btn-show-templates" style="flex: 1; font-size: 0.8em;">📁 Templates</button>
+        <button class="btn btn-secondary" id="btn-show-history" style="flex: 1; font-size: 0.8em;">📜 Historique</button>
+      </div>
+      <div id="templates-tab">
+        <div class="property-label">Templates enregistrés</div>
+        <div class="templates-list" id="templates-list"><p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun template</p></div>
+      </div>
+      <div id="history-tab" style="display: none;">
+        <div class="property-label">Historique des versions</div>
+        <div class="templates-list" id="history-list"><p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun historique</p></div>
+      </div>
       <div class="modal-actions"><button class="btn btn-secondary" id="btn-close-templates">Fermer</button></div>
     </div>
   </div>
