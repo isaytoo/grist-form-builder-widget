@@ -91,34 +91,43 @@ async function detectUserRole() {
     const tables = await grist.docApi.listTables();
 
     if (!tables.includes(helperTable)) {
-      // Étape 1: Créer la table avec une colonne placeholder
+      // Créer la table
       await grist.docApi.applyUserActions([
-        ['AddTable', helperTable, [
-          { id: 'UserEmail', type: 'Text' }
-        ]]
+        ['AddTable', helperTable, [{ id: 'UserEmail', type: 'Text' }]]
       ]);
-      // Étape 2: Convertir la colonne en formule
+      console.log('[FormBuilder] Table helper créée');
+    }
+
+    // Toujours s'assurer que la formule est correcte (corrige les tables créées sans formule)
+    try {
       await grist.docApi.applyUserActions([
         ['ModifyColumn', helperTable, 'UserEmail', { isFormula: true, formula: 'user.Email' }]
       ]);
-      // Étape 3: Ajouter un enregistrement pour déclencher la formule
+    } catch (modErr) {
+      console.log('[FormBuilder] ModifyColumn info:', modErr.message);
+    }
+
+    // S'assurer qu'il y a au moins un enregistrement
+    const data = await grist.docApi.fetchTable(helperTable);
+    if (!data.id || data.id.length === 0) {
       await grist.docApi.applyUserActions([
         ['AddRecord', helperTable, null, {}]
       ]);
-      console.log('[FormBuilder] Table helper créée:', helperTable);
-    }
-
-    // Lire l'email de l'utilisateur courant via la formule
-    const data = await grist.docApi.fetchTable(helperTable);
-    console.log('[FormBuilder] Données helper:', JSON.stringify(data));
-    if (data.UserEmail && data.UserEmail.length > 0) {
+      // Re-lire après ajout
+      const data2 = await grist.docApi.fetchTable(helperTable);
+      if (data2.UserEmail && data2.UserEmail.length > 0) {
+        const email = data2.UserEmail[0];
+        if (email && typeof email === 'string' && email.includes('@')) {
+          currentUserEmail = email;
+        }
+      }
+    } else if (data.UserEmail && data.UserEmail.length > 0) {
       const email = data.UserEmail[0];
-      // Vérifier que ce n'est pas une erreur de formule
       if (email && typeof email === 'string' && email.includes('@')) {
         currentUserEmail = email;
-        console.log('[FormBuilder] Email détecté via helper:', currentUserEmail);
+        console.log('[FormBuilder] Email détecté:', currentUserEmail);
       } else {
-        console.log('[FormBuilder] Valeur UserEmail invalide:', email);
+        console.log('[FormBuilder] Valeur UserEmail:', email, '- type:', typeof email);
       }
     }
   } catch (e) {
