@@ -82,29 +82,8 @@ grist.ready({
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
 // Note: Pour activer la restriction par rôle, définir isOwner = false pour les non-propriétaires
 async function detectUserRole() {
-  // DEBUG: décoder le JWT pour obtenir userId, puis chercher l'email
-  try {
-    var tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
-    // Décoder le payload JWT (base64)
-    var parts = tokenInfo.token.split('.');
-    if (parts.length === 3) {
-      var payload = JSON.parse(atob(parts[1]));
-      console.log('[FormBuilder] JWT payload:', JSON.stringify(payload));
-      console.log('[FormBuilder] userId:', payload.userId);
-    }
-  } catch(e) {
-    console.log('[FormBuilder] getAccessToken error:', e.message);
-  }
-
-  // Essayer de lire _grist_ACLPrincipals
-  try {
-    var aclData = await grist.docApi.fetchTable('_grist_ACLPrincipals');
-    console.log('[FormBuilder] _grist_ACLPrincipals:', JSON.stringify(aclData));
-  } catch(e) {
-    console.log('[FormBuilder] _grist_ACLPrincipals error:', e.message);
-  }
-
   // Par défaut, tous les utilisateurs ont accès complet
+  // La gestion des rôles peut être activée via les règles d'accès Grist
   isOwner = true;
   applyRoleRestrictions();
 }
@@ -216,8 +195,6 @@ grist.onOptions(async function(options) {
     }
     renderFormFields();
   }
-  
-  await detectUserRole();
   
   hideLoading();
   
