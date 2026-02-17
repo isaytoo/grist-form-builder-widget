@@ -82,6 +82,15 @@ grist.ready({
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
 // Note: Pour activer la restriction par rôle, définir isOwner = false pour les non-propriétaires
 async function detectUserRole() {
+  // DEBUG: voir ce que Grist nous donne
+  console.log('[FormBuilder] URL params:', window.location.search);
+  try {
+    var tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
+    console.log('[FormBuilder] getAccessToken result:', JSON.stringify(tokenInfo));
+  } catch(e) {
+    console.log('[FormBuilder] getAccessToken error:', e.message);
+  }
+
   // Par défaut, tous les utilisateurs ont accès complet
   // La gestion des rôles peut être activée via les règles d'accès Grist
   isOwner = true;
@@ -195,6 +204,8 @@ grist.onOptions(async function(options) {
     }
     renderFormFields();
   }
+  
+  await detectUserRole();
   
   hideLoading();
   
