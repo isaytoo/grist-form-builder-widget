@@ -90,12 +90,19 @@ async function detectUserRole() {
   try {
     const tables = await grist.docApi.listTables();
 
-    // Créer une table helper temporaire avec une formule user.Email si elle n'existe pas
     if (!tables.includes(helperTable)) {
+      // Étape 1: Créer la table avec une colonne placeholder
       await grist.docApi.applyUserActions([
         ['AddTable', helperTable, [
-          { id: 'UserEmail', type: 'Text', isFormula: true, formula: 'user.Email' }
-        ]],
+          { id: 'UserEmail', type: 'Text' }
+        ]]
+      ]);
+      // Étape 2: Convertir la colonne en formule
+      await grist.docApi.applyUserActions([
+        ['ModifyColumn', helperTable, 'UserEmail', { isFormula: true, formula: 'user.Email' }]
+      ]);
+      // Étape 3: Ajouter un enregistrement pour déclencher la formule
+      await grist.docApi.applyUserActions([
         ['AddRecord', helperTable, null, {}]
       ]);
       console.log('[FormBuilder] Table helper créée:', helperTable);
@@ -103,9 +110,16 @@ async function detectUserRole() {
 
     // Lire l'email de l'utilisateur courant via la formule
     const data = await grist.docApi.fetchTable(helperTable);
+    console.log('[FormBuilder] Données helper:', JSON.stringify(data));
     if (data.UserEmail && data.UserEmail.length > 0) {
-      currentUserEmail = data.UserEmail[0] || null;
-      console.log('[FormBuilder] Email détecté via helper:', currentUserEmail);
+      const email = data.UserEmail[0];
+      // Vérifier que ce n'est pas une erreur de formule
+      if (email && typeof email === 'string' && email.includes('@')) {
+        currentUserEmail = email;
+        console.log('[FormBuilder] Email détecté via helper:', currentUserEmail);
+      } else {
+        console.log('[FormBuilder] Valeur UserEmail invalide:', email);
+      }
     }
   } catch (e) {
     console.log('[FormBuilder] Détection email échouée:', e.message);
@@ -178,8 +192,8 @@ async function checkUserRole() {
       // Les autres sont en mode saisie uniquement
       isOwner = true; // L'édition de structure reste liée au mode Grist, pas au rôle
     } else {
-      console.log('[FormBuilder] Utilisateur non trouvé dans', rolesTable);
-      // Utilisateur non trouvé dans la table des rôles → bloquer par sécurité
+      console.log('[FormBuilder] Utilisateur non trouvé dans', rolesTable, '- email:', currentUserEmail);
+      // Utilisateur non trouvé dans la table des rôles → bloquer
       canSubmit = false;
     }
   } catch (e) {
