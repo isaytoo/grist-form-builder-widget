@@ -83,27 +83,35 @@ grist.ready({
 });
 
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
+// Utilise uniquement grist.docApi (postMessage) pour éviter les problèmes CORS
 async function detectUserRole() {
+  const helperTable = '_BM_UserHelper';
+
   try {
-    // Récupérer l'email de l'utilisateur via getAccessToken
-    const tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
-    if (tokenInfo && tokenInfo.baseUrl) {
-      try {
-        const resp = await fetch(tokenInfo.baseUrl + '/api/session/access/active', {
-          headers: { 'Authorization': 'Bearer ' + tokenInfo.token }
-        });
-        if (resp.ok) {
-          const sessionInfo = await resp.json();
-          currentUserEmail = sessionInfo?.user?.email || null;
-          console.log('[FormBuilder] Utilisateur détecté:', currentUserEmail);
-        }
-      } catch (e) {
-        console.log('[FormBuilder] Impossible de récupérer l\'email utilisateur:', e.message);
-      }
+    const tables = await grist.docApi.listTables();
+
+    // Créer une table helper temporaire avec une formule user.Email si elle n'existe pas
+    if (!tables.includes(helperTable)) {
+      await grist.docApi.applyUserActions([
+        ['AddTable', helperTable, [
+          { id: 'UserEmail', type: 'Text', isFormula: true, formula: 'user.Email' }
+        ]],
+        ['AddRecord', helperTable, null, {}]
+      ]);
+      console.log('[FormBuilder] Table helper créée:', helperTable);
+    }
+
+    // Lire l'email de l'utilisateur courant via la formule
+    const data = await grist.docApi.fetchTable(helperTable);
+    if (data.UserEmail && data.UserEmail.length > 0) {
+      currentUserEmail = data.UserEmail[0] || null;
+      console.log('[FormBuilder] Email détecté via helper:', currentUserEmail);
     }
   } catch (e) {
-    console.log('[FormBuilder] getAccessToken non disponible:', e.message);
+    console.log('[FormBuilder] Détection email échouée:', e.message);
   }
+
+  console.log('[FormBuilder] Email final:', currentUserEmail || 'non détecté');
 
   // Vérifier le rôle via la table configurée
   await checkUserRole();
@@ -129,9 +137,15 @@ async function checkUserRole() {
     return;
   }
 
-  // Si on n'a pas l'email, ne pas bloquer (fallback permissif)
+  // Si on n'a pas l'email
   if (!currentUserEmail) {
-    console.log('[FormBuilder] Email non disponible, accès autorisé par défaut');
+    if (isFormMode) {
+      // En mode formulaire partagé, bloquer si on ne peut pas vérifier l'identité
+      console.log('[FormBuilder] Email non disponible en mode form, soumission bloquée');
+      canSubmit = false;
+    } else {
+      console.log('[FormBuilder] Email non disponible, accès autorisé par défaut');
+    }
     return;
   }
 
@@ -142,6 +156,7 @@ async function checkUserRole() {
 
     if (!emailCol || !roleCol) {
       console.log('[FormBuilder] Colonnes de rôles introuvables dans', rolesTable);
+      if (isFormMode) canSubmit = false;
       return;
     }
 
@@ -169,8 +184,8 @@ async function checkUserRole() {
     }
   } catch (e) {
     console.log('[FormBuilder] Erreur lecture table rôles:', e.message);
-    // En cas d'erreur, ne pas bloquer
-    canSubmit = true;
+    // En mode form, bloquer par sécurité. Sinon, ne pas bloquer.
+    canSubmit = !isFormMode;
   }
 }
 
