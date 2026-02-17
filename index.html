@@ -249,7 +249,6 @@
       <div class="sidebar-tabs">
         <button class="sidebar-tab active" data-tab="fields">Champs</button>
         <button class="sidebar-tab" data-tab="elements">Éléments</button>
-        <button class="sidebar-tab" data-tab="roles">Rôles</button>
       </div>
       <div class="sidebar-content">
         <div class="tab-panel active" id="tab-fields">
@@ -281,30 +280,6 @@
             <div class="element-item" draggable="true" data-element-type="lookup"><span class="field-icon">🔍</span><span class="field-name">Lookup</span></div>
             <div class="element-item" draggable="true" data-element-type="calculated"><span class="field-icon">🧮</span><span class="field-name">Champ calculé</span></div>
             <div class="element-item" draggable="true" data-element-type="divider"><span class="field-icon">➖</span><span class="field-name">Filet</span></div>
-          </div>
-        </div>
-        <div class="tab-panel" id="tab-roles">
-          <div style="padding: 10px;">
-            <p style="color: #64748b; font-size: 0.8em; margin-bottom: 12px;">Restreindre qui peut soumettre ce formulaire en fonction d'une table de rôles dans le document.</p>
-            <div style="margin-bottom: 12px;">
-              <label style="font-size: 0.85em; font-weight: 500; color: #334155; display: block; margin-bottom: 4px;">Table des utilisateurs</label>
-              <select class="table-select" id="roles-table-select" style="width: 100%;"><option value="">-- Aucune restriction --</option></select>
-            </div>
-            <div style="margin-bottom: 12px;">
-              <label style="font-size: 0.85em; font-weight: 500; color: #334155; display: block; margin-bottom: 4px;">Colonne Email</label>
-              <select class="table-select" id="roles-email-column" style="width: 100%;"><option value="">--</option></select>
-            </div>
-            <div style="margin-bottom: 12px;">
-              <label style="font-size: 0.85em; font-weight: 500; color: #334155; display: block; margin-bottom: 4px;">Colonne Rôle/Statut</label>
-              <select class="table-select" id="roles-role-column" style="width: 100%;"><option value="">--</option></select>
-            </div>
-            <div style="margin-bottom: 12px;">
-              <label style="font-size: 0.85em; font-weight: 500; color: #334155; display: block; margin-bottom: 4px;">Rôles autorisés à soumettre</label>
-              <input type="text" class="table-select" id="roles-allowed" placeholder="Ex: Gestionnaire, Compta" style="width: 100%;">
-              <p style="color: #94a3b8; font-size: 0.75em; margin-top: 4px;">Séparer par des virgules. Laisser vide = tout le monde peut soumettre.</p>
-            </div>
-            <button class="btn btn-primary" id="btn-save-roles" style="width: 100%; margin-top: 8px;">Enregistrer les restrictions</button>
-            <div id="roles-status" style="margin-top: 8px; font-size: 0.8em;"></div>
           </div>
         </div>
         </div>

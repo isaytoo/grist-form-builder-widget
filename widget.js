@@ -21,9 +21,6 @@ let versionHistory = [];
 let currentPage = 1;
 let totalPages = 1;
 let isOwner = false;
-let userRole = null;
-let canSubmit = true;
-let currentUserEmail = null;
 let snapToGrid = true;
 let showGrid = true;
 let zoomLevel = 100;
@@ -83,128 +80,12 @@ grist.ready({
 });
 
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
+// Note: Pour activer la restriction par rôle, définir isOwner = false pour les non-propriétaires
 async function detectUserRole() {
-  // Récupérer l'email via getAccessToken + API REST Grist
-  try {
-    var tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
-    console.log('[FormBuilder] Token obtenu, baseUrl:', tokenInfo.baseUrl);
-
-    if (tokenInfo && tokenInfo.baseUrl && tokenInfo.token) {
-      // baseUrl = https://grist.gristup.fr/api/docs/{docId}
-      // On veut https://grist.gristup.fr/api/session/access/active
-      var baseUrl = tokenInfo.baseUrl;
-      var apiRoot = baseUrl.replace(/\/api\/docs\/.*$/, '/api');
-      console.log('[FormBuilder] API root:', apiRoot);
-
-      // Essayer /api/session/access/active
-      try {
-        var resp = await fetch(apiRoot + '/session/access/active', {
-          headers: { 'Authorization': 'Bearer ' + tokenInfo.token }
-        });
-        console.log('[FormBuilder] Session API status:', resp.status);
-        if (resp.ok) {
-          var sessionInfo = await resp.json();
-          currentUserEmail = sessionInfo?.user?.email || null;
-          console.log('[FormBuilder] Email via session:', currentUserEmail);
-        } else {
-          console.log('[FormBuilder] Session API réponse:', resp.status, resp.statusText);
-        }
-      } catch (e) {
-        console.log('[FormBuilder] Session API erreur:', e.message);
-      }
-
-      // Fallback: essayer directement via le baseUrl du doc
-      if (!currentUserEmail) {
-        try {
-          var resp2 = await fetch(baseUrl + '/tables/_grist_ACLPrincipals/records', {
-            headers: { 'Authorization': 'Bearer ' + tokenInfo.token }
-          });
-          console.log('[FormBuilder] ACL API status:', resp2.status);
-        } catch (e) {
-          console.log('[FormBuilder] ACL API erreur:', e.message);
-        }
-      }
-    }
-  } catch (e) {
-    console.log('[FormBuilder] getAccessToken erreur:', e.message);
-  }
-
-  console.log('[FormBuilder] Email final:', currentUserEmail || 'non détecté');
-
-  // Vérifier le rôle via la table configurée
-  await checkUserRole();
-  applyRoleRestrictions();
-}
-
-// Vérifier le rôle de l'utilisateur via la table de rôles configurée
-async function checkUserRole() {
-  // Par défaut, tout le monde peut soumettre
+  // Par défaut, tous les utilisateurs ont accès complet
+  // La gestion des rôles peut être activée via les règles d'accès Grist
   isOwner = true;
-  canSubmit = true;
-  userRole = null;
-
-  if (!formConfig) return;
-
-  const rolesTable = formConfig.rolesTable;
-  const rolesEmailColumn = formConfig.rolesEmailColumn;
-  const rolesRoleColumn = formConfig.rolesRoleColumn;
-  const allowedRoles = formConfig.allowedRoles || [];
-
-  // Si pas de config de rôles, tout le monde peut soumettre (comportement par défaut)
-  if (!rolesTable || !rolesEmailColumn || !rolesRoleColumn || allowedRoles.length === 0) {
-    return;
-  }
-
-  // Si on n'a pas l'email
-  if (!currentUserEmail) {
-    if (isFormMode) {
-      // En mode formulaire partagé, bloquer si on ne peut pas vérifier l'identité
-      console.log('[FormBuilder] Email non disponible en mode form, soumission bloquée');
-      canSubmit = false;
-    } else {
-      console.log('[FormBuilder] Email non disponible, accès autorisé par défaut');
-    }
-    return;
-  }
-
-  try {
-    const data = await grist.docApi.fetchTable(rolesTable);
-    const emailCol = data[rolesEmailColumn];
-    const roleCol = data[rolesRoleColumn];
-
-    if (!emailCol || !roleCol) {
-      console.log('[FormBuilder] Colonnes de rôles introuvables dans', rolesTable);
-      if (isFormMode) canSubmit = false;
-      return;
-    }
-
-    // Chercher l'utilisateur par email (insensible à la casse)
-    const userIndex = emailCol.findIndex(function(email) {
-      return email && email.toString().toLowerCase() === currentUserEmail.toLowerCase();
-    });
-
-    if (userIndex >= 0) {
-      userRole = roleCol[userIndex];
-      console.log('[FormBuilder] Rôle trouvé:', userRole);
-
-      // Vérifier si le rôle est autorisé à soumettre
-      canSubmit = allowedRoles.some(function(r) {
-        return r.toLowerCase() === userRole.toString().toLowerCase();
-      });
-
-      // Seuls les OWNER Grist peuvent éditer la structure
-      // Les autres sont en mode saisie uniquement
-      isOwner = true; // L'édition de structure reste liée au mode Grist, pas au rôle
-    } else {
-      console.log('[FormBuilder] Utilisateur non trouvé dans', rolesTable, '- email:', currentUserEmail);
-      // Utilisateur non trouvé dans la table des rôles → bloquer
-      canSubmit = false;
-    }
-  } catch (e) {
-    console.log('[FormBuilder] Erreur lecture table rôles:', e.message);
-    // En mode form, bloquer par sécurité. Sinon, ne pas bloquer.
-    canSubmit = !isFormMode;
-  }
+  applyRoleRestrictions();
 }
 
 // Appliquer les restrictions selon le rôle
@@ -225,23 +106,6 @@ function applyRoleRestrictions() {
     
     // Forcer le mode Saisie
     switchMode('fill');
-  }
-
-  // Bloquer le bouton Enregistrer si l'utilisateur n'a pas le droit de soumettre
-  if (!canSubmit && btnSubmit) {
-    btnSubmit.disabled = true;
-    btnSubmit.style.opacity = '0.5';
-    btnSubmit.style.cursor = 'not-allowed';
-    btnSubmit.title = 'Vous n\'avez pas la permission de soumettre ce formulaire';
-    // Ajouter un message visible
-    const submitParent = btnSubmit.parentElement;
-    if (submitParent && !document.getElementById('no-submit-msg')) {
-      const msg = document.createElement('p');
-      msg.id = 'no-submit-msg';
-      msg.style.cssText = 'color: #ef4444; font-size: 0.85em; margin-top: 8px; text-align: center;';
-      msg.textContent = '🔒 Vous n\'avez pas la permission de soumettre ce formulaire' + (userRole ? ' (rôle: ' + userRole + ')' : '');
-      submitParent.appendChild(msg);
-    }
   }
 }
 
@@ -331,9 +195,6 @@ grist.onOptions(async function(options) {
     }
     renderFormFields();
   }
-  
-  // Détecter le rôle de l'utilisateur (vérification des droits de soumission)
-  await detectUserRole();
   
   hideLoading();
   
@@ -2270,12 +2131,7 @@ async function saveFormConfig() {
     title: formTitleInput.value || 'Formulaire ' + currentTable,
     templates: templates,
     totalPages: totalPages,
-    versionHistory: versionHistory.slice(0, 10), // Garder les 10 dernières versions
-    // Config des rôles (restriction de soumission)
-    rolesTable: formConfig?.rolesTable || '',
-    rolesEmailColumn: formConfig?.rolesEmailColumn || '',
-    rolesRoleColumn: formConfig?.rolesRoleColumn || '',
-    allowedRoles: formConfig?.allowedRoles || []
+    versionHistory: versionHistory.slice(0, 10) // Garder les 10 dernières versions
   };
   
   try {
@@ -3088,12 +2944,6 @@ function initConditions() {
 
 // Soumettre le formulaire
 async function submitForm() {
-  // Vérifier les droits de soumission
-  if (!canSubmit) {
-    showToast('Vous n\'avez pas la permission de soumettre ce formulaire' + (userRole ? ' (rôle: ' + userRole + ')' : ''), 'error');
-    return;
-  }
-
   if (!formConfig || !formConfig.tableId) {
     showToast('Configuration invalide', 'error');
     return;
@@ -3937,141 +3787,3 @@ window.addEventListener('resize', () => {
   }
 });
 
-// === Gestion de l'onglet Rôles ===
-
-// Peupler les dropdowns de l'onglet Rôles
-async function populateRolesTab() {
-  const rolesTableSelect = document.getElementById('roles-table-select');
-  const rolesEmailCol = document.getElementById('roles-email-column');
-  const rolesRoleCol = document.getElementById('roles-role-column');
-  const rolesAllowed = document.getElementById('roles-allowed');
-  const rolesStatus = document.getElementById('roles-status');
-
-  if (!rolesTableSelect) return;
-
-  // Peupler la liste des tables
-  rolesTableSelect.innerHTML = '<option value="">-- Aucune restriction --</option>';
-  availableTables.forEach(function(t) {
-    var opt = document.createElement('option');
-    opt.value = t;
-    opt.textContent = t;
-    if (formConfig && formConfig.rolesTable === t) opt.selected = true;
-    rolesTableSelect.appendChild(opt);
-  });
-
-  // Pré-remplir les rôles autorisés
-  if (formConfig && formConfig.allowedRoles && formConfig.allowedRoles.length > 0) {
-    rolesAllowed.value = formConfig.allowedRoles.join(', ');
-  }
-
-  // Si une table est déjà sélectionnée, charger ses colonnes
-  if (formConfig && formConfig.rolesTable) {
-    await loadRolesColumns(formConfig.rolesTable);
-  }
-
-  // Afficher le statut actuel
-  updateRolesStatus();
-}
-
-// Charger les colonnes d'une table pour les dropdowns email/rôle
-async function loadRolesColumns(tableId) {
-  var rolesEmailCol = document.getElementById('roles-email-column');
-  var rolesRoleCol = document.getElementById('roles-role-column');
-
-  if (!tableId) {
-    rolesEmailCol.innerHTML = '<option value="">--</option>';
-    rolesRoleCol.innerHTML = '<option value="">--</option>';
-    return;
-  }
-
-  try {
-    var data = await grist.docApi.fetchTable(tableId);
-    var columns = Object.keys(data).filter(function(col) {
-      return col !== 'id' && col !== 'manualSort' && !col.startsWith('grist');
-    });
-
-    rolesEmailCol.innerHTML = '<option value="">-- Sélectionner --</option>';
-    rolesRoleCol.innerHTML = '<option value="">-- Sélectionner --</option>';
-
-    columns.forEach(function(col) {
-      var opt1 = document.createElement('option');
-      opt1.value = col;
-      opt1.textContent = col;
-      if (formConfig && formConfig.rolesEmailColumn === col) opt1.selected = true;
-      rolesEmailCol.appendChild(opt1);
-
-      var opt2 = document.createElement('option');
-      opt2.value = col;
-      opt2.textContent = col;
-      if (formConfig && formConfig.rolesRoleColumn === col) opt2.selected = true;
-      rolesRoleCol.appendChild(opt2);
-    });
-  } catch (e) {
-    console.log('[FormBuilder] Erreur chargement colonnes rôles:', e.message);
-  }
-}
-
-// Mettre à jour le statut affiché
-function updateRolesStatus() {
-  var rolesStatus = document.getElementById('roles-status');
-  if (!rolesStatus) return;
-
-  if (formConfig && formConfig.rolesTable && formConfig.allowedRoles && formConfig.allowedRoles.length > 0) {
-    rolesStatus.innerHTML = '<span style="color: #10b981;">✅ Restriction active</span><br>' +
-      '<span style="color: #64748b;">Table: ' + formConfig.rolesTable + '</span><br>' +
-      '<span style="color: #64748b;">Rôles autorisés: ' + formConfig.allowedRoles.join(', ') + '</span>';
-    if (currentUserEmail) {
-      rolesStatus.innerHTML += '<br><span style="color: #64748b;">Votre email: ' + currentUserEmail + '</span>';
-      rolesStatus.innerHTML += '<br><span style="color: ' + (canSubmit ? '#10b981' : '#ef4444') + ';">' +
-        (canSubmit ? '✅ Vous pouvez soumettre' : '🔒 Soumission bloquée') +
-        (userRole ? ' (rôle: ' + userRole + ')' : '') + '</span>';
-    }
-  } else {
-    rolesStatus.innerHTML = '<span style="color: #94a3b8;">Aucune restriction — tout le monde peut soumettre.</span>';
-  }
-}
-
-// Event: changement de table dans l'onglet Rôles
-document.getElementById('roles-table-select')?.addEventListener('change', function(e) {
-  loadRolesColumns(e.target.value);
-});
-
-// Event: sauvegarder les restrictions de rôles
-document.getElementById('btn-save-roles')?.addEventListener('click', async function() {
-  var rolesTable = document.getElementById('roles-table-select').value;
-  var rolesEmailColumn = document.getElementById('roles-email-column').value;
-  var rolesRoleColumn = document.getElementById('roles-role-column').value;
-  var rolesAllowedStr = document.getElementById('roles-allowed').value;
-
-  var allowedRoles = rolesAllowedStr
-    ? rolesAllowedStr.split(',').map(function(r) { return r.trim(); }).filter(Boolean)
-    : [];
-
-  // Valider la config
-  if (rolesTable && (!rolesEmailColumn || !rolesRoleColumn)) {
-    showToast('Veuillez sélectionner les colonnes Email et Rôle', 'error');
-    return;
-  }
-
-  // Mettre à jour formConfig
-  if (!formConfig) formConfig = {};
-  formConfig.rolesTable = rolesTable;
-  formConfig.rolesEmailColumn = rolesEmailColumn;
-  formConfig.rolesRoleColumn = rolesRoleColumn;
-  formConfig.allowedRoles = allowedRoles;
-
-  // Sauvegarder la config complète
-  await saveFormConfig();
-
-  // Re-vérifier le rôle de l'utilisateur courant
-  await checkUserRole();
-  applyRoleRestrictions();
-  updateRolesStatus();
-
-  showToast('Restrictions de rôles enregistrées', 'success');
-});
-
-// Peupler l'onglet Rôles quand on clique dessus
-document.querySelector('.sidebar-tab[data-tab="roles"]')?.addEventListener('click', function() {
-  populateRolesTab();
-});
