@@ -85,49 +85,69 @@ grist.ready({
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
 // Utilise uniquement grist.docApi (postMessage) pour éviter les problèmes CORS
 async function detectUserRole() {
-  const helperTable = '_BM_UserHelper';
+  // Trouver le vrai nom de la table helper (Grist peut renommer)
+  var helperTable = null;
+  var emailColumn = null;
 
   try {
-    const tables = await grist.docApi.listTables();
+    var tables = await grist.docApi.listTables();
 
-    if (!tables.includes(helperTable)) {
-      // Créer la table
+    // Chercher la table helper (Grist peut avoir transformé le nom)
+    helperTable = tables.find(function(t) {
+      return t === 'BM_UserHelper' || t === '_BM_UserHelper' || t === 'GristFormHelper';
+    });
+
+    if (!helperTable) {
+      // Créer la table avec un nom simple et une colonne formule en une seule action
       await grist.docApi.applyUserActions([
-        ['AddTable', helperTable, [{ id: 'UserEmail', type: 'Text' }]]
+        ['AddTable', 'GristFormHelper', [
+          { id: 'A', type: 'Any', isFormula: true, formula: 'user.Email' }
+        ]],
+        ['AddRecord', 'GristFormHelper', null, {}]
       ]);
-      console.log('[FormBuilder] Table helper créée');
+      console.log('[FormBuilder] Table helper créée via AddTable');
+
+      // Retrouver le vrai nom après création
+      tables = await grist.docApi.listTables();
+      helperTable = tables.find(function(t) {
+        return t.indexOf('GristFormHelper') >= 0 || t.indexOf('gristformhelper') >= 0;
+      });
+      console.log('[FormBuilder] Nom réel de la table:', helperTable);
     }
 
-    // Toujours s'assurer que la formule est correcte (corrige les tables créées sans formule)
-    try {
-      await grist.docApi.applyUserActions([
-        ['ModifyColumn', helperTable, 'UserEmail', { isFormula: true, formula: 'user.Email' }]
-      ]);
-    } catch (modErr) {
-      console.log('[FormBuilder] ModifyColumn info:', modErr.message);
+    if (!helperTable) {
+      console.log('[FormBuilder] Table helper introuvable après création');
+      throw new Error('Table helper introuvable');
     }
 
-    // S'assurer qu'il y a au moins un enregistrement
-    const data = await grist.docApi.fetchTable(helperTable);
+    // Lire la table et trouver la colonne email
+    var data = await grist.docApi.fetchTable(helperTable);
+    console.log('[FormBuilder] Colonnes helper:', Object.keys(data));
+
+    // Chercher la colonne qui contient un email (la formule user.Email)
+    var cols = Object.keys(data).filter(function(c) { return c !== 'id' && c !== 'manualSort'; });
+    for (var i = 0; i < cols.length; i++) {
+      var val = data[cols[i]][0];
+      if (val && typeof val === 'string' && val.includes('@')) {
+        currentUserEmail = val;
+        emailColumn = cols[i];
+        break;
+      }
+    }
+
+    // Si pas d'enregistrement, en ajouter un
     if (!data.id || data.id.length === 0) {
       await grist.docApi.applyUserActions([
         ['AddRecord', helperTable, null, {}]
       ]);
-      // Re-lire après ajout
-      const data2 = await grist.docApi.fetchTable(helperTable);
-      if (data2.UserEmail && data2.UserEmail.length > 0) {
-        const email = data2.UserEmail[0];
-        if (email && typeof email === 'string' && email.includes('@')) {
-          currentUserEmail = email;
+      data = await grist.docApi.fetchTable(helperTable);
+      cols = Object.keys(data).filter(function(c) { return c !== 'id' && c !== 'manualSort'; });
+      for (var j = 0; j < cols.length; j++) {
+        var val2 = data[cols[j]][0];
+        if (val2 && typeof val2 === 'string' && val2.includes('@')) {
+          currentUserEmail = val2;
+          break;
         }
-      }
-    } else if (data.UserEmail && data.UserEmail.length > 0) {
-      const email = data.UserEmail[0];
-      if (email && typeof email === 'string' && email.includes('@')) {
-        currentUserEmail = email;
-        console.log('[FormBuilder] Email détecté:', currentUserEmail);
-      } else {
-        console.log('[FormBuilder] Valeur UserEmail:', email, '- type:', typeof email);
       }
     }
   } catch (e) {
