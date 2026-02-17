@@ -83,75 +83,50 @@ grist.ready({
 });
 
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
-// Utilise uniquement grist.docApi (postMessage) pour éviter les problèmes CORS
 async function detectUserRole() {
-  // Trouver le vrai nom de la table helper (Grist peut renommer)
-  var helperTable = null;
-  var emailColumn = null;
-
+  // Récupérer l'email via getAccessToken + API REST Grist
   try {
-    var tables = await grist.docApi.listTables();
+    var tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
+    console.log('[FormBuilder] Token obtenu, baseUrl:', tokenInfo.baseUrl);
 
-    // Chercher la table helper (Grist peut avoir transformé le nom)
-    helperTable = tables.find(function(t) {
-      return t === 'BM_UserHelper' || t === '_BM_UserHelper' || t === 'GristFormHelper';
-    });
+    if (tokenInfo && tokenInfo.baseUrl && tokenInfo.token) {
+      // baseUrl = https://grist.gristup.fr/api/docs/{docId}
+      // On veut https://grist.gristup.fr/api/session/access/active
+      var baseUrl = tokenInfo.baseUrl;
+      var apiRoot = baseUrl.replace(/\/api\/docs\/.*$/, '/api');
+      console.log('[FormBuilder] API root:', apiRoot);
 
-    if (!helperTable) {
-      // Créer la table avec un nom simple et une colonne formule en une seule action
-      await grist.docApi.applyUserActions([
-        ['AddTable', 'GristFormHelper', [
-          { id: 'A', type: 'Any', isFormula: true, formula: 'user.Email' }
-        ]],
-        ['AddRecord', 'GristFormHelper', null, {}]
-      ]);
-      console.log('[FormBuilder] Table helper créée via AddTable');
-
-      // Retrouver le vrai nom après création
-      tables = await grist.docApi.listTables();
-      helperTable = tables.find(function(t) {
-        return t.indexOf('GristFormHelper') >= 0 || t.indexOf('gristformhelper') >= 0;
-      });
-      console.log('[FormBuilder] Nom réel de la table:', helperTable);
-    }
-
-    if (!helperTable) {
-      console.log('[FormBuilder] Table helper introuvable après création');
-      throw new Error('Table helper introuvable');
-    }
-
-    // Lire la table et trouver la colonne email
-    var data = await grist.docApi.fetchTable(helperTable);
-    console.log('[FormBuilder] Colonnes helper:', Object.keys(data));
-
-    // Chercher la colonne qui contient un email (la formule user.Email)
-    var cols = Object.keys(data).filter(function(c) { return c !== 'id' && c !== 'manualSort'; });
-    for (var i = 0; i < cols.length; i++) {
-      var val = data[cols[i]][0];
-      if (val && typeof val === 'string' && val.includes('@')) {
-        currentUserEmail = val;
-        emailColumn = cols[i];
-        break;
+      // Essayer /api/session/access/active
+      try {
+        var resp = await fetch(apiRoot + '/session/access/active', {
+          headers: { 'Authorization': 'Bearer ' + tokenInfo.token }
+        });
+        console.log('[FormBuilder] Session API status:', resp.status);
+        if (resp.ok) {
+          var sessionInfo = await resp.json();
+          currentUserEmail = sessionInfo?.user?.email || null;
+          console.log('[FormBuilder] Email via session:', currentUserEmail);
+        } else {
+          console.log('[FormBuilder] Session API réponse:', resp.status, resp.statusText);
+        }
+      } catch (e) {
+        console.log('[FormBuilder] Session API erreur:', e.message);
       }
-    }
 
-    // Si pas d'enregistrement, en ajouter un
-    if (!data.id || data.id.length === 0) {
-      await grist.docApi.applyUserActions([
-        ['AddRecord', helperTable, null, {}]
-      ]);
-      data = await grist.docApi.fetchTable(helperTable);
-      cols = Object.keys(data).filter(function(c) { return c !== 'id' && c !== 'manualSort'; });
-      for (var j = 0; j < cols.length; j++) {
-        var val2 = data[cols[j]][0];
-        if (val2 && typeof val2 === 'string' && val2.includes('@')) {
-          currentUserEmail = val2;
-          break;
+      // Fallback: essayer directement via le baseUrl du doc
+      if (!currentUserEmail) {
+        try {
+          var resp2 = await fetch(baseUrl + '/tables/_grist_ACLPrincipals/records', {
+            headers: { 'Authorization': 'Bearer ' + tokenInfo.token }
+          });
+          console.log('[FormBuilder] ACL API status:', resp2.status);
+        } catch (e) {
+          console.log('[FormBuilder] ACL API erreur:', e.message);
         }
       }
     }
   } catch (e) {
-    console.log('[FormBuilder] Détection email échouée:', e.message);
+    console.log('[FormBuilder] getAccessToken erreur:', e.message);
   }
 
   console.log('[FormBuilder] Email final:', currentUserEmail || 'non détecté');
