@@ -3010,8 +3010,15 @@ async function submitForm() {
   let hasError = false;
   
   formConfig.fields.forEach(field => {
+    // Ignorer les éléments non-champs et les champs calculés/formule
     if (field.fieldType === 'section') return;
+    if (field.fieldType === 'calculated') return;
+    if (field.fieldType === 'title') return;
+    if (field.fieldType === 'image') return;
+    if (field.fieldType === 'divider') return;
+    if (field.fieldType === 'qrcode') return;
     if (!field.columnId) return;
+    if (field.isFormula) return; // Colonnes de formule Grist
     
     const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
     if (group && group.classList.contains('hidden')) return;
@@ -3118,7 +3125,15 @@ async function submitForm() {
   } catch (error) {
     hideLoading();
     console.error('Erreur soumission:', error);
-    showToast('Erreur: ' + error.message, 'error');
+    
+    // Gérer l'erreur de colonne de formule
+    if (error.message && error.message.includes('formula column')) {
+      const match = error.message.match(/formula column (\w+)/);
+      const colName = match ? match[1] : 'une colonne';
+      showToast(`Erreur: "${colName}" est une colonne de formule et ne peut pas être modifiée. Retirez ce champ du formulaire.`, 'error');
+    } else {
+      showToast('Erreur: ' + error.message, 'error');
+    }
   }
 }
 
