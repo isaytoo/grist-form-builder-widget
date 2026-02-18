@@ -25,6 +25,8 @@ let snapToGrid = true;
 let showGrid = true;
 let zoomLevel = 100;
 let fieldIdCounter = 0;
+let selectedRecordId = null; // ID de l'enregistrement sélectionné pour mise à jour
+let selectedRecordData = null; // Données de l'enregistrement sélectionné
 
 // Éléments DOM
 const tableSelect = document.getElementById('table-select');
@@ -247,6 +249,176 @@ grist.onOptions(async function(options) {
     applyRoleRestrictions();
   }
 });
+
+// Écouter la sélection d'un enregistrement dans Grist
+grist.onRecord(function(record) {
+  if (!record || !formConfig || !formConfig.tableId) return;
+  
+  selectedRecordId = record.id;
+  selectedRecordData = record;
+  
+  // Pré-remplir le formulaire en mode Saisie
+  if (formView.classList.contains('active')) {
+    fillFormWithRecord(record);
+  }
+  
+  // Mettre à jour l'indicateur de mode
+  updateRecordModeIndicator();
+});
+
+// Pré-remplir le formulaire avec les données d'un enregistrement
+function fillFormWithRecord(record) {
+  if (!formConfig || !formConfig.fields) return;
+  
+  formConfig.fields.forEach(field => {
+    if (!field.columnId) return;
+    
+    const value = record[field.columnId];
+    if (value === undefined || value === null) return;
+    
+    if (field.fieldType === 'radio') {
+      const container = document.getElementById(`input-${field.id}`);
+      if (container) {
+        const radio = container.querySelector(`input[value="${value}"]`);
+        if (radio) radio.checked = true;
+      }
+    } else if (field.fieldType === 'checkbox') {
+      const container = document.getElementById(`input-${field.id}`);
+      if (container) {
+        const values = String(value).split(',').map(v => v.trim());
+        container.querySelectorAll('input').forEach(cb => {
+          cb.checked = values.includes(cb.value);
+        });
+      }
+    } else {
+      const input = document.getElementById(`input-${field.id}`);
+      if (input) input.value = value;
+    }
+  });
+}
+
+// Afficher le sélecteur d'enregistrement existant
+async function renderRecordSelector() {
+  const canvasView = document.getElementById('form-canvas-view');
+  if (!canvasView || !formConfig || !formConfig.tableId) return;
+  
+  // Supprimer l'ancien sélecteur s'il existe
+  const oldSelector = document.getElementById('record-selector-container');
+  if (oldSelector) oldSelector.remove();
+  
+  // Créer le conteneur du sélecteur
+  const container = document.createElement('div');
+  container.id = 'record-selector-container';
+  container.style.cssText = 'padding: 10px 15px; margin: 0 auto 10px; max-width: 600px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;';
+  
+  container.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <label style="font-size: 0.85em; color: #64748b; white-space: nowrap;">📋 Modifier un enregistrement :</label>
+      <select id="record-selector" style="flex: 1; min-width: 200px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9em;">
+        <option value="">-- Nouvel enregistrement --</option>
+      </select>
+      <button id="btn-load-record" style="padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em;">Charger</button>
+    </div>
+  `;
+  
+  canvasView.insertBefore(container, canvasView.firstChild);
+  
+  // Charger les enregistrements existants
+  try {
+    const data = await grist.docApi.fetchTable(formConfig.tableId);
+    const selector = document.getElementById('record-selector');
+    
+    if (data && data.id) {
+      // Trouver une colonne d'affichage (première colonne texte non-id)
+      const displayCol = Object.keys(data).find(col => 
+        col !== 'id' && !col.startsWith('grist') && col !== 'manualSort' && 
+        data[col] && data[col].some(v => typeof v === 'string' && v)
+      ) || 'id';
+      
+      for (let i = 0; i < data.id.length; i++) {
+        const option = document.createElement('option');
+        option.value = data.id[i];
+        const displayValue = data[displayCol] ? data[displayCol][i] : data.id[i];
+        option.textContent = `#${data.id[i]} - ${displayValue || '(vide)'}`;
+        selector.appendChild(option);
+      }
+    }
+    
+    // Si un enregistrement est déjà sélectionné, le pré-sélectionner
+    if (selectedRecordId) {
+      selector.value = selectedRecordId;
+    }
+    
+    // Événement de chargement
+    document.getElementById('btn-load-record')?.addEventListener('click', async () => {
+      const recordId = parseInt(selector.value);
+      if (!recordId) {
+        selectedRecordId = null;
+        selectedRecordData = null;
+        resetFormInputs();
+        updateRecordModeIndicator();
+        return;
+      }
+      
+      // Charger l'enregistrement
+      try {
+        const data = await grist.docApi.fetchTable(formConfig.tableId);
+        const index = data.id.findIndex(id => id === recordId);
+        if (index >= 0) {
+          const record = { id: recordId };
+          Object.keys(data).forEach(col => {
+            record[col] = data[col][index];
+          });
+          selectedRecordId = recordId;
+          selectedRecordData = record;
+          fillFormWithRecord(record);
+          updateRecordModeIndicator();
+          showToast('Enregistrement chargé', 'success');
+        }
+      } catch (e) {
+        console.error('Erreur chargement enregistrement:', e);
+        showToast('Erreur lors du chargement', 'error');
+      }
+    });
+    
+  } catch (e) {
+    console.log('Impossible de charger les enregistrements:', e);
+  }
+}
+
+// Mettre à jour l'indicateur de mode (création vs mise à jour)
+function updateRecordModeIndicator() {
+  let indicator = document.getElementById('record-mode-indicator');
+  
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'record-mode-indicator';
+    indicator.style.cssText = 'padding: 8px 15px; margin: 10px auto; max-width: 600px; border-radius: 6px; font-size: 0.85em; text-align: center;';
+    const formCanvasView = document.getElementById('form-canvas-view');
+    if (formCanvasView) {
+      formCanvasView.insertBefore(indicator, formCanvasView.firstChild);
+    }
+  }
+  
+  if (selectedRecordId) {
+    indicator.style.background = '#fef3c7';
+    indicator.style.color = '#92400e';
+    indicator.style.border = '1px solid #fcd34d';
+    indicator.innerHTML = `<strong>📝 Mode mise à jour</strong> - Ligne #${selectedRecordId} sélectionnée <button id="btn-new-record" style="margin-left: 10px; padding: 4px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">+ Nouveau</button>`;
+    
+    document.getElementById('btn-new-record')?.addEventListener('click', () => {
+      selectedRecordId = null;
+      selectedRecordData = null;
+      resetFormInputs();
+      updateRecordModeIndicator();
+    });
+  } else {
+    indicator.style.background = '#dcfce7';
+    indicator.style.color = '#166534';
+    indicator.style.border = '1px solid #86efac';
+    indicator.innerHTML = '<strong>➕ Mode création</strong> - Nouvel enregistrement';
+  }
+}
 
 // Charger la liste des tables
 async function loadTables() {
@@ -2453,6 +2625,9 @@ function renderFormView() {
   
   formFieldsView.innerHTML = '';
   
+  // Ajouter le sélecteur d'enregistrement existant
+  renderRecordSelector();
+  
   // Filtrer les champs de la page courante
   const pageFields = formConfig.fields.filter(f => (f.page || 1) === currentPage);
   
@@ -3145,12 +3320,23 @@ async function submitForm() {
   
   try {
     showLoading();
-    await grist.docApi.applyUserActions([
-      ['AddRecord', formConfig.tableId, null, record]
-    ]);
-    hideLoading();
-    showToast('Enregistrement ajouté avec succès', 'success');
-    resetFormInputs();
+    
+    if (selectedRecordId) {
+      // Mode mise à jour : UpdateRecord
+      await grist.docApi.applyUserActions([
+        ['UpdateRecord', formConfig.tableId, selectedRecordId, record]
+      ]);
+      hideLoading();
+      showToast('Enregistrement mis à jour avec succès', 'success');
+    } else {
+      // Mode création : AddRecord
+      await grist.docApi.applyUserActions([
+        ['AddRecord', formConfig.tableId, null, record]
+      ]);
+      hideLoading();
+      showToast('Enregistrement ajouté avec succès', 'success');
+      resetFormInputs();
+    }
   } catch (error) {
     hideLoading();
     console.error('Erreur soumission:', error);
