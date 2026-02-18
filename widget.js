@@ -3036,15 +3036,24 @@ async function initLookupFields() {
       }
     }
     
-    const displayCol = field.lookupDisplayColumn || 'id';
+    const displayColsRaw = field.lookupDisplayColumn || 'id';
     const valueCol = field.lookupValueColumn || 'id';
+    
+    // Supporter plusieurs colonnes d'affichage séparées par des virgules
+    const displayCols = displayColsRaw.split(',').map(c => c.trim()).filter(c => c);
     
     // Préparer les options
     const options = [];
     if (field.lookupData && field.lookupData.id) {
       for (let i = 0; i < field.lookupData.id.length; i++) {
+        // Concaténer les valeurs des colonnes d'affichage
+        const displayParts = displayCols.map(col => {
+          return field.lookupData[col] ? field.lookupData[col][i] : '';
+        }).filter(v => v !== null && v !== undefined && v !== '');
+        const displayValue = displayParts.join(' ') || field.lookupData.id[i];
+        
         options.push({
-          display: field.lookupData[displayCol] ? field.lookupData[displayCol][i] : field.lookupData.id[i],
+          display: displayValue,
           value: field.lookupData[valueCol] ? field.lookupData[valueCol][i] : field.lookupData.id[i]
         });
       }
