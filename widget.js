@@ -1513,6 +1513,25 @@ function renderPropertiesPanel() {
   }
   
   if (!isDecorative) {
+    // Sélecteur de type de champ
+    html += `
+      <div class="property-group">
+        <div class="property-label">Type de champ</div>
+        <select class="property-select" id="prop-field-type">
+          <option value="text" ${f.fieldType === 'text' ? 'selected' : ''}>Texte</option>
+          <option value="textarea" ${f.fieldType === 'textarea' ? 'selected' : ''}>Zone de texte</option>
+          <option value="number" ${f.fieldType === 'number' ? 'selected' : ''}>Nombre</option>
+          <option value="date" ${f.fieldType === 'date' ? 'selected' : ''}>Date</option>
+          <option value="email" ${f.fieldType === 'email' ? 'selected' : ''}>Email</option>
+          <option value="phone" ${f.fieldType === 'phone' ? 'selected' : ''}>Téléphone</option>
+          <option value="select" ${f.fieldType === 'select' ? 'selected' : ''}>Liste déroulante</option>
+          <option value="radio" ${f.fieldType === 'radio' ? 'selected' : ''}>Boutons radio</option>
+          <option value="checkbox" ${f.fieldType === 'checkbox' ? 'selected' : ''}>Cases à cocher</option>
+          <option value="lookup" ${f.fieldType === 'lookup' ? 'selected' : ''}>Lookup (référence)</option>
+        </select>
+      </div>
+    `;
+    
     if (f.columnId) {
       html += `
         <div class="property-group">
@@ -1809,6 +1828,18 @@ function renderPropertiesPanel() {
   propertiesContent.innerHTML = html;
   
   // Event listeners
+  document.getElementById('prop-field-type')?.addEventListener('change', (e) => {
+    const newType = e.target.value;
+    selectedField.fieldType = newType;
+    // Initialiser les options si nécessaire
+    if (['select', 'radio', 'checkbox'].includes(newType) && !selectedField.options) {
+      selectedField.options = ['Option 1', 'Option 2'];
+    }
+    renderFormFields();
+    selectField(selectedField.id);
+    renderPropertiesPanel(); // Re-render pour afficher les nouvelles options
+  });
+  
   document.getElementById('prop-label')?.addEventListener('input', (e) => {
     selectedField.label = e.target.value;
     // Mettre à jour le texte directement sans re-render complet
