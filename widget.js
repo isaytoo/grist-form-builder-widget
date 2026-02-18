@@ -3787,3 +3787,25 @@ window.addEventListener('resize', () => {
   }
 });
 
+// Empêcher Grist d'intercepter les événements clavier dans les inputs du mode Saisie
+document.addEventListener('keydown', (e) => {
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+    e.stopPropagation();
+  }
+}, true);
+
+document.addEventListener('keyup', (e) => {
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+    e.stopPropagation();
+  }
+}, true);
+
+document.addEventListener('keypress', (e) => {
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+    e.stopPropagation();
+  }
+}, true);
+
