@@ -3788,24 +3788,37 @@ window.addEventListener('resize', () => {
 });
 
 // Empêcher Grist d'intercepter les événements clavier dans les inputs du mode Saisie
-document.addEventListener('keydown', (e) => {
-  const activeEl = document.activeElement;
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-    e.stopPropagation();
-  }
-}, true);
+// Solution: bloquer la propagation ET informer Grist que le widget gère le focus
+let inputHasFocus = false;
 
-document.addEventListener('keyup', (e) => {
-  const activeEl = document.activeElement;
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-    e.stopPropagation();
+document.addEventListener('focusin', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+    inputHasFocus = true;
+    // Informer le parent (Grist) que nous avons le focus
+    window.focus();
   }
-}, true);
+});
 
-document.addEventListener('keypress', (e) => {
-  const activeEl = document.activeElement;
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-    e.stopPropagation();
+document.addEventListener('focusout', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+    inputHasFocus = false;
   }
-}, true);
+});
+
+// Intercepter TOUS les événements clavier au niveau window
+['keydown', 'keyup', 'keypress'].forEach(eventType => {
+  window.addEventListener(eventType, (e) => {
+    if (inputHasFocus) {
+      e.stopImmediatePropagation();
+    }
+  }, true);
+});
+
+// Ajouter un click handler pour forcer le focus
+document.addEventListener('click', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    e.target.focus();
+    window.focus();
+  }
+});
 
