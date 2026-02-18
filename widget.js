@@ -270,11 +270,15 @@ grist.onRecord(function(record) {
 function fillFormWithRecord(record) {
   if (!formConfig || !formConfig.fields) return;
   
+  // D'abord réinitialiser tous les champs
+  resetFormInputs();
+  
   formConfig.fields.forEach(field => {
     if (!field.columnId) return;
     
     const value = record[field.columnId];
-    if (value === undefined || value === null) return;
+    // Ne remplir que si la valeur existe et n'est pas vide
+    if (value === undefined || value === null || value === '') return;
     
     if (field.fieldType === 'radio') {
       const container = document.getElementById(`input-${field.id}`);
