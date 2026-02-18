@@ -303,17 +303,17 @@ function fillFormWithRecord(record) {
 
 // Afficher le sélecteur d'enregistrement existant
 async function renderRecordSelector() {
-  const canvasView = document.getElementById('form-canvas-view');
-  if (!canvasView || !formConfig || !formConfig.tableId) return;
+  const formViewEl = document.getElementById('form-view');
+  if (!formViewEl || !formConfig || !formConfig.tableId) return;
   
   // Supprimer l'ancien sélecteur s'il existe
   const oldSelector = document.getElementById('record-selector-container');
   if (oldSelector) oldSelector.remove();
   
-  // Créer le conteneur du sélecteur
+  // Créer le conteneur du sélecteur (fixe en haut)
   const container = document.createElement('div');
   container.id = 'record-selector-container';
-  container.style.cssText = 'padding: 10px 15px; margin: 0 auto 10px; max-width: 600px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;';
+  container.style.cssText = 'position: sticky; top: 0; z-index: 100; padding: 10px 15px; margin: 0 auto 10px; max-width: 700px; background: #f8fafc; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
   
   container.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
@@ -325,7 +325,7 @@ async function renderRecordSelector() {
     </div>
   `;
   
-  canvasView.insertBefore(container, canvasView.firstChild);
+  formViewEl.insertBefore(container, formViewEl.firstChild);
   
   // Charger les enregistrements existants
   try {
@@ -393,14 +393,15 @@ async function renderRecordSelector() {
 // Mettre à jour l'indicateur de mode (création vs mise à jour)
 function updateRecordModeIndicator() {
   let indicator = document.getElementById('record-mode-indicator');
+  const selectorContainer = document.getElementById('record-selector-container');
   
   if (!indicator) {
     indicator = document.createElement('div');
     indicator.id = 'record-mode-indicator';
-    indicator.style.cssText = 'padding: 8px 15px; margin: 10px auto; max-width: 600px; border-radius: 6px; font-size: 0.85em; text-align: center;';
-    const formCanvasView = document.getElementById('form-canvas-view');
-    if (formCanvasView) {
-      formCanvasView.insertBefore(indicator, formCanvasView.firstChild);
+    indicator.style.cssText = 'padding: 8px 15px; margin: 0 auto 5px; max-width: 700px; border-radius: 6px; font-size: 0.85em; text-align: center;';
+    // Insérer après le sélecteur s'il existe
+    if (selectorContainer && selectorContainer.parentNode) {
+      selectorContainer.parentNode.insertBefore(indicator, selectorContainer.nextSibling);
     }
   }
   
