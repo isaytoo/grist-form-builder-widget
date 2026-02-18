@@ -3114,6 +3114,35 @@ async function submitForm() {
     return;
   }
   
+  // Récupérer les métadonnées des colonnes pour identifier les formules
+  let formulaColumns = [];
+  try {
+    const colMeta = await grist.docApi.fetchTable('_grist_Tables_column');
+    const tableMeta = await grist.docApi.fetchTable('_grist_Tables');
+    
+    // Trouver l'ID de la table cible
+    const tableIndex = tableMeta.tableId?.findIndex(t => t === formConfig.tableId);
+    const tableRef = tableIndex >= 0 ? tableMeta.id[tableIndex] : null;
+    
+    if (tableRef && colMeta.colId) {
+      for (let i = 0; i < colMeta.id.length; i++) {
+        if (colMeta.parentId[i] === tableRef && colMeta.isFormula[i]) {
+          formulaColumns.push(colMeta.colId[i]);
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Impossible de récupérer les métadonnées des colonnes:', e);
+  }
+  
+  // Filtrer les colonnes de formule du record
+  for (const colName of formulaColumns) {
+    if (record[colName] !== undefined) {
+      console.log(`Colonne de formule "${colName}" exclue de la soumission`);
+      delete record[colName];
+    }
+  }
+  
   try {
     showLoading();
     await grist.docApi.applyUserActions([
