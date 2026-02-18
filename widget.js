@@ -115,7 +115,8 @@ let isInitialized = false;
 // Vérifier si on est en mode formulaire public (paramètre URL ?mode=form)
 const urlParams = new URLSearchParams(window.location.search);
 const isFormMode = urlParams.get('mode') === 'form';
-const targetTable = urlParams.get('table'); // Table cible pour le formulaire
+const targetTable = urlParams.get('table'); // Table cible pour le formulaire (legacy)
+const targetFormId = urlParams.get('formId'); // ID unique du formulaire
 
 // Charger les données au démarrage
 grist.onOptions(async function(options) {
@@ -142,8 +143,14 @@ grist.onOptions(async function(options) {
     if (tables.includes('BM_FormConfig')) {
       const data = await grist.docApi.fetchTable('BM_FormConfig');
       if (data.ConfigData && data.ConfigData.length > 0) {
-        // Si une table cible est spécifiée, chercher sa config
-        if (targetTable) {
+        // Si un formId est spécifié, chercher sa config
+        if (targetFormId) {
+          const index = data.ConfigKey?.findIndex(k => k === targetFormId);
+          if (index !== undefined && index >= 0) {
+            formConfig = JSON.parse(data.ConfigData[index]);
+          }
+        } else if (targetTable) {
+          // Legacy: chercher par table (pour compatibilité)
           const configKey = 'form_' + targetTable;
           const index = data.ConfigKey?.findIndex(k => k === configKey);
           if (index !== undefined && index >= 0) {
@@ -2118,6 +2125,16 @@ function renderPropertiesPanel() {
   });
 }
 
+// Générer un formId unique à partir du titre
+function generateFormId(title) {
+  const slug = (title || 'formulaire')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Supprimer accents
+    .replace(/[^a-z0-9]+/g, '_') // Remplacer caractères spéciaux par _
+    .replace(/^_|_$/g, ''); // Supprimer _ au début/fin
+  return 'form_' + slug;
+}
+
 // Sauvegarder la configuration
 async function saveFormConfig() {
   if (!currentTable) {
@@ -2125,10 +2142,14 @@ async function saveFormConfig() {
     return;
   }
   
+  const title = formTitleInput.value || 'Formulaire ' + currentTable;
+  const formId = generateFormId(title);
+  
   const config = {
+    formId: formId,
     tableId: currentTable,
     fields: formFields,
-    title: formTitleInput.value || 'Formulaire ' + currentTable,
+    title: title,
     templates: templates,
     totalPages: totalPages,
     versionHistory: versionHistory.slice(0, 10) // Garder les 10 dernières versions
@@ -2164,10 +2185,10 @@ async function saveConfigToTable(config) {
       ]);
     }
     
-    // Chercher si une config existe déjà
+    // Chercher si une config existe déjà (par formId)
     const existingData = await grist.docApi.fetchTable(configTableName);
     const configJson = JSON.stringify(config);
-    const configKey = 'form_' + (config.tableId || 'default');
+    const configKey = config.formId || 'form_' + (config.tableId || 'default');
     
     const existingIndex = existingData.ConfigKey?.findIndex(k => k === configKey);
     
@@ -3454,9 +3475,11 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   // Sauvegarder d'abord la configuration
   await saveFormConfig();
   
-  // Générer l'URL du formulaire public avec le paramètre table
+  // Générer l'URL du formulaire public avec le formId unique
+  const title = formTitleInput.value || 'Formulaire ' + currentTable;
+  const formId = generateFormId(title);
   const baseUrl = window.location.href.split('?')[0];
-  const formUrl = `${baseUrl}?mode=form&table=${encodeURIComponent(currentTable)}`;
+  const formUrl = `${baseUrl}?mode=form&formId=${encodeURIComponent(formId)}`;
   
   // Afficher la modale de partage
   const shareModal = document.getElementById('modal-share');
