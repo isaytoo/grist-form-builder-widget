@@ -73,11 +73,41 @@ const tabPanels = document.querySelectorAll('.tab-panel');
 // Éléments draggables
 const elementItems = document.querySelectorAll('.element-item');
 
+// Vérifier si on est dans Grist (l'API grist est disponible)
+let isInGrist = true;
+let gristTimeout = null;
+
 // Initialisation Grist
 grist.ready({
   requiredAccess: 'full',
   allowSelectBy: true
 });
+
+// Timeout pour détecter si on est hors de Grist (pas de réponse de l'API)
+gristTimeout = setTimeout(() => {
+  if (!isInitialized) {
+    isInGrist = false;
+    hideLoading();
+    showNotInGristMessage();
+  }
+}, 3000);
+
+function showNotInGristMessage() {
+  const container = document.querySelector('.app-container') || document.body;
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; font-family: system-ui, sans-serif; text-align: center; padding: 20px;">
+      <div style="font-size: 4em; margin-bottom: 20px;">🔒</div>
+      <h1 style="color: #1e293b; margin-bottom: 10px;">Widget Grist requis</h1>
+      <p style="color: #64748b; max-width: 400px; line-height: 1.6;">
+        Ce formulaire doit être ouvert depuis un document Grist.<br><br>
+        Le lien de partage est destiné à être intégré dans une page Grist avec le widget Form Builder Pro.
+      </p>
+      <div style="margin-top: 30px; padding: 15px 20px; background: #e0f2fe; border-radius: 8px; color: #0369a1;">
+        <strong>💡 Astuce :</strong> Intégrez ce widget dans votre document Grist pour utiliser les formulaires.
+      </div>
+    </div>
+  `;
+}
 
 // Détecter si l'utilisateur est propriétaire (peut modifier la structure)
 // Note: Pour activer la restriction par rôle, définir isOwner = false pour les non-propriétaires
@@ -122,6 +152,12 @@ const targetFormId = urlParams.get('formId'); // ID unique du formulaire
 grist.onOptions(async function(options) {
   if (isInitialized) return;
   isInitialized = true;
+  
+  // Annuler le timeout car on est bien dans Grist
+  if (gristTimeout) {
+    clearTimeout(gristTimeout);
+    gristTimeout = null;
+  }
   
   formConfig = options || {};
   
