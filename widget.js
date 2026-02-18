@@ -317,7 +317,10 @@ async function renderRecordSelector() {
   
   container.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <label style="font-size: 0.85em; color: #64748b; white-space: nowrap;">📋 Modifier un enregistrement :</label>
+      <label style="font-size: 0.85em; color: #64748b; white-space: nowrap;">📋 Modifier :</label>
+      <select id="record-display-col" style="width: 120px; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8em; background: white;">
+        <option value="id">ID</option>
+      </select>
       <select id="record-selector" style="flex: 1; min-width: 200px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9em;">
         <option value="">-- Nouvel enregistrement --</option>
       </select>
@@ -328,24 +331,50 @@ async function renderRecordSelector() {
   formViewEl.insertBefore(container, formViewEl.firstChild);
   
   // Charger les enregistrements existants
+  let tableData = null;
   try {
-    const data = await grist.docApi.fetchTable(formConfig.tableId);
+    tableData = await grist.docApi.fetchTable(formConfig.tableId);
     const selector = document.getElementById('record-selector');
+    const colSelector = document.getElementById('record-display-col');
     
-    if (data && data.id) {
-      // Trouver une colonne d'affichage (première colonne texte non-id)
-      const displayCol = Object.keys(data).find(col => 
-        col !== 'id' && !col.startsWith('grist') && col !== 'manualSort' && 
-        data[col] && data[col].some(v => typeof v === 'string' && v)
-      ) || 'id';
+    if (tableData && tableData.id) {
+      // Remplir le sélecteur de colonnes
+      const columns = Object.keys(tableData).filter(col => 
+        col !== 'id' && !col.startsWith('grist') && col !== 'manualSort'
+      );
+      columns.forEach(col => {
+        const opt = document.createElement('option');
+        opt.value = col;
+        opt.textContent = col;
+        colSelector.appendChild(opt);
+      });
       
-      for (let i = 0; i < data.id.length; i++) {
-        const option = document.createElement('option');
-        option.value = data.id[i];
-        const displayValue = data[displayCol] ? data[displayCol][i] : data.id[i];
-        option.textContent = `#${data.id[i]} - ${displayValue || '(vide)'}`;
-        selector.appendChild(option);
+      // Fonction pour remplir le sélecteur d'enregistrements
+      function fillRecordSelector(displayCol) {
+        selector.innerHTML = '<option value="">-- Nouvel enregistrement --</option>';
+        for (let i = 0; i < tableData.id.length; i++) {
+          const option = document.createElement('option');
+          option.value = tableData.id[i];
+          const displayValue = tableData[displayCol] ? tableData[displayCol][i] : tableData.id[i];
+          option.textContent = `#${tableData.id[i]} - ${displayValue || '(vide)'}`;
+          selector.appendChild(option);
+        }
+        if (selectedRecordId) {
+          selector.value = selectedRecordId;
+        }
       }
+      
+      // Remplir avec la première colonne par défaut
+      const defaultCol = columns.find(col => 
+        tableData[col] && tableData[col].some(v => typeof v === 'string' && v)
+      ) || 'id';
+      colSelector.value = defaultCol;
+      fillRecordSelector(defaultCol);
+      
+      // Événement changement de colonne
+      colSelector.addEventListener('change', (e) => {
+        fillRecordSelector(e.target.value);
+      });
     }
     
     // Si un enregistrement est déjà sélectionné, le pré-sélectionner
