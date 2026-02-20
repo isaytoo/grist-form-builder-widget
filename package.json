@@ -1,0 +1,22 @@
+{
+  "name": "@isaytoo/form-builder",
+  "description": "A powerful form builder for Grist with drag-and-drop, multi-page forms, conditional logic, and more.",
+  "homePage": "https://github.com/isaytoo/grist-form-builder-widget",
+  "version": "1.0.0",
+  "grist": {
+    "name": "Form Builder Pro",
+    "url": "https://gristlabs.github.io/grist-widget/form-builder/",
+    "widgetId": "@isaytoo/widget-form-builder",
+    "published": true,
+    "accessLevel": "full",
+    "renderAfterReady": true,
+    "description": "A powerful form builder for Grist with drag-and-drop, multi-page forms, conditional logic, and more.",
+    "isGristLabsMaintained": false,
+    "authors": [
+      {
+        "name": "Said Hamadou",
+        "url": "https://github.com/isaytoo"
+      }
+    ]
+  }
+}
