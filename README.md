@@ -15,7 +15,7 @@
 
 Visual drag-and-drop form builder for Grist. Design custom forms, preview them, and submit data directly into your Grist tables.
 
-**Widget URL:** `https://grist-form-builder-widget.vercel.app/`
+**Widget URL:** `https://isaytoo.github.io/grist-form-builder-widget/`
 
 ### 🚀 Quick Start
 
@@ -23,7 +23,7 @@ Visual drag-and-drop form builder for Grist. Design custom forms, preview them, 
 2. Select **"Custom"** as the widget type
 3. Enter the custom widget URL:
    ```
-   https://grist-form-builder-widget.vercel.app/
+   https://isaytoo.github.io/grist-form-builder-widget/
    ```
 4. Set the access level to **"Full document access"**
 5. Done! Start building your forms.
@@ -81,7 +81,7 @@ grist-form-builder-widget/
 
 Constructeur de formulaires visuel par glisser-déposer pour Grist. Concevez des formulaires personnalisés, prévisualisez-les et soumettez les données directement dans vos tables Grist.
 
-**URL du widget :** `https://grist-form-builder-widget.vercel.app/`
+**URL du widget :** `https://isaytoo.github.io/grist-form-builder-widget/`
 
 ### 🚀 Utilisation rapide
 
@@ -89,7 +89,7 @@ Constructeur de formulaires visuel par glisser-déposer pour Grist. Concevez des
 2. Sélectionnez **"Personnalisé"** comme type de widget
 3. Entrez l'URL :
    ```
-   https://grist-form-builder-widget.vercel.app/
+   https://isaytoo.github.io/grist-form-builder-widget/
    ```
 4. Définissez le niveau d'accès sur **"Full document access"**
 5. C'est prêt ! Commencez à construire vos formulaires.
