@@ -1490,6 +1490,13 @@ function renderPropertiesPanel() {
   // Lookup properties
   const isLookup = f.fieldType === 'lookup';
   if (isLookup) {
+    // Build column options from lookupData if available
+    let columnOptions = '<option value="">-- Sélectionner --</option>';
+    if (f.lookupData) {
+      const cols = Object.keys(f.lookupData).filter(c => c !== 'id' && c !== 'manualSort');
+      columnOptions += cols.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+    
     html += `
       <div class="property-group">
         <div class="property-label">Table source</div>
@@ -1498,13 +1505,20 @@ function renderPropertiesPanel() {
           ${availableTables.map(t => `<option value="${t}" ${f.lookupTable === t ? 'selected' : ''}>${t}</option>`).join('')}
         </select>
       </div>
-      <div class="property-group">
+      <div class="property-group" id="lookup-columns-group" style="${f.lookupTable ? '' : 'display:none;'}">
         <div class="property-label">Colonne à afficher</div>
-        <input type="text" class="property-input" id="prop-lookup-display" value="${f.lookupDisplayColumn || ''}" placeholder="Nom de la colonne">
+        <select class="property-select" id="prop-lookup-display">
+          <option value="">-- Sélectionner --</option>
+          ${f.lookupData ? Object.keys(f.lookupData).filter(c => c !== 'manualSort').map(c => `<option value="${c}" ${f.lookupDisplayColumn === c ? 'selected' : ''}>${c}</option>`).join('') : ''}
+        </select>
+        <div style="font-size: 0.75em; color: #64748b; margin-top: 4px;">💡 Séparez par virgule pour afficher plusieurs colonnes</div>
       </div>
-      <div class="property-group">
-        <div class="property-label">Colonne de valeur</div>
-        <input type="text" class="property-input" id="prop-lookup-value" value="${f.lookupValueColumn || ''}" placeholder="ID ou valeur à stocker">
+      <div class="property-group" id="lookup-value-group" style="${f.lookupTable ? '' : 'display:none;'}">
+        <div class="property-label">Colonne de valeur (à enregistrer)</div>
+        <select class="property-select" id="prop-lookup-value">
+          <option value="id" ${f.lookupValueColumn === 'id' || !f.lookupValueColumn ? 'selected' : ''}>id (recommandé pour références)</option>
+          ${f.lookupData ? Object.keys(f.lookupData).filter(c => c !== 'manualSort').map(c => `<option value="${c}" ${f.lookupValueColumn === c ? 'selected' : ''}>${c}</option>`).join('') : ''}
+        </select>
       </div>
     `;
   }
@@ -2221,11 +2235,20 @@ function renderPropertiesPanel() {
   });
   
   // Lookup properties
-  document.getElementById('prop-lookup-table')?.addEventListener('change', (e) => {
+  document.getElementById('prop-lookup-table')?.addEventListener('change', async (e) => {
     selectedField.lookupTable = e.target.value;
     // Charger les données de la table pour l'autocomplétion
     if (e.target.value) {
-      loadLookupData(selectedField);
+      await loadLookupData(selectedField);
+      // Re-render to show column dropdowns
+      renderPropertiesPanel();
+      attachPropertyListeners();
+    } else {
+      // Hide column groups if no table selected
+      const colGroup = document.getElementById('lookup-columns-group');
+      const valGroup = document.getElementById('lookup-value-group');
+      if (colGroup) colGroup.style.display = 'none';
+      if (valGroup) valGroup.style.display = 'none';
     }
   });
   
