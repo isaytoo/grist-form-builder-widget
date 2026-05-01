@@ -3305,10 +3305,36 @@ async function fillFilterDsRows(rows, dataSource) {
       if (!filter.parentFieldId || !filter.sourceColumn) continue;
       const parentField = formFields.find(f => f.id === filter.parentFieldId);
       if (!parentField) continue;
-      const parentValue = await fillReadFieldValue(parentField, filter.sourceColumn);
-      if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) {
+      // Read raw value from parent field (no resolution)
+      const rawParentValue = await fillReadFieldValue(parentField);
+      if (rawParentValue === null || rawParentValue === '' || (Array.isArray(rawParentValue) && rawParentValue.length === 0)) {
         keep = false;
         break;
+      }
+
+      // The sourceColumn in the child table may store a Grist reference (row ID).
+      // We need to compare the child row's sourceColumn value with either:
+      //   1. The raw value directly (if sourceColumn stores plain values)
+      //   2. The row ID from the parent's dataSource table (if sourceColumn is a reference)
+      const childColValue = row[filter.sourceColumn];
+      const childColIsRef = typeof childColValue === 'number';
+
+      let parentValue = rawParentValue;
+
+      if (childColIsRef && parentField.dataSource && parentField.dataSource.mode === 'grist' && parentField.dataSource.tableId) {
+        // Resolve: find the row ID in the parent's table whose valueColumn matches the selected value
+        try {
+          const pDs = parentField.dataSource;
+          const pRows = await fillFetchDsTable(pDs.tableId);
+          const valueCol = pDs.valueColumn || pDs.labelColumn;
+          const matchRow = pRows.find(r => String(r[valueCol]) === String(rawParentValue));
+          if (matchRow) {
+            console.log('[cascade] Resolved parent row ID:', matchRow.id, 'for value:', rawParentValue);
+            parentValue = matchRow.id;
+          }
+        } catch (err) {
+          console.warn('[cascade] Erreur résolution référence:', err);
+        }
       }
 
       if (filter.operator === 'between') {
