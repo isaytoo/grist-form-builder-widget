@@ -483,10 +483,66 @@
               </ul>
             </div>
 
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 2px solid #06b6d4;">
+              <div style="font-weight: 700; color: #0e7490; margin-bottom: 8px; font-size: 0.95em;">🎯 Exemple complet — Recommander des produits selon l'âge</div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
+                Démontre l'opérateur <strong>entre deux colonnes</strong> avec un cas pratique : l'utilisateur saisit son âge et le formulaire propose uniquement les produits adaptés à sa tranche.
+              </p>
+
+              <div style="font-weight: 600; color: #0891b2; margin-bottom: 6px; font-size: 0.88em;">📊 Table <code style="background:#e2e8f0;padding:2px 5px;border-radius:3px;">Produits</code> dans Grist</div>
+              <div style="font-family: monospace; font-size: 0.78em; background: #f8fafc; padding: 10px 12px; border-radius: 4px; color: #475569; margin-bottom: 12px; line-height: 1.6;">
+                nom · categorie · age_min · age_max · prix<br>
+                Hochet musical · Bébé · 0 · 2 · 15<br>
+                Tricycle · Enfant · 3 · 7 · 80<br>
+                Trottinette · Enfant · 6 · 12 · 90<br>
+                Skateboard · Ado · 10 · 16 · 120<br>
+                Tablette · Tous · 10 · 99 · 300<br>
+                Vélo VTT adulte · Adulte · 16 · 75 · 600<br>
+                Carte senior SNCF · Senior · 60 · 120 · 75
+              </div>
+
+              <div style="font-weight: 600; color: #0891b2; margin-bottom: 6px; font-size: 0.88em;">🛠️ Champ 1 — Âge (saisie utilisateur)</div>
+              <ul style="color: #475569; line-height: 1.7; font-size: 0.88em; padding-left: 20px; margin: 0 0 12px 0;">
+                <li>Glisse un élément <strong>Nombre</strong> sur le canvas</li>
+                <li>Libellé : "Quel est votre âge ?"</li>
+                <li>Pas de source Grist nécessaire (l'utilisateur tape)</li>
+              </ul>
+
+              <div style="font-weight: 600; color: #0891b2; margin-bottom: 6px; font-size: 0.88em;">🛠️ Champ 2 — Produits recommandés (cascade)</div>
+              <ol style="color: #475569; line-height: 1.7; font-size: 0.88em; padding-left: 20px; margin: 0 0 12px 0;">
+                <li>Glisse une <strong>Liste déroulante</strong>, libellé : "Produits recommandés"</li>
+                <li>Source des options → <strong>🔗 Depuis Grist</strong></li>
+                <li>Table source : <code>Produits</code></li>
+                <li>Colonne libellé : <code>nom</code></li>
+                <li>Colonne valeur : <code>nom</code> (ou laisse vide)</li>
+                <li>Section <strong>Filtres en cascade</strong> → <strong>+ Ajouter un filtre</strong></li>
+                <li>Champ parent : <strong>Quel est votre âge ?</strong></li>
+                <li>Opérateur : <strong>entre deux colonnes</strong></li>
+                <li>Colonne minimum : <code>age_min</code></li>
+                <li>Colonne maximum : <code>age_max</code></li>
+              </ol>
+
+              <div style="font-weight: 600; color: #0891b2; margin-bottom: 6px; font-size: 0.88em;">▶️ Résultat à la saisie</div>
+              <div style="background: #f0fdfa; border-radius: 6px; padding: 10px 12px; font-size: 0.85em; color: #0f766e; line-height: 1.7;">
+                • Saisir <strong>5</strong> → propose : Tricycle, Trottinette<br>
+                • Saisir <strong>12</strong> → propose : Trottinette, Skateboard, Tablette<br>
+                • Saisir <strong>30</strong> → propose : Tablette, Vélo VTT adulte<br>
+                • Saisir <strong>65</strong> → propose : Tablette, Vélo VTT adulte, Carte senior SNCF
+              </div>
+
+              <div style="margin-top: 10px; padding: 8px 12px; background: #fffbeb; border-radius: 4px; font-size: 0.82em; color: #78350f;">
+                💡 <strong>Pour aller plus loin :</strong> ajoute un second filtre sur ce même champ avec un autre champ parent <em>Catégorie</em> (sélecteur statique avec Bébé/Enfant/Ado/Adulte/Senior) et opérateur <strong>=</strong> sur la colonne <code>categorie</code>. Tu obtiens un filtrage croisé âge ET catégorie.
+              </div>
+            </div>
+
             <div style="background: #fef3c7; border-radius: 8px; padding: 12px 14px; border-left: 3px solid #f59e0b;">
               <div style="font-size: 0.88em; color: #92400e; line-height: 1.6;">
                 <strong>⚠️ Permission requise :</strong> le widget doit avoir <strong>"Accès complet au document"</strong> pour lister les tables et lire les données. Configure-le dans le panneau du widget Grist (à droite de l'écran).
               </div>
+            </div>
+
+            <div style="margin-top: 12px; padding: 10px 14px; background: #ecfeff; border-radius: 6px; font-size: 0.85em; color: #0e7490;">
+              📥 <strong>Données prêtes à l'emploi :</strong> les CSV d'exemple (Departements, Villes, Produits) sont disponibles dans le dossier <code style="background:#cffafe;padding:2px 5px;border-radius:3px;">/exemples/</code> du dépôt GitHub du widget.
             </div>
           </div>
 
@@ -604,7 +660,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=4"></script>
+<script src="widget.js?v=5"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>© 2026 Said Hamadou (isaytoo)</span>
   <a href="https://gristup.fr" target="_blank" style="color: #3b82f6; text-decoration: none;">gristup.fr</a>
