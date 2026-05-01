@@ -1828,7 +1828,8 @@ function renderPropertiesPanel() {
   if (hasOptions) {
     if (!f.dataSource) f.dataSource = { mode: 'static', tableId: '', labelColumn: '', valueColumn: '', filters: [] };
     const ds = f.dataSource;
-    const otherFieldsForFilter = formFields.filter(of => of.id !== f.id && of.columnId);
+    const cascadeInputTypes = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'select', 'radio', 'checkbox'];
+    const otherFieldsForFilter = formFields.filter(of => of.id !== f.id && cascadeInputTypes.includes(of.fieldType));
 
     html += `
       <div class="property-group">
@@ -1953,7 +1954,9 @@ function renderPropertiesPanel() {
   
   // Condition d'affichage
   if (!isSection) {
-    const otherFields = formFields.filter(of => of.id !== f.id && of.columnId);
+    // Tous les champs saisissables peuvent piloter une condition (pas que ceux liés à une colonne)
+    const inputTypes = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'select', 'radio', 'checkbox'];
+    const otherFields = formFields.filter(of => of.id !== f.id && inputTypes.includes(of.fieldType));
     html += `
       <div class="property-group">
         <div class="property-label">Condition d'affichage</div>
