@@ -9,6 +9,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Form Builder Pro - Widget Grist</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -121,6 +124,19 @@
     .option-row button { padding: 5px 8px; border: none; background: #ef4444; color: white; border-radius: 4px; cursor: pointer; font-size: 0.75em; }
     .add-option-btn { width: 100%; padding: 6px; border: 1px dashed #cbd5e1; background: white; border-radius: 4px; font-size: 0.8em; color: #64748b; cursor: pointer; margin-top: 5px; }
     .add-option-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+    .property-hint { font-size: 0.75em; color: #94a3b8; margin-top: 4px; line-height: 1.3; }
+    .ds-mode-tabs { display: flex; gap: 4px; padding: 3px; background: #f1f5f9; border-radius: 6px; }
+    .ds-mode-tab { flex: 1; padding: 6px 8px; border: none; background: transparent; border-radius: 4px; cursor: pointer; font-size: 0.8em; color: #64748b; font-weight: 500; transition: all 0.15s; }
+    .ds-mode-tab:hover:not(.active) { color: #1e293b; }
+    .ds-mode-tab.active { background: white; color: #3b82f6; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .ds-filters { display: flex; flex-direction: column; gap: 8px; }
+    .ds-filter-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; background: #f8fafc; }
+    .ds-filter-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .ds-filter-num { font-size: 0.75em; font-weight: 700; color: #3b82f6; text-transform: uppercase; }
+    .ds-filter-remove { width: 22px; height: 22px; padding: 0; border: none; background: #ef4444; color: white; border-radius: 4px; cursor: pointer; font-size: 0.85em; line-height: 1; }
+    .ds-filter-remove:hover { background: #dc2626; }
+    .form-field-input.dynamic-source { background: #eff6ff; color: #3b82f6; font-weight: 600; font-size: 0.75em; border-color: #93c5fd; }
+    .options-preview.dynamic-source { background: #eff6ff; border: 1px dashed #93c5fd; padding: 6px 10px; border-radius: 4px; }
     .form-view { display: none; height: 100%; overflow-y: auto; }
     .form-view.active { display: block; }
     .editor-view { display: flex; }
@@ -492,7 +508,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js"></script>
+<script src="widget.js?v=1"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>© 2026 Said Hamadou (isaytoo)</span>
   <a href="https://gristup.fr" target="_blank" style="color: #3b82f6; text-decoration: none;">gristup.fr</a>

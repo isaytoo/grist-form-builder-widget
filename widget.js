@@ -659,7 +659,8 @@ formCanvas.addEventListener('drop', (e) => {
       placeholder: '',
       options: [],
       validation: {},
-      condition: null
+      condition: null,
+      dataSource: { mode: 'static', tableId: '', labelColumn: '', valueColumn: '', filters: [] }
     };
   } else if (draggedData.type === 'element') {
     newField = {
@@ -676,10 +677,11 @@ formCanvas.addEventListener('drop', (e) => {
       fontSize: draggedData.elementType === 'title' ? 14 : null,
       required: false,
       placeholder: '',
-      options: draggedData.elementType === 'select' || draggedData.elementType === 'radio' || draggedData.elementType === 'checkbox' 
+      options: draggedData.elementType === 'select' || draggedData.elementType === 'radio' || draggedData.elementType === 'checkbox'
         ? ['Option 1', 'Option 2', 'Option 3'] : [],
       validation: {},
-      condition: null
+      condition: null,
+      dataSource: { mode: 'static', tableId: '', labelColumn: '', valueColumn: '', filters: [] }
     };
   }
   
@@ -1031,24 +1033,46 @@ function createFormFieldElement(field) {
     case 'textarea':
       inputHtml = `<textarea class="form-field-input form-field-textarea" placeholder="${field.placeholder || 'Saisir...'}" readonly></textarea>`;
       break;
-    case 'select':
-      inputHtml = `<select class="form-field-input" disabled>
-        <option>${field.placeholder || 'Sélectionner...'}</option>
-        ${field.options.map(o => `<option>${o}</option>`).join('')}
-      </select>`;
+    case 'select': {
+      const isDynamic = field.dataSource && field.dataSource.mode === 'grist';
+      if (isDynamic) {
+        const ds = field.dataSource;
+        const summary = ds.tableId
+          ? `🔗 ${ds.tableId}${ds.labelColumn ? ' · ' + ds.labelColumn : ''}${ds.filters?.length ? ' · ' + ds.filters.length + ' filtre(s)' : ''}`
+          : '🔗 Dynamique (à configurer)';
+        inputHtml = `<select class="form-field-input dynamic-source" disabled>
+          <option>${summary}</option>
+        </select>`;
+      } else {
+        inputHtml = `<select class="form-field-input" disabled>
+          <option>${field.placeholder || 'Sélectionner...'}</option>
+          ${field.options.map(o => `<option>${o}</option>`).join('')}
+        </select>`;
+      }
       break;
+    }
     case 'radio':
-    case 'checkbox':
-      inputHtml = `<div class="options-preview">
-        ${field.options.slice(0, 3).map(o => `
-          <label class="option-item">
-            <input type="${field.fieldType === 'radio' ? 'radio' : 'checkbox'}" disabled>
-            <span>${o}</span>
-          </label>
-        `).join('')}
-        ${field.options.length > 3 ? '<span style="font-size: 0.75em; color: #94a3b8;">...</span>' : ''}
-      </div>`;
+    case 'checkbox': {
+      const isDynamic = field.dataSource && field.dataSource.mode === 'grist';
+      if (isDynamic) {
+        const ds = field.dataSource;
+        const summary = ds.tableId
+          ? `🔗 ${ds.tableId}${ds.labelColumn ? ' · ' + ds.labelColumn : ''}${ds.filters?.length ? ' · ' + ds.filters.length + ' filtre(s)' : ''}`
+          : '🔗 Dynamique (à configurer)';
+        inputHtml = `<div class="options-preview dynamic-source"><span style="font-size:0.75em;color:#3b82f6;font-weight:600;">${summary}</span></div>`;
+      } else {
+        inputHtml = `<div class="options-preview">
+          ${field.options.slice(0, 3).map(o => `
+            <label class="option-item">
+              <input type="${field.fieldType === 'radio' ? 'radio' : 'checkbox'}" disabled>
+              <span>${o}</span>
+            </label>
+          `).join('')}
+          ${field.options.length > 3 ? '<span style="font-size: 0.75em; color: #94a3b8;">...</span>' : ''}
+        </div>`;
+      }
       break;
+    }
     case 'signature':
       inputHtml = `<div class="signature-pad">✍️ Zone de signature</div>`;
       break;
@@ -1800,22 +1824,110 @@ function renderPropertiesPanel() {
     `;
   }
   
-  // Options pour select/radio/checkbox
+  // Options pour select/radio/checkbox — statique ou dynamique (Grist)
   if (hasOptions) {
+    if (!f.dataSource) f.dataSource = { mode: 'static', tableId: '', labelColumn: '', valueColumn: '', filters: [] };
+    const ds = f.dataSource;
+    const otherFieldsForFilter = formFields.filter(of => of.id !== f.id && of.columnId);
+
     html += `
       <div class="property-group">
-        <div class="property-label">Options</div>
-        <div class="options-editor" id="options-editor">
-          ${f.options.map((opt, i) => `
-            <div class="option-row">
-              <input type="text" value="${opt}" data-index="${i}">
-              <button data-index="${i}">×</button>
-            </div>
-          `).join('')}
-          <button class="add-option-btn" id="btn-add-option">+ Ajouter une option</button>
+        <div class="property-label">Source des options</div>
+        <div class="ds-mode-tabs">
+          <button type="button" class="ds-mode-tab ${ds.mode !== 'grist' ? 'active' : ''}" data-ds-mode="static">📝 Statique</button>
+          <button type="button" class="ds-mode-tab ${ds.mode === 'grist' ? 'active' : ''}" data-ds-mode="grist">🔗 Depuis Grist</button>
         </div>
       </div>
     `;
+
+    if (ds.mode !== 'grist') {
+      // Mode statique : UI existante
+      html += `
+        <div class="property-group">
+          <div class="property-label">Options</div>
+          <div class="options-editor" id="options-editor">
+            ${f.options.map((opt, i) => `
+              <div class="option-row">
+                <input type="text" value="${opt}" data-index="${i}">
+                <button data-index="${i}">×</button>
+              </div>
+            `).join('')}
+            <button class="add-option-btn" id="btn-add-option">+ Ajouter une option</button>
+          </div>
+        </div>
+      `;
+    } else {
+      // Mode dynamique : configuration de la source Grist
+      const tableOptions = (availableTables || []).map(t =>
+        `<option value="${t}" ${ds.tableId === t ? 'selected' : ''}>${t}</option>`
+      ).join('');
+      const cachedCols = (window.dsColumnsCache || {})[ds.tableId] || [];
+      const colOptions = (selected) => `<option value="">-- Choisir --</option>` +
+        cachedCols.map(c => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('');
+
+      html += `
+        <div class="property-group">
+          <div class="property-label">Table source</div>
+          <select class="property-select" id="ds-table">
+            <option value="">-- Choisir une table --</option>
+            ${tableOptions}
+          </select>
+        </div>
+        <div class="property-group">
+          <div class="property-label">Colonne libellé (affichée)</div>
+          <select class="property-select" id="ds-label-col" ${!ds.tableId ? 'disabled' : ''}>${colOptions(ds.labelColumn)}</select>
+        </div>
+        <div class="property-group">
+          <div class="property-label">Colonne valeur (sauvegardée — optionnel)</div>
+          <select class="property-select" id="ds-value-col" ${!ds.tableId ? 'disabled' : ''}>${colOptions(ds.valueColumn)}</select>
+          <div class="property-hint">Si vide, on utilise la colonne libellé.</div>
+        </div>
+
+        <div class="property-group">
+          <div class="property-label">Filtres en cascade ${ds.filters.length ? `(${ds.filters.length})` : ''}</div>
+          <div class="ds-filters" id="ds-filters">
+      `;
+
+      ds.filters.forEach((filter, idx) => {
+        const parentOpts = otherFieldsForFilter.map(of =>
+          `<option value="${of.id}" ${filter.parentFieldId === of.id ? 'selected' : ''}>${of.label}</option>`
+        ).join('');
+        const op = filter.operator || '=';
+        html += `
+          <div class="ds-filter-card" data-filter-idx="${idx}">
+            <div class="ds-filter-header">
+              <span class="ds-filter-num">Filtre ${idx + 1}</span>
+              <button type="button" class="ds-filter-remove" data-filter-idx="${idx}" title="Supprimer">×</button>
+            </div>
+            <div class="property-label">Champ parent (du formulaire)</div>
+            <select class="property-select ds-filter-parent" data-filter-idx="${idx}">
+              <option value="">-- Choisir --</option>
+              ${parentOpts}
+            </select>
+            <div class="property-label" style="margin-top:6px;">Opérateur</div>
+            <select class="property-select ds-filter-operator" data-filter-idx="${idx}">
+              <option value="=" ${op === '=' ? 'selected' : ''}>= (égal à)</option>
+              <option value=">=" ${op === '>=' ? 'selected' : ''}>≥ (sup. ou égal)</option>
+              <option value="<=" ${op === '<=' ? 'selected' : ''}>≤ (inf. ou égal)</option>
+              <option value="between" ${op === 'between' ? 'selected' : ''}>entre deux colonnes</option>
+            </select>
+            <div class="property-label" style="margin-top:6px;">${op === 'between' ? 'Colonne minimum (source)' : 'Colonne source'}</div>
+            <select class="property-select ds-filter-srccol" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumn)}</select>
+            ${op === 'between' ? `
+              <div class="property-label" style="margin-top:6px;">Colonne maximum (source)</div>
+              <select class="property-select ds-filter-srccolmax" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumnMax)}</select>
+            ` : ''}
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+          <button type="button" class="add-option-btn" id="ds-add-filter">+ Ajouter un filtre</button>
+          <div class="property-hint">Les filtres se combinent en ET. Si un parent n'a pas encore de valeur, son filtre est ignoré.</div>
+        </div>
+      `;
+    }
   }
   
   // Validation
@@ -2374,8 +2486,106 @@ function renderPropertiesPanel() {
       renderFormFields();
       selectField(selectedField.id);
     });
+
+    // === Source dynamique (mode Grist) ===
+    if (!window.dsColumnsCache) window.dsColumnsCache = {};
+
+    // Toggle mode statique / Grist
+    document.querySelectorAll('.ds-mode-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.dsMode;
+        if (!selectedField.dataSource) selectedField.dataSource = { mode, tableId: '', labelColumn: '', valueColumn: '', filters: [] };
+        selectedField.dataSource.mode = mode;
+        renderPropertiesPanel();
+      });
+    });
+
+    // Helper : charge les colonnes d'une table dans le cache puis re-render le panneau
+    async function loadDsColumns(tableId) {
+      if (!tableId || window.dsColumnsCache[tableId]) {
+        renderPropertiesPanel();
+        return;
+      }
+      try {
+        const data = await grist.docApi.fetchTable(tableId);
+        const cols = Object.keys(data).filter(c => c !== 'id' && !c.startsWith('grist') && c !== 'manualSort');
+        window.dsColumnsCache[tableId] = cols;
+      } catch (err) {
+        console.warn('Impossible de charger les colonnes de', tableId, err);
+        window.dsColumnsCache[tableId] = [];
+      }
+      renderPropertiesPanel();
+    }
+
+    // Sélection de la table source
+    document.getElementById('ds-table')?.addEventListener('change', async (e) => {
+      const tableId = e.target.value;
+      selectedField.dataSource.tableId = tableId;
+      selectedField.dataSource.labelColumn = '';
+      selectedField.dataSource.valueColumn = '';
+      // On garde les filtres mais on reset leurs colonnes source qui ne sont plus pertinentes
+      selectedField.dataSource.filters.forEach(f => { f.sourceColumn = ''; f.sourceColumnMax = ''; });
+      await loadDsColumns(tableId);
+    });
+
+    document.getElementById('ds-label-col')?.addEventListener('change', (e) => {
+      selectedField.dataSource.labelColumn = e.target.value;
+      renderFormFields();
+    });
+    document.getElementById('ds-value-col')?.addEventListener('change', (e) => {
+      selectedField.dataSource.valueColumn = e.target.value;
+    });
+
+    // Ajouter un filtre
+    document.getElementById('ds-add-filter')?.addEventListener('click', () => {
+      selectedField.dataSource.filters.push({ parentFieldId: '', operator: '=', sourceColumn: '', sourceColumnMax: '' });
+      renderPropertiesPanel();
+    });
+
+    // Supprimer un filtre
+    document.querySelectorAll('.ds-filter-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.filterIdx);
+        selectedField.dataSource.filters.splice(idx, 1);
+        renderPropertiesPanel();
+      });
+    });
+
+    // Modification d'un filtre
+    document.querySelectorAll('.ds-filter-parent').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.filterIdx);
+        selectedField.dataSource.filters[idx].parentFieldId = e.target.value;
+      });
+    });
+    document.querySelectorAll('.ds-filter-operator').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.filterIdx);
+        selectedField.dataSource.filters[idx].operator = e.target.value;
+        // Si on quitte 'between', oublier la colonne max
+        if (e.target.value !== 'between') selectedField.dataSource.filters[idx].sourceColumnMax = '';
+        renderPropertiesPanel();
+      });
+    });
+    document.querySelectorAll('.ds-filter-srccol').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.filterIdx);
+        selectedField.dataSource.filters[idx].sourceColumn = e.target.value;
+      });
+    });
+    document.querySelectorAll('.ds-filter-srccolmax').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.filterIdx);
+        selectedField.dataSource.filters[idx].sourceColumnMax = e.target.value;
+      });
+    });
+
+    // Pré-charge les colonnes au render si la table est déjà sélectionnée
+    if (selectedField.dataSource?.mode === 'grist' && selectedField.dataSource.tableId && !window.dsColumnsCache[selectedField.dataSource.tableId]) {
+      loadDsColumns(selectedField.dataSource.tableId);
+    }
   }
-  
+
   // Validation
   document.getElementById('prop-validation-type')?.addEventListener('change', (e) => {
     const type = e.target.value;
