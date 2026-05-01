@@ -3204,6 +3204,32 @@ function renderFormView() {
 // SOURCES D'OPTIONS DYNAMIQUES — mode Saisie (utilise formFields)
 // =============================================================================
 const fillDsTableCache = {};
+const fillColumnTypesCache = {};
+
+async function fillGetColumnTypes(tableId) {
+  if (fillColumnTypesCache[tableId]) return fillColumnTypesCache[tableId];
+  try {
+    const meta = await grist.docApi.fetchTable('_grist_Tables_column');
+    const tables = await grist.docApi.fetchTable('_grist_Tables');
+    // Trouver l'index de la table
+    const tIdx = tables.tableId.indexOf(tableId);
+    if (tIdx === -1) { fillColumnTypesCache[tableId] = {}; return {}; }
+    const tRef = tables.id[tIdx];
+    // Filtrer les colonnes de cette table
+    const types = {};
+    for (let i = 0; i < meta.id.length; i++) {
+      if (meta.parentId[i] === tRef) {
+        types[meta.colId[i]] = meta.type[i];
+      }
+    }
+    fillColumnTypesCache[tableId] = types;
+    return types;
+  } catch (err) {
+    console.warn('Erreur fetch column types:', tableId, err);
+    fillColumnTypesCache[tableId] = {};
+    return {};
+  }
+}
 
 async function fillFetchDsTable(tableId) {
   if (fillDsTableCache[tableId]) return fillDsTableCache[tableId];
@@ -3234,55 +3260,7 @@ async function fillReadFieldValue(field, filterSourceColumn = null) {
     return Array.from(cs).map(c => c.value);
   }
   const el = document.getElementById(`input-${field.id}`);
-  let value = el ? el.value : null;
-
-  console.log('[fillReadFieldValue] field:', field.id, 'value:', value, 'filterSourceColumn:', filterSourceColumn, 'lookupTable:', field.lookupTable, 'dataSource:', field.dataSource?.mode);
-
-  // Si le champ est un lookup et qu'on a besoin de résoudre la référence pour le cascade
-  if (field.lookupTable && filterSourceColumn && value !== null && value !== '') {
-    try {
-      if (!field.lookupData) {
-        console.log('[fillReadFieldValue] Fetching lookup table:', field.lookupTable);
-        field.lookupData = await grist.docApi.fetchTable(field.lookupTable);
-      }
-      if (field.lookupData && field.lookupData.id) {
-        const idNum = parseInt(value, 10);
-        const idx = field.lookupData.id.indexOf(idNum);
-        console.log('[fillReadFieldValue] idNum:', idNum, 'idx:', idx, 'column:', filterSourceColumn);
-        if (idx !== -1 && field.lookupData[filterSourceColumn]) {
-          const resolved = field.lookupData[filterSourceColumn][idx];
-          console.log('[fillReadFieldValue] Resolved value (lookup):', resolved);
-          return resolved;
-        }
-      }
-    } catch (err) {
-      console.warn('[fillReadFieldValue] Erreur résolution lookup pour cascade:', err);
-    }
-  }
-
-  // Si le champ a une dataSource Grist et qu'on a besoin de résoudre la valeur
-  if (field.dataSource && field.dataSource.mode === 'grist' && field.dataSource.tableId && filterSourceColumn && value !== null && value !== '') {
-    try {
-      if (!field.dsCache) {
-        console.log('[fillReadFieldValue] Fetching dataSource table:', field.dataSource.tableId);
-        field.dsCache = await grist.docApi.fetchTable(field.dataSource.tableId);
-      }
-      if (field.dsCache && field.dsCache.id) {
-        const idNum = parseInt(value, 10);
-        const idx = field.dsCache.id.indexOf(idNum);
-        console.log('[fillReadFieldValue] dataSource idNum:', idNum, 'idx:', idx, 'column:', filterSourceColumn);
-        if (idx !== -1 && field.dsCache[filterSourceColumn]) {
-          const resolved = field.dsCache[filterSourceColumn][idx];
-          console.log('[fillReadFieldValue] Resolved value (dataSource):', resolved);
-          return resolved;
-        }
-      }
-    } catch (err) {
-      console.warn('[fillReadFieldValue] Erreur résolution dataSource pour cascade:', err);
-    }
-  }
-
-  return value;
+  return el ? el.value : null;
 }
 
 function fillCompareValues(a, op, b) {
@@ -3317,19 +3295,29 @@ async function fillFilterDsRows(rows, dataSource) {
       //   1. The raw value directly (if sourceColumn stores plain values)
       //   2. The row ID from the parent's dataSource table (if sourceColumn is a reference)
       const childColValue = row[filter.sourceColumn];
-      const childColIsRef = typeof childColValue === 'number';
+      // Détecter si la colonne est une référence via les métadonnées Grist
+      let childColIsRef = false;
+      if (dataSource.tableId) {
+        try {
+          const colTypes = await fillGetColumnTypes(dataSource.tableId);
+          const colType = colTypes[filter.sourceColumn] || '';
+          childColIsRef = colType.startsWith('Ref:') || colType.startsWith('RefList:');
+        } catch (err) {
+          // fallback: typeof check
+          childColIsRef = typeof childColValue === 'number';
+        }
+      }
 
       let parentValue = rawParentValue;
 
       if (childColIsRef && parentField.dataSource && parentField.dataSource.mode === 'grist' && parentField.dataSource.tableId) {
-        // Resolve: find the row ID in the parent's table whose valueColumn matches the selected value
+        // La colonne enfant est une référence Grist : on résout l'ID de la ligne parente
         try {
           const pDs = parentField.dataSource;
           const pRows = await fillFetchDsTable(pDs.tableId);
           const valueCol = pDs.valueColumn || pDs.labelColumn;
           const matchRow = pRows.find(r => String(r[valueCol]) === String(rawParentValue));
           if (matchRow) {
-            console.log('[cascade] Resolved parent row ID:', matchRow.id, 'for value:', rawParentValue);
             parentValue = matchRow.id;
           }
         } catch (err) {
