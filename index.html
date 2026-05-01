@@ -395,11 +395,107 @@
             <p style="color: #475569; margin-top: 10px;">Exemple : <code style="background:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:0.85em;">...?mode=form&table=Clients</code></p>
           </div>
           
+          <div style="background: #ecfeff; border-radius: 10px; padding: 20px; border-left: 4px solid #06b6d4;">
+            <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">🔗 Sélecteurs en cascade (options dynamiques)</h3>
+            <p style="color: #475569; line-height: 1.6; margin-bottom: 14px;">
+              Les champs <strong>Liste déroulante</strong>, <strong>Choix unique</strong> et <strong>Cases à cocher</strong> peuvent charger leurs options depuis une table Grist, et les <strong>filtrer en cascade</strong> selon la valeur d'un autre champ du formulaire (ex. choisir un département → ne voir que les villes de ce département).
+            </p>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">📋 Étape 1 — Préparer la table source dans Grist</div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 6px;">
+                Crée une table contenant tes options. Exemple <code style="background:#e2e8f0;padding:2px 5px;border-radius:3px;font-size:0.85em;">Villes</code> :
+              </p>
+              <div style="font-family: monospace; font-size: 0.8em; background: #f8fafc; padding: 8px 12px; border-radius: 4px; color: #475569;">
+                nom · code_dept<br>
+                Lyon · 69<br>
+                Bron · 69<br>
+                Grenoble · 38<br>
+                Paris 1er · 75
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🎨 Étape 2 — Configurer le champ "parent"</div>
+              <ol style="color: #475569; line-height: 1.8; font-size: 0.9em; padding-left: 20px; margin: 0;">
+                <li>Glisse une <strong>Liste déroulante</strong> sur le canvas</li>
+                <li>Clique dessus pour ouvrir les propriétés à droite</li>
+                <li>Donne-lui un libellé clair : ex. "Département"</li>
+                <li>Section <strong>Source des options</strong> → clique <strong>🔗 Depuis Grist</strong></li>
+                <li>Choisis la table source (ex. <code>Departements</code>), la colonne libellé (<code>nom</code>) et la colonne valeur (<code>code</code>)</li>
+                <li>Pas de filtre nécessaire pour ce champ — il propose toutes les valeurs</li>
+              </ol>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🌳 Étape 3 — Configurer le champ "enfant" (cascade)</div>
+              <ol style="color: #475569; line-height: 1.8; font-size: 0.9em; padding-left: 20px; margin: 0;">
+                <li>Glisse une autre <strong>Liste déroulante</strong></li>
+                <li>Libellé : "Ville", source <strong>🔗 Depuis Grist</strong></li>
+                <li>Table source : <code>Villes</code>, colonne libellé : <code>nom</code></li>
+                <li>Section <strong>Filtres en cascade</strong> → clique <strong>+ Ajouter un filtre</strong></li>
+                <li>Champ parent : <strong>Département</strong> · Opérateur : <strong>=</strong> · Colonne source : <code>code_dept</code></li>
+              </ol>
+              <p style="background: #f0f9ff; padding: 8px 12px; border-radius: 4px; margin-top: 10px; font-size: 0.85em; color: #075985;">
+                💡 Quand l'utilisateur choisira un département, le select Ville rechargera automatiquement ses options en ne gardant que celles dont <code>code_dept</code> correspond.
+              </p>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🧮 Les 4 opérateurs disponibles</div>
+              <div style="display: grid; gap: 8px; font-size: 0.88em;">
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong style="color: #0891b2;">= (égal à)</strong> — la colonne source vaut exactement la valeur du parent.<br>
+                  <span style="font-style: italic; color: #64748b;">Ex. ville.code_dept = 69 si Département = 69</span>
+                </div>
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong style="color: #0891b2;">≥ (supérieur ou égal)</strong> — la colonne source est ≥ valeur du parent.<br>
+                  <span style="font-style: italic; color: #64748b;">Ex. produit.prix_min ≥ budget saisi</span>
+                </div>
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong style="color: #0891b2;">≤ (inférieur ou égal)</strong> — la colonne source est ≤ valeur du parent.<br>
+                  <span style="font-style: italic; color: #64748b;">Ex. tarif.plafond ≤ revenu déclaré</span>
+                </div>
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong style="color: #0891b2;">entre deux colonnes</strong> — la valeur du parent est entre deux colonnes (min/max) de la table source.<br>
+                  <span style="font-style: italic; color: #64748b;">Ex. produit.age_min ≤ âge_saisi ≤ produit.age_max</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🔀 Plusieurs filtres combinés (ET)</div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 8px;">
+                Tu peux ajouter plusieurs filtres sur un même champ. Toutes les conditions doivent être vraies pour qu'une option soit affichée.
+              </p>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.88em; margin: 0;">
+                <strong>Exemple :</strong> select "Produits" filtré par <em>Catégorie</em> = catégorie ET <em>Âge</em> entre age_min et age_max → ne propose que les produits de la bonne catégorie ET adaptés à l'âge.
+              </p>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">⚡ Comportement à la saisie</div>
+              <ul style="color: #475569; line-height: 1.8; font-size: 0.9em; padding-left: 20px; margin: 0;">
+                <li>Si le parent n'a pas encore de valeur, son filtre est <strong>ignoré</strong> (pas de blocage)</li>
+                <li>Quand le parent change, l'enfant <strong>recharge ses options</strong> automatiquement</li>
+                <li>Cascade transitive (A → B → C) gérée : changer A reconfigure B, qui reconfigure C</li>
+                <li>Si la valeur sélectionnée d'un enfant n'est plus valide, elle est <strong>réinitialisée</strong></li>
+              </ul>
+            </div>
+
+            <div style="background: #fef3c7; border-radius: 8px; padding: 12px 14px; border-left: 3px solid #f59e0b;">
+              <div style="font-size: 0.88em; color: #92400e; line-height: 1.6;">
+                <strong>⚠️ Permission requise :</strong> le widget doit avoir <strong>"Accès complet au document"</strong> pour lister les tables et lire les données. Configure-le dans le panneau du widget Grist (à droite de l'écran).
+              </div>
+            </div>
+          </div>
+
           <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">⚙️ Fonctionnalités</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>📄</span> Multi-pages A4</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔀</span> Champs conditionnels</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔗</span> Sélecteurs en cascade</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🧮</span> Champs calculés</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔍</span> Lookup / Autocomplétion</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>✍️</span> Signature</div>
@@ -508,7 +604,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=3"></script>
+<script src="widget.js?v=4"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>© 2026 Said Hamadou (isaytoo)</span>
   <a href="https://gristup.fr" target="_blank" style="color: #3b82f6; text-decoration: none;">gristup.fr</a>
