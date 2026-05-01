@@ -1,0 +1,13 @@
+nom,categorie,age_min,age_max,prix
+Sucette anti-douleur,Bébé,0,3,5
+Hochet musical,Bébé,0,2,15
+Tricycle,Enfant,3,7,80
+Vélo 16 pouces,Enfant,5,9,150
+Trottinette,Enfant,6,12,90
+Skateboard,Ado,10,16,120
+Console portable,Ado,8,18,250
+Tablette,Tous,10,99,300
+Vélo VTT adulte,Adulte,16,75,600
+Permis voiture,Adulte,18,99,1200
+Carte senior SNCF,Senior,60,120,75
+Mutuelle senior,Senior,55,120,40
