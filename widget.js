@@ -3223,7 +3223,7 @@ async function fillFetchDsTable(tableId) {
   }
 }
 
-function fillReadFieldValue(field) {
+async function fillReadFieldValue(field, filterSourceColumn = null) {
   if (!field) return null;
   if (field.fieldType === 'radio') {
     const c = document.querySelector(`#input-${field.id} input:checked`);
@@ -3234,7 +3234,27 @@ function fillReadFieldValue(field) {
     return Array.from(cs).map(c => c.value);
   }
   const el = document.getElementById(`input-${field.id}`);
-  return el ? el.value : null;
+  let value = el ? el.value : null;
+
+  // Si le champ est un lookup et qu'on a besoin de résoudre la référence pour le cascade
+  if (field.lookupTable && filterSourceColumn && value !== null && value !== '') {
+    try {
+      if (!field.lookupData) {
+        field.lookupData = await grist.docApi.fetchTable(field.lookupTable);
+      }
+      if (field.lookupData && field.lookupData.id) {
+        const idNum = parseInt(value, 10);
+        const idx = field.lookupData.id.indexOf(idNum);
+        if (idx !== -1 && field.lookupData[filterSourceColumn]) {
+          return field.lookupData[filterSourceColumn][idx];
+        }
+      }
+    } catch (err) {
+      console.warn('Erreur résolution lookup pour cascade:', err);
+    }
+  }
+
+  return value;
 }
 
 function fillCompareValues(a, op, b) {
@@ -3248,36 +3268,42 @@ function fillCompareValues(a, op, b) {
   }
 }
 
-function fillFilterDsRows(rows, dataSource) {
+async function fillFilterDsRows(rows, dataSource) {
   if (!dataSource.filters || dataSource.filters.length === 0) return rows;
-  return rows.filter(row => {
+  const filtered = [];
+  for (const row of rows) {
+    let keep = true;
     for (const filter of dataSource.filters) {
       if (!filter.parentFieldId || !filter.sourceColumn) continue;
       const parentField = formFields.find(f => f.id === filter.parentFieldId);
       if (!parentField) continue;
-      const parentValue = fillReadFieldValue(parentField);
-      if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) continue;
+      const parentValue = await fillReadFieldValue(parentField, filter.sourceColumn);
+      if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) {
+        keep = false;
+        break;
+      }
 
       if (filter.operator === 'between') {
         if (!filter.sourceColumnMax) continue;
         const min = row[filter.sourceColumn];
         const max = row[filter.sourceColumnMax];
         const nMin = parseFloat(min), nMax = parseFloat(max), nVal = parseFloat(parentValue);
-        if (isNaN(nMin) || isNaN(nMax) || isNaN(nVal)) return false;
-        if (!(nMin <= nVal && nVal <= nMax)) return false;
+        if (isNaN(nMin) || isNaN(nMax) || isNaN(nVal)) { keep = false; break; }
+        if (!(nMin <= nVal && nVal <= nMax)) { keep = false; break; }
       } else {
-        if (!fillCompareValues(row[filter.sourceColumn], filter.operator, parentValue)) return false;
+        if (!fillCompareValues(row[filter.sourceColumn], filter.operator, parentValue)) { keep = false; break; }
       }
     }
-    return true;
-  });
+    if (keep) filtered.push(row);
+  }
+  return filtered;
 }
 
 async function reloadFillDynamicField(field) {
   const ds = field.dataSource;
   if (!ds || ds.mode !== 'grist' || !ds.tableId || !ds.labelColumn) return;
   const rows = await fillFetchDsTable(ds.tableId);
-  const filtered = fillFilterDsRows(rows, ds);
+  const filtered = await fillFilterDsRows(rows, ds);
 
   const valueCol = ds.valueColumn || ds.labelColumn;
   const seen = new Set();
