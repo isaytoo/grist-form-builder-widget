@@ -3195,6 +3195,177 @@ function renderFormView() {
   
   // Initialiser les conditions
   initConditions();
+
+  // Initialiser les sources d'options dynamiques (cascade)
+  initFillModeDynamicSources();
+}
+
+// =============================================================================
+// SOURCES D'OPTIONS DYNAMIQUES — mode Saisie (utilise formFields)
+// =============================================================================
+const fillDsTableCache = {};
+
+async function fillFetchDsTable(tableId) {
+  if (fillDsTableCache[tableId]) return fillDsTableCache[tableId];
+  try {
+    const data = await grist.docApi.fetchTable(tableId);
+    if (!data || !data.id) return [];
+    const rows = data.id.map((id, i) => {
+      const r = { id };
+      Object.keys(data).forEach(k => { if (k !== 'id') r[k] = data[k][i]; });
+      return r;
+    });
+    fillDsTableCache[tableId] = rows;
+    return rows;
+  } catch (err) {
+    console.warn('Échec fetch table', tableId, err);
+    return [];
+  }
+}
+
+function fillReadFieldValue(field) {
+  if (!field) return null;
+  if (field.fieldType === 'radio') {
+    const c = document.querySelector(`#input-${field.id} input:checked`);
+    return c ? c.value : null;
+  }
+  if (field.fieldType === 'checkbox') {
+    const cs = document.querySelectorAll(`#input-${field.id} input:checked`);
+    return Array.from(cs).map(c => c.value);
+  }
+  const el = document.getElementById(`input-${field.id}`);
+  return el ? el.value : null;
+}
+
+function fillCompareValues(a, op, b) {
+  const na = parseFloat(a), nb = parseFloat(b);
+  const numeric = !isNaN(na) && !isNaN(nb);
+  switch (op) {
+    case '=':  return numeric ? na === nb : String(a) === String(b);
+    case '>=': return numeric ? na >= nb : String(a) >= String(b);
+    case '<=': return numeric ? na <= nb : String(a) <= String(b);
+    default:   return false;
+  }
+}
+
+function fillFilterDsRows(rows, dataSource) {
+  if (!dataSource.filters || dataSource.filters.length === 0) return rows;
+  return rows.filter(row => {
+    for (const filter of dataSource.filters) {
+      if (!filter.parentFieldId || !filter.sourceColumn) continue;
+      const parentField = formFields.find(f => f.id === filter.parentFieldId);
+      if (!parentField) continue;
+      const parentValue = fillReadFieldValue(parentField);
+      if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) continue;
+
+      if (filter.operator === 'between') {
+        if (!filter.sourceColumnMax) continue;
+        const min = row[filter.sourceColumn];
+        const max = row[filter.sourceColumnMax];
+        const nMin = parseFloat(min), nMax = parseFloat(max), nVal = parseFloat(parentValue);
+        if (isNaN(nMin) || isNaN(nMax) || isNaN(nVal)) return false;
+        if (!(nMin <= nVal && nVal <= nMax)) return false;
+      } else {
+        if (!fillCompareValues(row[filter.sourceColumn], filter.operator, parentValue)) return false;
+      }
+    }
+    return true;
+  });
+}
+
+async function reloadFillDynamicField(field) {
+  const ds = field.dataSource;
+  if (!ds || ds.mode !== 'grist' || !ds.tableId || !ds.labelColumn) return;
+  const rows = await fillFetchDsTable(ds.tableId);
+  const filtered = fillFilterDsRows(rows, ds);
+
+  const valueCol = ds.valueColumn || ds.labelColumn;
+  const seen = new Set();
+  const opts = [];
+  filtered.forEach(r => {
+    const v = r[valueCol];
+    const l = r[ds.labelColumn];
+    if (v === undefined || v === null || v === '') return;
+    const key = String(v);
+    if (seen.has(key)) return;
+    seen.add(key);
+    opts.push({ value: String(v), label: String(l !== undefined ? l : v) });
+  });
+
+  const currentValue = fillReadFieldValue(field);
+  const stillValid = Array.isArray(currentValue)
+    ? currentValue.every(v => opts.some(o => o.value === v))
+    : opts.some(o => o.value === currentValue);
+
+  if (field.fieldType === 'select') {
+    const sel = document.getElementById(`input-${field.id}`);
+    if (!sel) return;
+    sel.innerHTML = `<option value="">${field.placeholder || 'Sélectionner...'}</option>` +
+      opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    sel.value = stillValid ? (Array.isArray(currentValue) ? currentValue[0] : currentValue) : '';
+    sel.dispatchEvent(new Event('change'));
+  } else if (field.fieldType === 'radio') {
+    const c = document.getElementById(`input-${field.id}`);
+    if (!c) return;
+    c.innerHTML = opts.map(o => `
+      <label class="form-radio-item">
+        <input type="radio" name="radio-${field.id}" value="${o.value}" ${stillValid && currentValue === o.value ? 'checked' : ''}>
+        <span>${o.label}</span>
+      </label>
+    `).join('');
+  } else if (field.fieldType === 'checkbox') {
+    const c = document.getElementById(`input-${field.id}`);
+    if (!c) return;
+    const sel = Array.isArray(currentValue) ? currentValue : [];
+    c.innerHTML = opts.map(o => `
+      <label class="form-checkbox-item">
+        <input type="checkbox" value="${o.value}" ${sel.includes(o.value) ? 'checked' : ''}>
+        <span>${o.label}</span>
+      </label>
+    `).join('');
+  }
+}
+
+function initFillModeDynamicSources() {
+  if (!formFields || formFields.length === 0) return;
+  const dynamicFields = formFields.filter(f =>
+    ['select', 'radio', 'checkbox'].includes(f.fieldType) &&
+    f.dataSource && f.dataSource.mode === 'grist' && f.dataSource.tableId && f.dataSource.labelColumn
+  );
+  if (dynamicFields.length === 0) return;
+
+  const childrenByParent = {};
+  dynamicFields.forEach(child => {
+    (child.dataSource.filters || []).forEach(filter => {
+      if (!filter.parentFieldId) return;
+      if (!childrenByParent[filter.parentFieldId]) childrenByParent[filter.parentFieldId] = [];
+      if (!childrenByParent[filter.parentFieldId].includes(child)) {
+        childrenByParent[filter.parentFieldId].push(child);
+      }
+    });
+  });
+
+  // Charger initialement chaque champ dynamique
+  dynamicFields.forEach(f => reloadFillDynamicField(f));
+
+  // Listeners sur les parents
+  Object.keys(childrenByParent).forEach(parentId => {
+    const parentField = formFields.find(f => f.id === parentId);
+    if (!parentField) return;
+    const trigger = async () => {
+      for (const child of childrenByParent[parentId]) {
+        await reloadFillDynamicField(child);
+      }
+    };
+    if (parentField.fieldType === 'radio' || parentField.fieldType === 'checkbox') {
+      const c = document.getElementById(`input-${parentField.id}`);
+      c?.querySelectorAll('input').forEach(inp => inp.addEventListener('change', trigger));
+    } else {
+      const el = document.getElementById(`input-${parentField.id}`);
+      el?.addEventListener('change', trigger);
+      el?.addEventListener('input', trigger);
+    }
+  });
 }
 
 // Initialiser les champs calculés
