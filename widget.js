@@ -3236,7 +3236,7 @@ async function fillReadFieldValue(field, filterSourceColumn = null) {
   const el = document.getElementById(`input-${field.id}`);
   let value = el ? el.value : null;
 
-  console.log('[fillReadFieldValue] field:', field.id, 'value:', value, 'filterSourceColumn:', filterSourceColumn, 'lookupTable:', field.lookupTable);
+  console.log('[fillReadFieldValue] field:', field.id, 'value:', value, 'filterSourceColumn:', filterSourceColumn, 'lookupTable:', field.lookupTable, 'dataSource:', field.dataSource?.mode);
 
   // Si le champ est un lookup et qu'on a besoin de résoudre la référence pour le cascade
   if (field.lookupTable && filterSourceColumn && value !== null && value !== '') {
@@ -3251,12 +3251,34 @@ async function fillReadFieldValue(field, filterSourceColumn = null) {
         console.log('[fillReadFieldValue] idNum:', idNum, 'idx:', idx, 'column:', filterSourceColumn);
         if (idx !== -1 && field.lookupData[filterSourceColumn]) {
           const resolved = field.lookupData[filterSourceColumn][idx];
-          console.log('[fillReadFieldValue] Resolved value:', resolved);
+          console.log('[fillReadFieldValue] Resolved value (lookup):', resolved);
           return resolved;
         }
       }
     } catch (err) {
       console.warn('[fillReadFieldValue] Erreur résolution lookup pour cascade:', err);
+    }
+  }
+
+  // Si le champ a une dataSource Grist et qu'on a besoin de résoudre la valeur
+  if (field.dataSource && field.dataSource.mode === 'grist' && field.dataSource.tableId && filterSourceColumn && value !== null && value !== '') {
+    try {
+      if (!field.dsCache) {
+        console.log('[fillReadFieldValue] Fetching dataSource table:', field.dataSource.tableId);
+        field.dsCache = await grist.docApi.fetchTable(field.dataSource.tableId);
+      }
+      if (field.dsCache && field.dsCache.id) {
+        const idNum = parseInt(value, 10);
+        const idx = field.dsCache.id.indexOf(idNum);
+        console.log('[fillReadFieldValue] dataSource idNum:', idNum, 'idx:', idx, 'column:', filterSourceColumn);
+        if (idx !== -1 && field.dsCache[filterSourceColumn]) {
+          const resolved = field.dsCache[filterSourceColumn][idx];
+          console.log('[fillReadFieldValue] Resolved value (dataSource):', resolved);
+          return resolved;
+        }
+      }
+    } catch (err) {
+      console.warn('[fillReadFieldValue] Erreur résolution dataSource pour cascade:', err);
     }
   }
 
