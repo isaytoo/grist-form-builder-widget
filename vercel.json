@@ -5,7 +5,10 @@
       "headers": [
         { "key": "X-Frame-Options", "value": "ALLOWALL" },
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Content-Security-Policy", "value": "frame-ancestors *" }
+        { "key": "Content-Security-Policy", "value": "frame-ancestors *" },
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" },
+        { "key": "Expires", "value": "0" }
       ]
     }
   ]
