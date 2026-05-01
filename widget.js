@@ -3236,21 +3236,27 @@ async function fillReadFieldValue(field, filterSourceColumn = null) {
   const el = document.getElementById(`input-${field.id}`);
   let value = el ? el.value : null;
 
+  console.log('[fillReadFieldValue] field:', field.id, 'value:', value, 'filterSourceColumn:', filterSourceColumn, 'lookupTable:', field.lookupTable);
+
   // Si le champ est un lookup et qu'on a besoin de résoudre la référence pour le cascade
   if (field.lookupTable && filterSourceColumn && value !== null && value !== '') {
     try {
       if (!field.lookupData) {
+        console.log('[fillReadFieldValue] Fetching lookup table:', field.lookupTable);
         field.lookupData = await grist.docApi.fetchTable(field.lookupTable);
       }
       if (field.lookupData && field.lookupData.id) {
         const idNum = parseInt(value, 10);
         const idx = field.lookupData.id.indexOf(idNum);
+        console.log('[fillReadFieldValue] idNum:', idNum, 'idx:', idx, 'column:', filterSourceColumn);
         if (idx !== -1 && field.lookupData[filterSourceColumn]) {
-          return field.lookupData[filterSourceColumn][idx];
+          const resolved = field.lookupData[filterSourceColumn][idx];
+          console.log('[fillReadFieldValue] Resolved value:', resolved);
+          return resolved;
         }
       }
     } catch (err) {
-      console.warn('Erreur résolution lookup pour cascade:', err);
+      console.warn('[fillReadFieldValue] Erreur résolution lookup pour cascade:', err);
     }
   }
 
