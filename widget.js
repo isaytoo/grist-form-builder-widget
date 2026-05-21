@@ -4426,6 +4426,10 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
   }
 });
 
+// Auto-sauvegarde des paramètres de partage public
+document.getElementById('cfg-proxy-url')?.addEventListener('change', () => saveFormConfig());
+document.getElementById('cfg-doc-id')?.addEventListener('change', () => saveFormConfig());
+
 btnModeEdit.addEventListener('click', () => switchMode('edit'));
 btnModeFill.addEventListener('click', () => switchMode('fill'));
 document.getElementById('btn-mode-guide')?.addEventListener('click', () => switchMode('guide'));
