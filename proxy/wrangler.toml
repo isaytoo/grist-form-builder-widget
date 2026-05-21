@@ -4,12 +4,10 @@ compatibility_date = "2024-01-01"
 
 [vars]
 # URL de ton instance Grist (sans slash final)
-# Ex: https://docs.getgrist.com ou https://grist.mon-domaine.fr
-GRIST_URL = ""
+GRIST_URL = "https://docs.getgrist.com"
 
 # Origins autorisées (séparées par virgule)
-# Wildcards supportés : *.github.io autorise tous les sous-domaines
-ALLOWED_ORIGINS = "*.github.io,*.getgrist.com"
+ALLOWED_ORIGINS = "*.github.io,*.getgrist.com,*.gristup.fr,https://isaytoo.github.io"
 
 # Rate limiting : max soumissions par IP par fenêtre de temps
 RATE_LIMIT_MAX = "30"           # 30 soumissions max
