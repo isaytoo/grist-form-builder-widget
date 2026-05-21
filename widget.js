@@ -4431,6 +4431,90 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
 document.getElementById('cfg-proxy-url')?.addEventListener('change', () => saveFormConfig());
 document.getElementById('cfg-doc-id')?.addEventListener('change', () => saveFormConfig());
 
+// ─── Proxy modal ────────────────────────────────────────────────
+const modalProxy = document.getElementById('modal-proxy');
+document.getElementById('btn-proxy-config')?.addEventListener('click', () => {
+  modalProxy?.classList.remove('hidden');
+});
+document.getElementById('btn-close-proxy')?.addEventListener('click', () => {
+  modalProxy?.classList.add('hidden');
+  saveFormConfig();
+});
+modalProxy?.addEventListener('click', (e) => {
+  if (e.target === modalProxy) { modalProxy.classList.add('hidden'); saveFormConfig(); }
+});
+
+// Platform tab switching
+document.getElementById('proxy-platform-tabs')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-platform]');
+  if (!btn) return;
+  const platform = btn.dataset.platform;
+  document.querySelectorAll('#proxy-platform-tabs button').forEach(b => {
+    b.className = b.dataset.platform === platform ? 'btn btn-primary' : 'btn btn-secondary';
+  });
+  ['cloudflare', 'vercel', 'netlify', 'node', 'deno'].forEach(p => {
+    const el = document.getElementById('proxy-info-' + p);
+    if (el) el.style.display = p === platform ? '' : 'none';
+  });
+});
+
+// Test proxy connection
+document.getElementById('btn-test-proxy')?.addEventListener('click', async () => {
+  const resultEl = document.getElementById('proxy-test-result');
+  const proxyUrl = document.getElementById('cfg-proxy-url')?.value?.trim();
+  if (!proxyUrl) {
+    if (resultEl) {
+      resultEl.style.display = 'block';
+      resultEl.style.background = '#fef2f2';
+      resultEl.style.color = '#991b1b';
+      resultEl.style.borderLeft = '4px solid #ef4444';
+      resultEl.textContent = '❌ Veuillez entrer une URL de proxy';
+    }
+    return;
+  }
+  if (resultEl) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#f0f9ff';
+    resultEl.style.color = '#1e40af';
+    resultEl.style.borderLeft = '4px solid #3b82f6';
+    resultEl.textContent = '⏳ Test en cours...';
+  }
+  try {
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ docId: '_test', tableId: '_test', record: {} })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (resultEl) {
+      if (res.status === 400 || res.status === 500) {
+        // 400/500 = le proxy répond (il rejette la requête test, c'est normal)
+        resultEl.style.background = '#ecfdf5';
+        resultEl.style.color = '#065f46';
+        resultEl.style.borderLeft = '4px solid #10b981';
+        resultEl.textContent = '✅ Proxy accessible ! (réponse : ' + (data.error || res.status) + ')';
+      } else if (res.ok) {
+        resultEl.style.background = '#ecfdf5';
+        resultEl.style.color = '#065f46';
+        resultEl.style.borderLeft = '4px solid #10b981';
+        resultEl.textContent = '✅ Proxy accessible et fonctionnel !';
+      } else {
+        resultEl.style.background = '#fef2f2';
+        resultEl.style.color = '#991b1b';
+        resultEl.style.borderLeft = '4px solid #ef4444';
+        resultEl.textContent = '⚠️ Proxy a répondu avec : ' + (data.error || 'HTTP ' + res.status);
+      }
+    }
+  } catch (err) {
+    if (resultEl) {
+      resultEl.style.background = '#fef2f2';
+      resultEl.style.color = '#991b1b';
+      resultEl.style.borderLeft = '4px solid #ef4444';
+      resultEl.textContent = '❌ Impossible de contacter le proxy : ' + err.message;
+    }
+  }
+});
+
 btnModeEdit.addEventListener('click', () => switchMode('edit'));
 btnModeFill.addEventListener('click', () => switchMode('fill'));
 document.getElementById('btn-mode-guide')?.addEventListener('click', () => switchMode('guide'));

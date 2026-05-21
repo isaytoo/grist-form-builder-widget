@@ -1,6 +1,18 @@
-# 🌐 Grist Form Proxy (Cloudflare Worker)
+# 🌐 Grist Form Proxy
 
 Proxy permettant de recevoir les soumissions de formulaires publics et de les écrire dans un document Grist via l'API REST — **sans que le répondant ait besoin d'un compte Grist**.
+
+## Plateformes disponibles
+
+| Plateforme | Dossier | Gratuit ? | Latence |
+|------------|---------|-----------|---------|
+| **Cloudflare Workers** ⭐ | `proxy/` (worker.js) | ✅ 100k req/jour | Ultra rapide (edge) |
+| **Vercel** | `proxy/vercel/` | ✅ 100 Go-h/mois | Rapide |
+| **Netlify** | `proxy/netlify/` | ✅ 125k req/mois | Moyen |
+| **Node.js / Docker** | `proxy/node/` | Selon VPS | Variable |
+| **Deno Deploy** | `proxy/deno/` | ✅ 1M req/mois | Rapide (edge) |
+
+> ⭐ **Recommandation** : Cloudflare Workers = le plus rapide et généreux en quota gratuit.
 
 ## Architecture
 

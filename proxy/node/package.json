@@ -1,0 +1,9 @@
+{
+  "name": "grist-form-proxy-node",
+  "version": "1.0.0",
+  "description": "Grist Form Proxy — Node.js self-hosted",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -246,6 +246,7 @@
       <button class="btn btn-warning" id="btn-export-pdf">📄 PDF</button>
       <button class="btn btn-secondary" id="btn-new-form" title="Créer un nouveau formulaire">📝 Nouveau</button>
       <button class="btn btn-secondary" id="btn-clear">🗑️ Vider</button>
+      <button class="btn btn-secondary" id="btn-proxy-config" title="Configuration du proxy">🌐 Proxy</button>
       <button class="btn btn-primary" id="btn-save">💾 Sauvegarder</button>
     </div>
   </div>
@@ -271,15 +272,6 @@
           </select>
           <button id="btn-create-response-table" title="Créer automatiquement une table de réponses" style="flex-shrink:0; padding: 6px 10px; border: 1px solid #10b981; background: #ecfdf5; color: #059669; border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer; white-space: nowrap;">+ Créer</button>
         </div>
-        <details style="margin-top: 12px;">
-          <summary style="font-size: 0.75em; font-weight: 600; color: #64748b; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">🌐 Partage public (optionnel)</summary>
-          <div style="margin-top: 8px;">
-            <div style="font-size: 0.72em; color: #94a3b8; margin-bottom: 4px;">URL du proxy (Cloudflare Worker)</div>
-            <input type="text" class="table-select" id="cfg-proxy-url" placeholder="https://grist-form-proxy.votre-compte.workers.dev" style="margin-bottom: 8px;">
-            <div style="font-size: 0.72em; color: #94a3b8; margin-bottom: 4px;">ID du document Grist</div>
-            <input type="text" class="table-select" id="cfg-doc-id" placeholder="ex: sXk7fGdH4R5B...">
-          </div>
-        </details>
       </div>
       <div class="sidebar-tabs">
         <button class="sidebar-tab active" data-tab="fields">Champs</button>
@@ -653,6 +645,67 @@
     </div>
   </div>
   
+  <div class="modal-overlay hidden" id="modal-proxy">
+    <div class="modal" style="max-width: 560px;">
+      <div class="modal-title">🌐 Configuration du Proxy</div>
+      <p style="font-size: 0.85em; color: #64748b; margin-bottom: 15px;">Le proxy permet de soumettre des formulaires publics sans compte Grist. Choisissez une plateforme et configurez-la.</p>
+
+      <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">Plateforme</div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;" id="proxy-platform-tabs">
+          <button class="btn btn-primary" data-platform="cloudflare" style="font-size: 0.78em; padding: 6px 12px;">☁️ Cloudflare</button>
+          <button class="btn btn-secondary" data-platform="vercel" style="font-size: 0.78em; padding: 6px 12px;">▲ Vercel</button>
+          <button class="btn btn-secondary" data-platform="netlify" style="font-size: 0.78em; padding: 6px 12px;">◆ Netlify</button>
+          <button class="btn btn-secondary" data-platform="node" style="font-size: 0.78em; padding: 6px 12px;">⬢ Node.js</button>
+          <button class="btn btn-secondary" data-platform="deno" style="font-size: 0.78em; padding: 6px 12px;">🦕 Deno</button>
+        </div>
+
+        <div id="proxy-instructions" style="font-size: 0.8em; color: #475569; background: white; border-radius: 6px; padding: 12px; border: 1px solid #e2e8f0; line-height: 1.7;">
+          <div id="proxy-info-cloudflare">
+            <strong>Cloudflare Workers</strong> — gratuit, 100k req/jour, ultra rapide (edge)<br>
+            <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">cd proxy && npx wrangler deploy</code><br>
+            Secret : <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">npx wrangler secret put GRIST_API_KEY</code>
+          </div>
+          <div id="proxy-info-vercel" style="display:none;">
+            <strong>Vercel</strong> — gratuit, 100 Go-h/mois, rapide<br>
+            <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">cd proxy/vercel && npx vercel --prod</code><br>
+            Variables : GRIST_URL, GRIST_API_KEY dans le dashboard Vercel
+          </div>
+          <div id="proxy-info-netlify" style="display:none;">
+            <strong>Netlify Functions</strong> — gratuit, 125k req/mois<br>
+            <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">cd proxy/netlify && npx netlify deploy --prod</code><br>
+            Variables : GRIST_URL, GRIST_API_KEY dans le dashboard Netlify
+          </div>
+          <div id="proxy-info-node" style="display:none;">
+            <strong>Node.js</strong> — self-hosted (VPS, Docker, PM2)<br>
+            <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">cd proxy/node && GRIST_URL=... GRIST_API_KEY=... node server.js</code><br>
+            Docker : <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">docker build -t grist-form-proxy . && docker run -p 8080:8080 ...</code>
+          </div>
+          <div id="proxy-info-deno" style="display:none;">
+            <strong>Deno Deploy</strong> — gratuit, 1M req/mois, edge<br>
+            <code style="font-size: 0.85em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">deno run --allow-net --allow-env proxy/deno/proxy.ts</code><br>
+            Ou connecter le repo sur <a href="https://dash.deno.com" target="_blank" style="color: #3b82f6;">dash.deno.com</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #ecfdf5; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #10b981;">
+        <div style="font-weight: 600; color: #065f46; margin-bottom: 10px; font-size: 0.9em;">Configuration active</div>
+        <div style="font-size: 0.78em; color: #047857; margin-bottom: 4px;">URL du proxy déployé</div>
+        <input type="text" class="table-select" id="cfg-proxy-url" placeholder="https://grist-form-proxy.votre-compte.workers.dev" style="margin-bottom: 10px; width: 100%; box-sizing: border-box;">
+        <div style="font-size: 0.78em; color: #047857; margin-bottom: 4px;">ID du document Grist</div>
+        <input type="text" class="table-select" id="cfg-doc-id" placeholder="ex: sXk7fGdH4R5B..." style="width: 100%; box-sizing: border-box;">
+      </div>
+
+      <div id="proxy-test-result" style="display: none; border-radius: 8px; padding: 12px 15px; margin-bottom: 15px; font-size: 0.85em;"></div>
+
+      <div class="modal-actions" style="gap: 8px;">
+        <button class="btn btn-secondary" id="btn-test-proxy" style="font-size: 0.85em;">🧪 Tester</button>
+        <button class="btn btn-secondary" id="btn-close-proxy">Fermer</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay hidden" id="modal-templates">
     <div class="modal">
       <div class="modal-title">📁 Templates</div>
@@ -687,7 +740,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=22"></script>
+<script src="widget.js?v=23"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>© 2026 Said Hamadou (isaytoo)</span>
   <a href="https://gristup.fr" target="_blank" style="color: #3b82f6; text-decoration: none;">gristup.fr</a>
