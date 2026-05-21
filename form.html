@@ -1003,7 +1003,9 @@ async function submitForm() {
       value = value.join(', ');
     }
     
-    record[field.columnId] = value;
+    // Utiliser columnId ou dériver du label (même logique que labelToColumnId côté widget)
+    const colId = field.columnId || ((field.label || 'col').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 40) || 'col');
+    if (colId) record[colId] = value;
   });
   
   if (hasError) {
