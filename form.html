@@ -921,7 +921,6 @@ async function submitForm() {
   
   formConfig.fields.forEach(field => {
     if (field.fieldType === 'section' || field.fieldType === 'title' || field.fieldType === 'image' || field.fieldType === 'qrcode') return;
-    if (!field.columnId) return;
     
     const group = document.querySelector(`.form-field-group[data-field-id="${field.id}"]`);
     if (group && group.classList.contains('hidden')) return;
@@ -952,7 +951,16 @@ async function submitForm() {
       value = el ? parseFloat(el.textContent) : 0;
     } else {
       const input = document.getElementById(`input-${field.id}`);
-      value = input ? input.value : null;
+      if (input && input.tagName === 'SELECT' && field.dataSource) {
+        // Pour les selects dynamiques, envoyer le texte visible (label) plutôt que la value brute
+        if (input.value) {
+          value = input.selectedOptions[0]?.textContent?.trim() || input.value;
+        } else {
+          value = null;
+        }
+      } else {
+        value = input ? input.value : null;
+      }
     }
     
     // Validation
