@@ -4528,22 +4528,14 @@ document.getElementById('btn-test-proxy')?.addEventListener('click', async () =>
     });
     const data = await res.json().catch(() => ({}));
     if (resultEl) {
-      if (res.status === 400 || res.status === 500) {
-        // 400/500 = le proxy répond (il rejette la requête test, c'est normal)
-        resultEl.style.background = '#ecfdf5';
-        resultEl.style.color = '#065f46';
-        resultEl.style.borderLeft = '4px solid #10b981';
-        resultEl.textContent = '✅ Proxy accessible ! (réponse : ' + (data.error || res.status) + ')';
-      } else if (res.ok) {
-        resultEl.style.background = '#ecfdf5';
-        resultEl.style.color = '#065f46';
-        resultEl.style.borderLeft = '4px solid #10b981';
+      // Toute réponse HTTP = proxy accessible (4xx = proxy rejette la requête test, normal)
+      resultEl.style.background = '#ecfdf5';
+      resultEl.style.color = '#065f46';
+      resultEl.style.borderLeft = '4px solid #10b981';
+      if (res.ok) {
         resultEl.textContent = '✅ Proxy accessible et fonctionnel !';
       } else {
-        resultEl.style.background = '#fef2f2';
-        resultEl.style.color = '#991b1b';
-        resultEl.style.borderLeft = '4px solid #ef4444';
-        resultEl.textContent = '⚠️ Proxy a répondu avec : ' + (data.error || 'HTTP ' + res.status);
+        resultEl.textContent = '✅ Proxy accessible ! (' + (data.error || 'HTTP ' + res.status) + ')';
       }
     }
   } catch (err) {
