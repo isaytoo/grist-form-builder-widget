@@ -4323,6 +4323,7 @@ tableSelect.addEventListener('change', (e) => loadTableColumns(e.target.value));
 // Sélection de la table de réponses
 responseTableSelect?.addEventListener('change', (e) => {
   responseTableId = e.target.value || null;
+  saveFormConfig();
 });
 
 // Normaliser un label en nom de colonne Grist valide (ASCII, pas d'accents, pas d'espaces)
