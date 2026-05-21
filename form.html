@@ -705,18 +705,31 @@ function filterDsRows(rows, dataSource) {
       if (!parentField) continue;
       const parentValue = readFieldValue(parentField);
       if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) continue;
-      console.log('[Filter]', filter.sourceColumn, filter.operator, '| parentValue:', JSON.stringify(parentValue), '| rowValue:', JSON.stringify(row[filter.sourceColumn]));
+
+      let rowValue = row[filter.sourceColumn];
+
+      // Si rowValue est un entier et que le parent a un dataSource avec valueColumn,
+      // c'est probablement un row id de référence : résoudre vers la vraie valeur
+      if (typeof rowValue === 'number' && Number.isInteger(rowValue) && parentField.dataSource && parentField.dataSource.tableId) {
+        const parentTableRows = dsTableCache[parentField.dataSource.tableId];
+        if (parentTableRows) {
+          const refRow = parentTableRows.find(r => r.id === rowValue);
+          if (refRow) {
+            const pValCol = parentField.dataSource.valueColumn || parentField.dataSource.labelColumn;
+            rowValue = refRow[pValCol] !== undefined ? refRow[pValCol] : rowValue;
+          }
+        }
+      }
 
       if (filter.operator === 'between') {
         if (!filter.sourceColumnMax) continue;
-        const min = row[filter.sourceColumn];
+        const min = rowValue;
         const max = row[filter.sourceColumnMax];
         const nMin = parseFloat(min), nMax = parseFloat(max), nVal = parseFloat(parentValue);
         if (isNaN(nMin) || isNaN(nMax) || isNaN(nVal)) return false;
         if (!(nMin <= nVal && nVal <= nMax)) return false;
       } else {
-        // Opérateurs binaires : compare row[sourceColumn] OP parentValue
-        if (!compareValues(row[filter.sourceColumn], filter.operator, parentValue)) return false;
+        if (!compareValues(rowValue, filter.operator, parentValue)) return false;
       }
     }
     return true;
@@ -728,9 +741,7 @@ async function reloadDynamicField(field) {
   const ds = field.dataSource;
   if (!ds || ds.mode !== 'grist' || !ds.tableId || !ds.labelColumn) return;
   const rows = await fetchDsTable(ds.tableId);
-  console.log('[DynField]', field.label, '→ rows:', rows.length, '| filters:', JSON.stringify(ds.filters));
   const filtered = filterDsRows(rows, ds);
-  console.log('[DynField]', field.label, '→ filtered:', filtered.length);
 
   // Dédoublonnage par valeur
   const valueCol = ds.valueColumn || ds.labelColumn;
