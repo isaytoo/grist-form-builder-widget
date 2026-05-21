@@ -375,8 +375,10 @@ function renderForm() {
   // Initialiser les conditions
   initConditions();
 
-  // Initialiser les sources d'options dynamiques (cascade)
-  initDynamicSources();
+  // Initialiser les sources d'options dynamiques (cascade) — pas en mode public
+  if (!isPublicMode) {
+    initDynamicSources();
+  }
 
   // Initialiser les calculs
   initCalculations();
