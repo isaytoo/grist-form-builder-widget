@@ -700,12 +700,12 @@ function filterDsRows(rows, dataSource) {
   if (!dataSource.filters || dataSource.filters.length === 0) return rows;
   return rows.filter(row => {
     for (const filter of dataSource.filters) {
-      if (!filter.parentFieldId || !filter.sourceColumn) continue; // filtre incomplet → ignoré
+      if (!filter.parentFieldId || !filter.sourceColumn) continue;
       const parentField = formConfig.fields.find(f => f.id === filter.parentFieldId);
       if (!parentField) continue;
       const parentValue = readFieldValue(parentField);
-      // Si le parent n'a pas de valeur, on ignore ce filtre (pas de restriction)
       if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) continue;
+      console.log('[Filter]', filter.sourceColumn, filter.operator, '| parentValue:', JSON.stringify(parentValue), '| rowValue:', JSON.stringify(row[filter.sourceColumn]));
 
       if (filter.operator === 'between') {
         if (!filter.sourceColumnMax) continue;
