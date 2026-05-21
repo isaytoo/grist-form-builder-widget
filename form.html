@@ -728,7 +728,9 @@ async function reloadDynamicField(field) {
   const ds = field.dataSource;
   if (!ds || ds.mode !== 'grist' || !ds.tableId || !ds.labelColumn) return;
   const rows = await fetchDsTable(ds.tableId);
+  console.log('[DynField]', field.label, '→ rows:', rows.length, '| filters:', JSON.stringify(ds.filters));
   const filtered = filterDsRows(rows, ds);
+  console.log('[DynField]', field.label, '→ filtered:', filtered.length);
 
   // Dédoublonnage par valeur
   const valueCol = ds.valueColumn || ds.labelColumn;
