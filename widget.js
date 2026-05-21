@@ -4501,12 +4501,23 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     resolvedFields.push(fieldOut);
   }
   
+  // Vérifier si la table de réponses a la colonne Soumis_le
+  let hasTimestamp = false;
+  const respTable = formConfig.responseTableId || formConfig.tableId;
+  if (respTable) {
+    try {
+      const cols = await grist.docApi.fetchTable(respTable);
+      hasTimestamp = cols && cols.Soumis_le !== undefined;
+    } catch (e) { /* ignore */ }
+  }
+  
   const publicConfig = {
     tableId: formConfig.tableId,
     responseTableId: formConfig.responseTableId || null,
     title: formConfig.title,
     fields: resolvedFields,
     dsTablesData: dsTablesData,
+    hasTimestamp: hasTimestamp,
     totalPages: formConfig.totalPages
   };
   const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(publicConfig))));

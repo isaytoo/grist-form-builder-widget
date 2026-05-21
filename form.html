@@ -998,8 +998,11 @@ async function submitForm() {
     return;
   }
   
-  // Ajouter l'horodatage
-  record['Soumis_le'] = Math.floor(Date.now() / 1000);
+  // Ajouter l'horodatage seulement si la colonne existe dans la config
+  const hasSoumisLe = formConfig.fields.some(f => f.columnId === 'Soumis_le');
+  if (hasSoumisLe || formConfig.hasTimestamp) {
+    record['Soumis_le'] = Math.floor(Date.now() / 1000);
+  }
   
   try {
     if (isPublicMode) {
