@@ -4458,10 +4458,11 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   
   const title = formTitleInput.value || 'Formulaire ' + currentTable;
   const formId = generateFormId(title);
+  const cacheBuster = Date.now();
   const baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '') + 'form.html';
   
   // Lien interne (depuis Grist)
-  const internalUrl = `${baseUrl}?mode=form&formId=${encodeURIComponent(formId)}`;
+  const internalUrl = `${baseUrl}?_cb=${cacheBuster}&mode=form&formId=${encodeURIComponent(formId)}`;
   
   // Lien public (via proxy) — nécessite proxyUrl et docId configurés
   const proxyUrl = formConfig.proxyUrl || '';
@@ -4529,7 +4530,7 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   
   let publicUrl = '';
   if (proxyUrl && docId) {
-    publicUrl = `${baseUrl}?proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
+    publicUrl = `${baseUrl}?_cb=${cacheBuster}&proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
   }
   
   // Afficher la modale de partage
