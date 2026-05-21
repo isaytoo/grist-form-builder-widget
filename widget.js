@@ -232,6 +232,12 @@ grist.onOptions(async function(options) {
     formTitleInput.value = formConfig.title;
   }
   
+  // Restaurer le responseTableId depuis la config
+  if (formConfig.responseTableId) {
+    responseTableId = formConfig.responseTableId;
+    if (responseTableSelect) responseTableSelect.value = formConfig.responseTableId;
+  }
+  
   if (formConfig.fields && formConfig.fields.length > 0) {
     formFields = formConfig.fields;
     fieldIdCounter = Math.max(...formFields.map(f => parseInt(f.id.replace('field_', '')) || 0)) + 1;
@@ -3743,6 +3749,7 @@ function initConditions() {
 
 // Soumettre le formulaire
 async function submitForm() {
+  console.log('[Form Builder] submitForm called. fields:', formConfig?.fields?.map(f => ({id: f.id, label: f.label, columnId: f.columnId, type: f.fieldType})));
   const destTable = formConfig.responseTableId || formConfig.tableId;
   if (!formConfig || !destTable) {
     showToast('Configuration invalide : aucune table de destination', 'error');
