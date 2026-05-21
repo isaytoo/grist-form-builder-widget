@@ -27,9 +27,11 @@ let zoomLevel = 100;
 let fieldIdCounter = 0;
 let selectedRecordId = null; // ID de l'enregistrement sélectionné pour mise à jour
 let selectedRecordData = null; // Données de l'enregistrement sélectionné
+let responseTableId = null; // Table séparée pour les réponses (si différente de tableId)
 
 // Éléments DOM
 const tableSelect = document.getElementById('table-select');
+const responseTableSelect = document.getElementById('response-table-select');
 const fieldsList = document.getElementById('fields-list');
 const formCanvas = document.getElementById('form-canvas');
 const emptyMessage = document.getElementById('empty-message');
@@ -470,6 +472,21 @@ async function loadTables() {
     
     if (formConfig && formConfig.tableId) {
       tableSelect.value = formConfig.tableId;
+    }
+    
+    // Remplir le sélecteur de table de réponses
+    if (responseTableSelect) {
+      responseTableSelect.innerHTML = '<option value="">-- Même table source --</option>';
+      tables.forEach(table => {
+        const option = document.createElement('option');
+        option.value = table;
+        option.textContent = table;
+        responseTableSelect.appendChild(option);
+      });
+      if (formConfig && formConfig.responseTableId) {
+        responseTableSelect.value = formConfig.responseTableId;
+        responseTableId = formConfig.responseTableId;
+      }
     }
   } catch (error) {
     console.error('Erreur chargement tables:', error);
@@ -2657,6 +2674,7 @@ async function saveFormConfig() {
   const config = {
     formId: formId,
     tableId: currentTable,
+    responseTableId: responseTableId || null,
     fields: formFields,
     title: title,
     templates: templates,
@@ -3725,8 +3743,9 @@ function initConditions() {
 
 // Soumettre le formulaire
 async function submitForm() {
-  if (!formConfig || !formConfig.tableId) {
-    showToast('Configuration invalide', 'error');
+  const destTable = formConfig.responseTableId || formConfig.tableId;
+  if (!formConfig || !destTable) {
+    showToast('Configuration invalide : aucune table de destination', 'error');
     return;
   }
   
@@ -3867,23 +3886,28 @@ async function submitForm() {
     }
   }
   
+  // Ajouter l'horodatage si la table de réponses a la colonne Soumis_le
+  if (formConfig.responseTableId && !selectedRecordId) {
+    record['Soumis_le'] = Math.floor(Date.now() / 1000);
+  }
+  
   try {
     showLoading();
     
     if (selectedRecordId) {
       // Mode mise à jour : UpdateRecord
       await grist.docApi.applyUserActions([
-        ['UpdateRecord', formConfig.tableId, selectedRecordId, record]
+        ['UpdateRecord', destTable, selectedRecordId, record]
       ]);
       hideLoading();
       showToast('Enregistrement mis à jour avec succès', 'success');
     } else {
       // Mode création : AddRecord
       await grist.docApi.applyUserActions([
-        ['AddRecord', formConfig.tableId, null, record]
+        ['AddRecord', destTable, null, record]
       ]);
       hideLoading();
-      showToast('Enregistrement ajouté avec succès', 'success');
+      showToast('Enregistrement ajouté avec succès dans ' + destTable, 'success');
       resetFormInputs();
     }
   } catch (error) {
@@ -4264,6 +4288,80 @@ modalConfirm.addEventListener('click', (e) => {
 
 // Event listeners
 tableSelect.addEventListener('change', (e) => loadTableColumns(e.target.value));
+
+// Sélection de la table de réponses
+responseTableSelect?.addEventListener('change', (e) => {
+  responseTableId = e.target.value || null;
+});
+
+// Créer automatiquement une table de réponses
+document.getElementById('btn-create-response-table')?.addEventListener('click', async () => {
+  if (formFields.length === 0) {
+    showToast('Ajoutez d\'abord des champs au formulaire', 'error');
+    return;
+  }
+  
+  const title = formTitleInput.value || 'Formulaire';
+  const tableName = 'Reponses_' + title.replace(/[^a-zA-Z0-9_\u00C0-\u024F]/g, '_').replace(/_+/g, '_').substring(0, 30);
+  
+  // Collecter les colonnes à créer (1 par champ avec columnId)
+  const columns = [];
+  const seenCols = new Set();
+  formFields.forEach(field => {
+    if (['section', 'title', 'image', 'divider', 'qrcode'].includes(field.fieldType)) return;
+    const colName = field.columnId || field.label?.replace(/[^a-zA-Z0-9_]/g, '_') || ('col_' + field.id);
+    if (seenCols.has(colName)) return;
+    seenCols.add(colName);
+    
+    let colType = 'Text';
+    if (field.fieldType === 'number') colType = 'Numeric';
+    else if (field.fieldType === 'date') colType = 'Date';
+    else if (field.fieldType === 'checkbox') colType = 'Text';
+    
+    columns.push({ id: colName, type: colType });
+  });
+  
+  if (columns.length === 0) {
+    showToast('Aucune colonne à créer (vérifiez les mappings de champs)', 'error');
+    return;
+  }
+  
+  // Ajouter une colonne horodatage
+  columns.push({ id: 'Soumis_le', type: 'DateTime:UTC' });
+  
+  try {
+    showLoading();
+    
+    // Vérifier si la table existe déjà
+    const tables = await grist.docApi.listTables();
+    if (tables.includes(tableName)) {
+      hideLoading();
+      showToast('La table "' + tableName + '" existe déjà — sélectionnez-la dans la liste', 'error');
+      responseTableSelect.value = tableName;
+      responseTableId = tableName;
+      return;
+    }
+    
+    // Créer la table
+    await grist.docApi.applyUserActions([
+      ['AddTable', tableName, columns]
+    ]);
+    
+    // Rafraîchir la liste des tables
+    await loadTables();
+    
+    // Sélectionner automatiquement la nouvelle table comme destination
+    responseTableSelect.value = tableName;
+    responseTableId = tableName;
+    
+    hideLoading();
+    showToast('Table "' + tableName + '" créée avec ' + columns.length + ' colonnes ! Pensez à sauvegarder.', 'success');
+  } catch (error) {
+    hideLoading();
+    console.error('Erreur création table:', error);
+    showToast('Erreur : ' + error.message, 'error');
+  }
+});
 
 btnModeEdit.addEventListener('click', () => switchMode('edit'));
 btnModeFill.addEventListener('click', () => switchMode('fill'));

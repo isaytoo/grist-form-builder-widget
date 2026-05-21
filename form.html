@@ -861,7 +861,8 @@ function showToast(message, type = 'info') {
 }
 
 async function submitForm() {
-  if (!formConfig || !formConfig.tableId) {
+  const destTable = formConfig?.responseTableId || formConfig?.tableId;
+  if (!formConfig || !destTable) {
     showToast('Configuration invalide', 'error');
     return;
   }
@@ -963,7 +964,7 @@ async function submitForm() {
   
   try {
     await grist.docApi.applyUserActions([
-      ['AddRecord', formConfig.tableId, null, record]
+      ['AddRecord', destTable, null, record]
     ]);
     
     formContent.style.display = 'none';

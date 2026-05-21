@@ -258,11 +258,19 @@
       <div class="sidebar-header">
         <div class="sidebar-title">Titre du formulaire</div>
         <input type="text" class="table-select" id="form-title-input" placeholder="Mon formulaire" value="">
-        <div class="sidebar-title" style="margin-top: 10px;">Table de destination</div>
-        <div style="font-size: 0.75em; color: #94a3b8; margin-bottom: 4px;">Les réponses du formulaire y seront enregistrées</div>
+        <div class="sidebar-title" style="margin-top: 10px;">Table source (colonnes)</div>
+        <div style="font-size: 0.75em; color: #94a3b8; margin-bottom: 4px;">Table d'où proviennent les champs disponibles</div>
         <select class="table-select" id="table-select">
           <option value="">Chargement...</option>
         </select>
+        <div class="sidebar-title" style="margin-top: 10px;">Table de réponses</div>
+        <div style="font-size: 0.75em; color: #94a3b8; margin-bottom: 4px;">Les soumissions y seront enregistrées</div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <select class="table-select" id="response-table-select" style="flex:1;">
+            <option value="">-- Même table source --</option>
+          </select>
+          <button id="btn-create-response-table" title="Créer automatiquement une table de réponses" style="flex-shrink:0; padding: 6px 10px; border: 1px solid #10b981; background: #ecfdf5; color: #059669; border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer; white-space: nowrap;">+ Créer</button>
+        </div>
       </div>
       <div class="sidebar-tabs">
         <button class="sidebar-tab active" data-tab="fields">Champs</button>
