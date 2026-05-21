@@ -275,6 +275,9 @@ const publicDocId    = urlParams.get('docId');    // ID du document Grist
 const publicConfig   = urlParams.get('config');   // Config encodée en base64
 const isPublicMode   = !!(publicProxyUrl && publicDocId && publicConfig);
 
+// Cache des tables pour sources dynamiques (initialisé ici pour mode public)
+const dsTableCache = {};
+
 // Vérifier si on est dans Grist
 let isInGrist = false;
 let gristTimeout = null;
@@ -283,6 +286,12 @@ if (isPublicMode) {
   // Mode public : décoder la config depuis l'URL, pas besoin de Grist
   try {
     formConfig = JSON.parse(decodeURIComponent(escape(atob(publicConfig))));
+    // Pré-remplir le cache des tables dynamiques avec les données embarquées
+    if (formConfig.dsTablesData) {
+      Object.keys(formConfig.dsTablesData).forEach(tId => {
+        dsTableCache[tId] = formConfig.dsTablesData[tId];
+      });
+    }
     loading.style.display = 'none';
     initFormDisplay();
   } catch (e) {
@@ -375,10 +384,8 @@ function renderForm() {
   // Initialiser les conditions
   initConditions();
 
-  // Initialiser les sources d'options dynamiques (cascade) — pas en mode public
-  if (!isPublicMode) {
-    initDynamicSources();
-  }
+  // Initialiser les sources d'options dynamiques (cascade)
+  initDynamicSources();
 
   // Initialiser les calculs
   initCalculations();
@@ -636,8 +643,6 @@ function initConditions() {
 // =============================================================================
 // SOURCES D'OPTIONS DYNAMIQUES (Grist) — cascade entre champs
 // =============================================================================
-
-const dsTableCache = {}; // tableId -> array de records bruts (objets)
 
 async function fetchDsTable(tableId) {
   if (dsTableCache[tableId]) return dsTableCache[tableId];

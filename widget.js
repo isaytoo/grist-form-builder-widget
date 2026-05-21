@@ -4463,42 +4463,42 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   const docId = formConfig.docId || '';
   
   // Créer une config allégée pour le lien public
-  // Résoudre les sources dynamiques : charger les options depuis Grist et les embarquer
+  // Pré-charger les données des tables sources dynamiques pour le filtrage cascade
+  const dsTablesData = {};
   const resolvedFields = [];
+  
   for (const f of formConfig.fields) {
-    let options = f.options || [];
+    const fieldOut = {
+      id: f.id, columnId: f.columnId, fieldType: f.fieldType,
+      label: f.label, required: f.required, placeholder: f.placeholder,
+      options: f.options || [], page: f.page, condition: f.condition,
+      labelPosition: f.labelPosition, minValue: f.minValue, maxValue: f.maxValue,
+      pattern: f.pattern, errorMessage: f.errorMessage
+    };
     
-    // Si le champ a une source dynamique Grist, charger les options maintenant
+    // Si le champ a une source dynamique, conserver dataSource et pré-charger la table
     if (f.dataSource && f.dataSource.mode === 'grist' && f.dataSource.tableId && f.dataSource.labelColumn) {
-      try {
-        const data = await grist.docApi.fetchTable(f.dataSource.tableId);
-        if (data && data.id) {
-          const labelCol = f.dataSource.labelColumn;
-          const valueCol = f.dataSource.valueColumn || labelCol;
-          const seen = new Set();
-          options = [];
-          for (let i = 0; i < data.id.length; i++) {
-            const val = data[valueCol] ? data[valueCol][i] : data[labelCol][i];
-            const label = data[labelCol] ? data[labelCol][i] : val;
-            if (val === undefined || val === null || val === '') continue;
-            const key = String(val);
-            if (seen.has(key)) continue;
-            seen.add(key);
-            options.push(String(label));
+      fieldOut.dataSource = f.dataSource;
+      const tId = f.dataSource.tableId;
+      if (!dsTablesData[tId]) {
+        try {
+          const data = await grist.docApi.fetchTable(tId);
+          if (data && data.id) {
+            // Convertir en array d'objets (format compact)
+            const rows = data.id.map((id, i) => {
+              const r = { id };
+              Object.keys(data).forEach(k => { if (k !== 'id') r[k] = data[k][i]; });
+              return r;
+            });
+            dsTablesData[tId] = rows;
           }
+        } catch (e) {
+          console.warn('Échec pré-chargement table', tId, e);
         }
-      } catch (e) {
-        console.warn('Échec résolution source dynamique pour', f.label, e);
       }
     }
     
-    resolvedFields.push({
-      id: f.id, columnId: f.columnId, fieldType: f.fieldType,
-      label: f.label, required: f.required, placeholder: f.placeholder,
-      options: options, page: f.page, condition: f.condition,
-      labelPosition: f.labelPosition, minValue: f.minValue, maxValue: f.maxValue,
-      pattern: f.pattern, errorMessage: f.errorMessage
-    });
+    resolvedFields.push(fieldOut);
   }
   
   const publicConfig = {
@@ -4506,6 +4506,7 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     responseTableId: formConfig.responseTableId || null,
     title: formConfig.title,
     fields: resolvedFields,
+    dsTablesData: dsTablesData,
     totalPages: formConfig.totalPages
   };
   const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(publicConfig))));
