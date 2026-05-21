@@ -9,6 +9,7 @@
  */
 
 // Variables globales
+let currentProxyPlatform = 'cloudflare';
 let availableTables = [];
 let currentTable = null;
 let tableColumns = [];
@@ -239,9 +240,24 @@ grist.onOptions(async function(options) {
   }
   
   // Restaurer les paramètres de partage public
-  if (formConfig.proxyUrl) {
-    const el = document.getElementById('cfg-proxy-url');
+  if (formConfig.proxyPlatform) {
+    switchProxyPlatform(formConfig.proxyPlatform);
+  }
+  if (formConfig.proxyUrls) {
+    Object.entries(formConfig.proxyUrls).forEach(([p, url]) => {
+      const el = document.getElementById('cfg-proxy-url-' + p);
+      if (el) el.value = url;
+    });
+  } else if (formConfig.proxyUrl) {
+    // Backward compat : ancienne config avec un seul champ URL
+    const el = document.getElementById('cfg-proxy-url-' + currentProxyPlatform);
     if (el) el.value = formConfig.proxyUrl;
+  }
+  if (formConfig.proxySecrets) {
+    Object.entries(formConfig.proxySecrets).forEach(([p, secret]) => {
+      const el = document.getElementById('cfg-proxy-secret-' + p);
+      if (el) el.value = secret;
+    });
   }
   if (formConfig.docId) {
     const el = document.getElementById('cfg-doc-id');
@@ -2687,14 +2703,25 @@ async function saveFormConfig() {
   const title = formTitleInput.value || 'Formulaire ' + currentTable;
   const formId = generateFormId(title);
   
-  const proxyUrlInput = document.getElementById('cfg-proxy-url');
   const docIdInput = document.getElementById('cfg-doc-id');
-  
+
+  const proxyUrls = {};
+  const proxySecrets = {};
+  ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
+    const urlEl = document.getElementById('cfg-proxy-url-' + p);
+    if (urlEl) proxyUrls[p] = urlEl.value.trim();
+    const secEl = document.getElementById('cfg-proxy-secret-' + p);
+    if (secEl) proxySecrets[p] = secEl.value.trim();
+  });
+
   const config = {
     formId: formId,
     tableId: currentTable,
     responseTableId: responseTableId || null,
-    proxyUrl: proxyUrlInput ? proxyUrlInput.value.trim() : '',
+    proxyPlatform: currentProxyPlatform,
+    proxyUrls: proxyUrls,
+    proxySecrets: proxySecrets,
+    proxyUrl: proxyUrls[currentProxyPlatform] || '',
     docId: docIdInput ? docIdInput.value.trim() : '',
     fields: formFields,
     title: title,
@@ -4428,7 +4455,10 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
 });
 
 // Auto-sauvegarde des paramètres de partage public
-document.getElementById('cfg-proxy-url')?.addEventListener('change', () => saveFormConfig());
+['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
+  document.getElementById('cfg-proxy-url-' + p)?.addEventListener('change', () => saveFormConfig());
+  document.getElementById('cfg-proxy-secret-' + p)?.addEventListener('change', () => saveFormConfig());
+});
 document.getElementById('cfg-doc-id')?.addEventListener('change', () => saveFormConfig());
 
 // ─── Proxy modal ────────────────────────────────────────────────
@@ -4444,24 +4474,35 @@ modalProxy?.addEventListener('click', (e) => {
   if (e.target === modalProxy) { modalProxy.classList.add('hidden'); saveFormConfig(); }
 });
 
-// Platform tab switching
-document.getElementById('proxy-platform-tabs')?.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-platform]');
-  if (!btn) return;
-  const platform = btn.dataset.platform;
+function switchProxyPlatform(platform) {
+  currentProxyPlatform = platform;
   document.querySelectorAll('#proxy-platform-tabs button').forEach(b => {
     b.className = b.dataset.platform === platform ? 'btn btn-primary' : 'btn btn-secondary';
   });
   ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
-    const el = document.getElementById('proxy-info-' + p);
+    const el = document.getElementById('proxy-fields-' + p);
     if (el) el.style.display = p === platform ? '' : 'none';
   });
+}
+
+function getActiveProxyUrl() {
+  return document.getElementById('cfg-proxy-url-' + currentProxyPlatform)?.value?.trim() || '';
+}
+
+function getActiveProxySecret() {
+  return document.getElementById('cfg-proxy-secret-' + currentProxyPlatform)?.value?.trim() || '';
+}
+
+document.getElementById('proxy-platform-tabs')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-platform]');
+  if (!btn) return;
+  switchProxyPlatform(btn.dataset.platform);
 });
 
 // Test proxy connection
 document.getElementById('btn-test-proxy')?.addEventListener('click', async () => {
   const resultEl = document.getElementById('proxy-test-result');
-  const proxyUrl = document.getElementById('cfg-proxy-url')?.value?.trim();
+  const proxyUrl = getActiveProxyUrl();
   if (!proxyUrl) {
     if (resultEl) {
       resultEl.style.display = 'block';
