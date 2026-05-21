@@ -268,50 +268,74 @@ const pageNav = document.getElementById('page-nav');
 const pageIndicator = document.getElementById('page-indicator');
 const toast = document.getElementById('toast');
 
+// Paramètres URL pour mode public (sans Grist)
+const urlParams = new URLSearchParams(window.location.search);
+const publicProxyUrl = urlParams.get('proxy');   // URL du Cloudflare Worker proxy
+const publicDocId    = urlParams.get('docId');    // ID du document Grist
+const publicConfig   = urlParams.get('config');   // Config encodée en base64
+const isPublicMode   = !!(publicProxyUrl && publicDocId && publicConfig);
+
 // Vérifier si on est dans Grist
 let isInGrist = false;
 let gristTimeout = null;
 
-// Initialisation Grist
-try {
-  grist.ready({
-    requiredAccess: 'full',
-    allowSelectBy: true
+if (isPublicMode) {
+  // Mode public : décoder la config depuis l'URL, pas besoin de Grist
+  try {
+    formConfig = JSON.parse(decodeURIComponent(escape(atob(publicConfig))));
+    loading.style.display = 'none';
+    initFormDisplay();
+  } catch (e) {
+    loading.style.display = 'none';
+    noForm.innerHTML = '<div class="no-form-icon">⚠️</div><p><strong>Lien de formulaire invalide</strong></p>';
+    noForm.style.display = 'block';
+  }
+} else {
+  // Mode Grist classique
+  try {
+    grist.ready({
+      requiredAccess: 'full',
+      allowSelectBy: true
+    });
+    isInGrist = true;
+  } catch (e) {
+    console.log('Grist API non disponible');
+  }
+
+  // Timeout si pas de réponse de Grist après 3 secondes
+  gristTimeout = setTimeout(() => {
+    if (!formConfig) {
+      loading.style.display = 'none';
+      noForm.innerHTML = `
+        <div class="no-form-icon">⚠️</div>
+        <p><strong>Ce formulaire doit être ouvert dans Grist</strong></p>
+        <p style="margin-top: 10px; font-size: 0.9em;">
+          Pour utiliser ce formulaire, ajoutez-le comme widget personnalisé<br>
+          dans votre document Grist avec l'URL :<br>
+          <code style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; margin-top: 8px; display: inline-block;">${window.location.href.split('?')[0]}</code>
+        </p>
+      `;
+      noForm.style.display = 'block';
+    }
+  }, 3000);
+
+  // Charger la configuration depuis Grist
+  grist.onOptions(async function(options) {
+    clearTimeout(gristTimeout);
+    formConfig = options || {};
+    
+    loading.style.display = 'none';
+    
+    if (!formConfig.fields || formConfig.fields.length === 0) {
+      noForm.style.display = 'block';
+      return;
+    }
+    
+    initFormDisplay();
   });
-  isInGrist = true;
-} catch (e) {
-  console.log('Grist API non disponible');
 }
 
-// Timeout si pas de réponse de Grist après 3 secondes
-gristTimeout = setTimeout(() => {
-  if (!formConfig) {
-    loading.style.display = 'none';
-    noForm.innerHTML = `
-      <div class="no-form-icon">⚠️</div>
-      <p><strong>Ce formulaire doit être ouvert dans Grist</strong></p>
-      <p style="margin-top: 10px; font-size: 0.9em;">
-        Pour utiliser ce formulaire, ajoutez-le comme widget personnalisé<br>
-        dans votre document Grist avec l'URL :<br>
-        <code style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px; margin-top: 8px; display: inline-block;">${window.location.href}</code>
-      </p>
-    `;
-    noForm.style.display = 'block';
-  }
-}, 3000);
-
-// Charger la configuration
-grist.onOptions(async function(options) {
-  clearTimeout(gristTimeout);
-  formConfig = options || {};
-  
-  loading.style.display = 'none';
-  
-  if (!formConfig.fields || formConfig.fields.length === 0) {
-    noForm.style.display = 'block';
-    return;
-  }
-  
+function initFormDisplay() {
   totalPages = formConfig.totalPages || 1;
   
   formTitle.textContent = formConfig.title || 'Formulaire';
@@ -323,7 +347,7 @@ grist.onOptions(async function(options) {
   }
   
   renderForm();
-});
+}
 
 function renderForm() {
   formFields.innerHTML = '';
@@ -615,6 +639,11 @@ const dsTableCache = {}; // tableId -> array de records bruts (objets)
 
 async function fetchDsTable(tableId) {
   if (dsTableCache[tableId]) return dsTableCache[tableId];
+  if (isPublicMode) {
+    // En mode public, pas d'accès aux tables Grist — les champs dynamiques utiliseront leurs options statiques
+    console.log('[Public mode] Source dynamique "' + tableId + '" non disponible');
+    return [];
+  }
   try {
     const data = await grist.docApi.fetchTable(tableId);
     if (!data || !data.id) return [];
@@ -962,10 +991,25 @@ async function submitForm() {
     return;
   }
   
+  // Ajouter l'horodatage
+  record['Soumis_le'] = Math.floor(Date.now() / 1000);
+  
   try {
-    await grist.docApi.applyUserActions([
-      ['AddRecord', destTable, null, record]
-    ]);
+    if (isPublicMode) {
+      // Mode public : appeler le proxy Cloudflare Worker
+      const res = await fetch(publicProxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docId: publicDocId, tableId: destTable, record: record })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur ' + res.status);
+    } else {
+      // Mode Grist : écrire directement via l'API interne
+      await grist.docApi.applyUserActions([
+        ['AddRecord', destTable, null, record]
+      ]);
+    }
     
     formContent.style.display = 'none';
     formActions.style.display = 'none';
@@ -973,7 +1017,7 @@ async function submitForm() {
     
   } catch (error) {
     console.error('Erreur soumission:', error);
-    showToast('Erreur lors de l\'envoi', 'error');
+    showToast('Erreur lors de l\'envoi : ' + error.message, 'error');
   }
 }
 

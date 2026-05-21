@@ -271,6 +271,15 @@
           </select>
           <button id="btn-create-response-table" title="Créer automatiquement une table de réponses" style="flex-shrink:0; padding: 6px 10px; border: 1px solid #10b981; background: #ecfdf5; color: #059669; border-radius: 6px; font-size: 0.75em; font-weight: 600; cursor: pointer; white-space: nowrap;">+ Créer</button>
         </div>
+        <details style="margin-top: 12px;">
+          <summary style="font-size: 0.75em; font-weight: 600; color: #64748b; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;">🌐 Partage public (optionnel)</summary>
+          <div style="margin-top: 8px;">
+            <div style="font-size: 0.72em; color: #94a3b8; margin-bottom: 4px;">URL du proxy (Cloudflare Worker)</div>
+            <input type="text" class="table-select" id="cfg-proxy-url" placeholder="https://grist-form-proxy.votre-compte.workers.dev" style="margin-bottom: 8px;">
+            <div style="font-size: 0.72em; color: #94a3b8; margin-bottom: 4px;">ID du document Grist</div>
+            <input type="text" class="table-select" id="cfg-doc-id" placeholder="ex: sXk7fGdH4R5B...">
+          </div>
+        </details>
       </div>
       <div class="sidebar-tabs">
         <button class="sidebar-tab active" data-tab="fields">Champs</button>
@@ -605,10 +614,19 @@
       </div>
       
       <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-        <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">📋 Étape 1 : Copiez le lien</div>
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">📋 Lien interne (depuis Grist)</div>
         <div style="display: flex; gap: 8px;">
           <input type="text" id="share-url" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.8em; background: white; font-family: monospace;">
           <button class="btn btn-primary" id="btn-copy-url" style="padding: 10px 15px;">📋 Copier</button>
+        </div>
+      </div>
+      
+      <div id="share-public-section" style="background: #ecfdf5; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #10b981;">
+        <div style="font-weight: 600; color: #065f46; margin-bottom: 10px; font-size: 0.9em;">🌐 Lien public (sans compte Grist)</div>
+        <div style="font-size: 0.8em; color: #047857; margin-bottom: 8px;">Accessible par n'importe qui — les réponses sont envoyées via le proxy.</div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="share-url-public" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #a7f3d0; border-radius: 6px; font-size: 0.8em; background: white; font-family: monospace;">
+          <button class="btn" id="btn-copy-url-public" style="padding: 10px 15px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;">📋 Copier</button>
         </div>
       </div>
       
@@ -669,7 +687,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=14"></script>
+<script src="widget.js?v=15"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>© 2026 Said Hamadou (isaytoo)</span>
   <a href="https://gristup.fr" target="_blank" style="color: #3b82f6; text-decoration: none;">gristup.fr</a>

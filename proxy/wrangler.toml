@@ -1,0 +1,28 @@
+name             = "grist-form-proxy"
+main             = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+# URL de ton instance Grist (sans slash final)
+# Ex: https://docs.getgrist.com ou https://grist.mon-domaine.fr
+GRIST_URL = ""
+
+# Origins autorisées (séparées par virgule)
+# Wildcards supportés : *.github.io autorise tous les sous-domaines
+ALLOWED_ORIGINS = "*.github.io,*.getgrist.com"
+
+# Rate limiting : max soumissions par IP par fenêtre de temps
+RATE_LIMIT_MAX = "30"           # 30 soumissions max
+RATE_LIMIT_WINDOW_MS = "60000"  # par minute
+
+# ─────────────────────────────────────────────────────────────────
+# Secrets à définir via : wrangler secret put NOM_DE_LA_VARIABLE
+# ─────────────────────────────────────────────────────────────────
+#
+# Clé API Grist avec droit d'écriture sur le document cible :
+#   wrangler secret put GRIST_API_KEY → votre-clé-api-grist
+#
+# Pour obtenir une clé API :
+#   1. Dans Grist → Profil → Paramètres → Clés API
+#   2. Créer une nouvelle clé avec accès au document
+#

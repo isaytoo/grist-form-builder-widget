@@ -238,6 +238,16 @@ grist.onOptions(async function(options) {
     if (responseTableSelect) responseTableSelect.value = formConfig.responseTableId;
   }
   
+  // Restaurer les paramètres de partage public
+  if (formConfig.proxyUrl) {
+    const el = document.getElementById('cfg-proxy-url');
+    if (el) el.value = formConfig.proxyUrl;
+  }
+  if (formConfig.docId) {
+    const el = document.getElementById('cfg-doc-id');
+    if (el) el.value = formConfig.docId;
+  }
+  
   if (formConfig.fields && formConfig.fields.length > 0) {
     formFields = formConfig.fields;
     fieldIdCounter = Math.max(...formFields.map(f => parseInt(f.id.replace('field_', '')) || 0)) + 1;
@@ -2677,10 +2687,15 @@ async function saveFormConfig() {
   const title = formTitleInput.value || 'Formulaire ' + currentTable;
   const formId = generateFormId(title);
   
+  const proxyUrlInput = document.getElementById('cfg-proxy-url');
+  const docIdInput = document.getElementById('cfg-doc-id');
+  
   const config = {
     formId: formId,
     tableId: currentTable,
     responseTableId: responseTableId || null,
+    proxyUrl: proxyUrlInput ? proxyUrlInput.value.trim() : '',
+    docId: docIdInput ? docIdInput.value.trim() : '',
     fields: formFields,
     title: title,
     templates: templates,
@@ -4436,18 +4451,54 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   // Sauvegarder d'abord la configuration
   await saveFormConfig();
   
-  // Générer l'URL du formulaire public avec le formId unique
   const title = formTitleInput.value || 'Formulaire ' + currentTable;
   const formId = generateFormId(title);
-  const baseUrl = window.location.href.split('?')[0];
-  const formUrl = `${baseUrl}?mode=form&formId=${encodeURIComponent(formId)}`;
+  const baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '') + 'form.html';
+  
+  // Lien interne (depuis Grist)
+  const internalUrl = `${baseUrl}?mode=form&formId=${encodeURIComponent(formId)}`;
+  
+  // Lien public (via proxy) — nécessite proxyUrl et docId configurés
+  const proxyUrl = formConfig.proxyUrl || '';
+  const docId = formConfig.docId || '';
+  
+  // Créer une config allégée pour le lien public (pas besoin de tout)
+  const publicConfig = {
+    tableId: formConfig.tableId,
+    responseTableId: formConfig.responseTableId || null,
+    title: formConfig.title,
+    fields: formConfig.fields.map(f => ({
+      id: f.id, columnId: f.columnId, fieldType: f.fieldType,
+      label: f.label, required: f.required, placeholder: f.placeholder,
+      options: f.options, page: f.page, condition: f.condition,
+      labelPosition: f.labelPosition, minValue: f.minValue, maxValue: f.maxValue,
+      pattern: f.pattern, errorMessage: f.errorMessage
+    })),
+    totalPages: formConfig.totalPages
+  };
+  const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(publicConfig))));
+  
+  let publicUrl = '';
+  if (proxyUrl && docId) {
+    publicUrl = `${baseUrl}?proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
+  }
   
   // Afficher la modale de partage
   const shareModal = document.getElementById('modal-share');
   const shareUrlInput = document.getElementById('share-url');
+  const sharePublicInput = document.getElementById('share-url-public');
   
   if (shareModal && shareUrlInput) {
-    shareUrlInput.value = formUrl;
+    shareUrlInput.value = internalUrl;
+    if (sharePublicInput) {
+      if (publicUrl) {
+        sharePublicInput.value = publicUrl;
+        sharePublicInput.parentElement.style.display = '';
+      } else {
+        sharePublicInput.parentElement.style.display = 'none';
+        sharePublicInput.value = '';
+      }
+    }
     shareModal.classList.remove('hidden');
   }
 });
@@ -4469,6 +4520,23 @@ document.getElementById('btn-copy-url')?.addEventListener('click', async () => {
       shareUrlInput.select();
       document.execCommand('copy');
       showToast('Lien copié !', 'success');
+    }
+  }
+});
+
+// Copier l'URL publique
+document.getElementById('btn-copy-url-public')?.addEventListener('click', async () => {
+  const input = document.getElementById('share-url-public');
+  if (input && input.value) {
+    try {
+      await navigator.clipboard.writeText(input.value);
+      const btn = document.getElementById('btn-copy-url-public');
+      btn.innerHTML = '✅ Copié !';
+      setTimeout(() => { btn.innerHTML = '📋 Copier'; }, 2000);
+    } catch (e) {
+      input.select();
+      document.execCommand('copy');
+      showToast('Lien public copié !', 'success');
     }
   }
 });
