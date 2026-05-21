@@ -4294,6 +4294,15 @@ responseTableSelect?.addEventListener('change', (e) => {
   responseTableId = e.target.value || null;
 });
 
+// Normaliser un label en nom de colonne Grist valide (ASCII, pas d'accents, pas d'espaces)
+function labelToColumnId(label) {
+  return (label || 'col')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Supprimer accents
+    .replace(/[^a-zA-Z0-9]+/g, '_') // Remplacer tout non-alphanum par _
+    .replace(/^_|_$/g, '') // Supprimer _ au début/fin
+    .substring(0, 40) || 'col';
+}
+
 // Créer automatiquement une table de réponses
 document.getElementById('btn-create-response-table')?.addEventListener('click', async () => {
   if (formFields.length === 0) {
@@ -4302,27 +4311,38 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
   }
   
   const title = formTitleInput.value || 'Formulaire';
-  const tableName = 'Reponses_' + title.replace(/[^a-zA-Z0-9_\u00C0-\u024F]/g, '_').replace(/_+/g, '_').substring(0, 30);
+  const tableName = 'Reponses_' + labelToColumnId(title).substring(0, 30);
   
-  // Collecter les colonnes à créer (1 par champ avec columnId)
+  // Collecter les colonnes à créer (1 par champ)
   const columns = [];
   const seenCols = new Set();
+  const fieldColumnMap = []; // Pour mettre à jour les columnId des champs
+  
   formFields.forEach(field => {
-    if (['section', 'title', 'image', 'divider', 'qrcode'].includes(field.fieldType)) return;
-    const colName = field.columnId || field.label?.replace(/[^a-zA-Z0-9_]/g, '_') || ('col_' + field.id);
-    if (seenCols.has(colName)) return;
-    seenCols.add(colName);
+    if (['section', 'title', 'image', 'divider', 'qrcode', 'calculated'].includes(field.fieldType)) return;
+    
+    // Utiliser le columnId existant s'il est propre, sinon générer depuis le label
+    let colName = field.columnId ? field.columnId : labelToColumnId(field.label);
+    
+    // Dédupliquer
+    let finalName = colName;
+    let suffix = 2;
+    while (seenCols.has(finalName)) {
+      finalName = colName + '_' + suffix;
+      suffix++;
+    }
+    seenCols.add(finalName);
     
     let colType = 'Text';
     if (field.fieldType === 'number') colType = 'Numeric';
     else if (field.fieldType === 'date') colType = 'Date';
-    else if (field.fieldType === 'checkbox') colType = 'Text';
     
-    columns.push({ id: colName, type: colType });
+    columns.push({ id: finalName, type: colType });
+    fieldColumnMap.push({ fieldId: field.id, columnId: finalName });
   });
   
   if (columns.length === 0) {
-    showToast('Aucune colonne à créer (vérifiez les mappings de champs)', 'error');
+    showToast('Aucune colonne à créer', 'error');
     return;
   }
   
@@ -4347,6 +4367,12 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
       ['AddTable', tableName, columns]
     ]);
     
+    // Mettre à jour le columnId de chaque champ pour qu'il pointe vers la bonne colonne
+    fieldColumnMap.forEach(({ fieldId, columnId }) => {
+      const field = formFields.find(f => f.id === fieldId);
+      if (field) field.columnId = columnId;
+    });
+    
     // Rafraîchir la liste des tables
     await loadTables();
     
@@ -4354,8 +4380,11 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
     responseTableSelect.value = tableName;
     responseTableId = tableName;
     
+    // Rafraîchir l'affichage
+    renderFormFields();
+    
     hideLoading();
-    showToast('Table "' + tableName + '" créée avec ' + columns.length + ' colonnes ! Pensez à sauvegarder.', 'success');
+    showToast('Table "' + tableName + '" créée ! Les champs sont mappés automatiquement. Sauvegardez.', 'success');
   } catch (error) {
     hideLoading();
     console.error('Erreur création table:', error);
