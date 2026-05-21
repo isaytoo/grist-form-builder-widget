@@ -4452,7 +4452,7 @@ document.getElementById('proxy-platform-tabs')?.addEventListener('click', (e) =>
   document.querySelectorAll('#proxy-platform-tabs button').forEach(b => {
     b.className = b.dataset.platform === platform ? 'btn btn-primary' : 'btn btn-secondary';
   });
-  ['cloudflare', 'vercel', 'netlify', 'node', 'deno'].forEach(p => {
+  ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
     const el = document.getElementById('proxy-info-' + p);
     if (el) el.style.display = p === platform ? '' : 'none';
   });
