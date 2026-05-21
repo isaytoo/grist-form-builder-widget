@@ -3891,6 +3891,15 @@ async function submitForm() {
     record['Soumis_le'] = Math.floor(Date.now() / 1000);
   }
   
+  console.log('[Form Builder] submitForm → destTable:', destTable, '| record:', JSON.stringify(record));
+  console.log('[Form Builder] formConfig.responseTableId:', formConfig.responseTableId, '| formConfig.tableId:', formConfig.tableId);
+  
+  if (Object.keys(record).length === 0) {
+    hideLoading();
+    showToast('Aucune donnée à enregistrer (vérifiez que les champs ont un columnId)', 'error');
+    return;
+  }
+  
   try {
     showLoading();
     
@@ -4383,8 +4392,11 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
     // Rafraîchir l'affichage
     renderFormFields();
     
+    // Sauvegarder automatiquement la config avec les nouveaux columnId
+    await saveFormConfig();
+    
     hideLoading();
-    showToast('Table "' + tableName + '" créée ! Les champs sont mappés automatiquement. Sauvegardez.', 'success');
+    showToast('Table "' + tableName + '" créée et configuration sauvegardée !', 'success');
   } catch (error) {
     hideLoading();
     console.error('Erreur création table:', error);
