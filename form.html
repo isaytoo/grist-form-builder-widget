@@ -1019,15 +1019,21 @@ async function submitForm() {
     record['Soumis_le'] = Math.floor(Date.now() / 1000);
   }
   
+  console.log('[Submit] destTable:', destTable, '| record:', JSON.stringify(record));
+  console.log('[Submit] proxyUrl:', publicProxyUrl, '| docId:', publicDocId);
+  
   try {
     if (isPublicMode) {
       // Mode public : appeler le proxy Cloudflare Worker
+      const payload = { docId: publicDocId, tableId: destTable, record: record };
+      console.log('[Submit] Sending to proxy:', JSON.stringify(payload));
       const res = await fetch(publicProxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ docId: publicDocId, tableId: destTable, record: record })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
+      console.log('[Submit] Response:', res.status, JSON.stringify(data));
       if (!res.ok) throw new Error(data.error || 'Erreur ' + res.status);
     } else {
       // Mode Grist : écrire directement via l'API interne
