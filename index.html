@@ -9,6 +9,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -16,7 +17,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* Le widget s'affiche toujours en schéma CLAIR, même si le navigateur/OS de l'utilisateur
+       est en mode sombre : sinon les contrôles natifs (boutons, selects, inputs) sans couleur
+       explicite reçoivent un texte clair du navigateur -> invisibles sur fond blanc. */
+    :root { color-scheme: light; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #f1f5f9; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f1f5f9; color: #334155; height: 100vh; overflow: hidden; }
     .app-container { display: flex; flex-direction: column; height: 100vh; }
     .header { background: white; border-bottom: 1px solid #e2e8f0; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
@@ -64,7 +70,7 @@
     .workspace { flex: 1; padding: 0; overflow: auto; background: #e2e8f0; position: relative; display: flex; flex-direction: column; }
     .workspace-inner { display: flex; justify-content: center; min-width: fit-content; padding: 20px 50px 50px 50px; flex: 1; }
     .workspace-toolbar { position: sticky; top: 0; left: 0; right: 0; background: white; padding: 8px 15px; display: flex; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 20; justify-content: center; flex-shrink: 0; border-bottom: 1px solid #e2e8f0; width: 100%; }
-    .toolbar-btn { padding: 5px 10px; border: 1px solid #e2e8f0; background: white; border-radius: 4px; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
+    .toolbar-btn { padding: 5px 10px; border: 1px solid #e2e8f0; background: white; color: #334155; border-radius: 4px; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
     .toolbar-btn:hover { background: #f1f5f9; }
     .toolbar-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
     .toolbar-separator { width: 1px; background: #e2e8f0; margin: 0 4px; }
