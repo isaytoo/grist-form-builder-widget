@@ -245,6 +245,18 @@
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <script>
 /**
+ * Échappe une valeur avant insertion dans du HTML.
+ *
+ * Cette page est servie aux répondants : les libellés et les options, qui
+ * peuvent venir d'une table Grist, ne doivent pas pouvoir y injecter de balise.
+ */
+function escHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+/**
  * Grist Form Builder Widget - Public Form
  * Copyright 2026 Said Hamadou (isaytoo)
  * Licensed under the Apache License, Version 2.0
@@ -395,7 +407,7 @@ function renderForm() {
 function renderSection(field) {
   const section = document.createElement('div');
   section.className = 'form-section';
-  section.innerHTML = `<div class="form-section-title">${field.label}</div>`;
+  section.innerHTML = `<div class="form-section-title">${escHtml(field.label)}</div>`;
   formFields.appendChild(section);
 }
 
@@ -424,20 +436,20 @@ function renderField(field) {
   
   switch (field.fieldType) {
     case 'textarea':
-      inputHtml = `<textarea id="input-${field.id}" class="form-textarea" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}></textarea>`;
+      inputHtml = `<textarea id="input-${field.id}" class="form-textarea" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}></textarea>`;
       break;
     case 'select':
       inputHtml = `<select id="input-${field.id}" class="form-select" ${field.required ? 'required' : ''}>
-        <option value="">${field.placeholder || 'Sélectionner...'}</option>
-        ${field.options.map(o => `<option value="${o}">${o}</option>`).join('')}
+        <option value="">${escHtml(field.placeholder || 'Sélectionner...')}</option>
+        ${field.options.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('')}
       </select>`;
       break;
     case 'radio':
       inputHtml = `<div class="form-radio-group" id="input-${field.id}">
         ${field.options.map(o => `
           <label class="form-radio-item">
-            <input type="radio" name="radio-${field.id}" value="${o}">
-            <span>${o}</span>
+            <input type="radio" name="radio-${field.id}" value="${escHtml(o)}">
+            <span>${escHtml(o)}</span>
           </label>
         `).join('')}
       </div>`;
@@ -446,8 +458,8 @@ function renderField(field) {
       inputHtml = `<div class="form-checkbox-group" id="input-${field.id}">
         ${field.options.map(o => `
           <label class="form-checkbox-item">
-            <input type="checkbox" value="${o}">
-            <span>${o}</span>
+            <input type="checkbox" value="${escHtml(o)}">
+            <span>${escHtml(o)}</span>
           </label>
         `).join('')}
       </div>`;
@@ -464,13 +476,13 @@ function renderField(field) {
       inputHtml = `<input type="date" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
       break;
     case 'number':
-      inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
       break;
     case 'email':
-      inputHtml = `<input type="email" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      inputHtml = `<input type="email" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
       break;
     case 'phone':
-      inputHtml = `<input type="tel" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      inputHtml = `<input type="tel" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
       break;
     case 'calculated':
       inputHtml = `
@@ -480,14 +492,14 @@ function renderField(field) {
       `;
       break;
     default:
-      inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+      inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
   }
   
   // Layout selon position du label
   if (field.labelPosition === 'left') {
     group.innerHTML = `
       <div style="display: flex; align-items: flex-start; gap: 15px;">
-        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 120px; padding-top: 12px;">${field.label}</label>
+        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 120px; padding-top: 12px;">${escHtml(field.label)}</label>
         <div style="flex: 1;">
           ${inputHtml}
           <div class="form-error" id="error-${field.id}"></div>
@@ -496,7 +508,7 @@ function renderField(field) {
     `;
   } else {
     group.innerHTML = `
-      <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${field.label}</label>
+      <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${escHtml(field.label)}</label>
       ${inputHtml}
       <div class="form-error" id="error-${field.id}"></div>
     `;
@@ -765,8 +777,8 @@ async function reloadDynamicField(field) {
   if (field.fieldType === 'select') {
     const sel = document.getElementById(`input-${field.id}`);
     if (!sel) return;
-    sel.innerHTML = `<option value="">${field.placeholder || 'Sélectionner...'}</option>` +
-      opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    sel.innerHTML = `<option value="">${escHtml(field.placeholder || 'Sélectionner...')}</option>` +
+      opts.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join('');
     sel.value = stillValid ? (Array.isArray(currentValue) ? currentValue[0] : currentValue) : '';
     sel.dispatchEvent(new Event('change'));
   } else if (field.fieldType === 'radio') {
@@ -774,8 +786,8 @@ async function reloadDynamicField(field) {
     if (!c) return;
     c.innerHTML = opts.map(o => `
       <label class="form-radio-item">
-        <input type="radio" name="radio-${field.id}" value="${o.value}" ${stillValid && currentValue === o.value ? 'checked' : ''}>
-        <span>${o.label}</span>
+        <input type="radio" name="radio-${field.id}" value="${escHtml(o.value)}" ${stillValid && currentValue === o.value ? 'checked' : ''}>
+        <span>${escHtml(o.label)}</span>
       </label>
     `).join('');
   } else if (field.fieldType === 'checkbox') {
@@ -784,8 +796,8 @@ async function reloadDynamicField(field) {
     const sel = Array.isArray(currentValue) ? currentValue : [];
     c.innerHTML = opts.map(o => `
       <label class="form-checkbox-item">
-        <input type="checkbox" value="${o.value}" ${sel.includes(o.value) ? 'checked' : ''}>
-        <span>${o.label}</span>
+        <input type="checkbox" value="${escHtml(o.value)}" ${sel.includes(o.value) ? 'checked' : ''}>
+        <span>${escHtml(o.label)}</span>
       </label>
     `).join('');
   }

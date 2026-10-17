@@ -8,6 +8,22 @@
  * https://github.com/isaytoo/grist-form-builder-widget
  */
 
+/**
+ * Échappe une valeur avant de l'insérer dans du HTML.
+ *
+ * Les libellés, options et placeholders sont saisis par le concepteur, et les
+ * champs « Recherche » tirent leurs valeurs d'une table Grist : tout cela
+ * partait dans innerHTML sans traitement. Une valeur contenant un guillemet
+ * sortait de son attribut, une valeur contenant une balise s'exécutait — y
+ * compris dans le formulaire public servi aux répondants.
+ */
+function escHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // Variables globales
 let currentProxyPlatform = 'cloudflare';
 let availableTables = [];
@@ -114,15 +130,6 @@ function showNotInGristMessage() {
   `;
 }
 
-// Détecter si l'utilisateur est propriétaire (peut modifier la structure)
-// Note: Pour activer la restriction par rôle, définir isOwner = false pour les non-propriétaires
-async function detectUserRole() {
-  // Par défaut, tous les utilisateurs ont accès complet
-  // La gestion des rôles peut être activée via les règles d'accès Grist
-  isOwner = true;
-  applyRoleRestrictions();
-}
-
 // Appliquer les restrictions selon le rôle
 function applyRoleRestrictions() {
   if (!isOwner) {
@@ -191,21 +198,14 @@ grist.onOptions(async function(options) {
             formConfig = JSON.parse(data.ConfigData[index]);
           }
         } else if (targetTable) {
-          // Legacy: chercher par table (pour compatibilité)
-          const configKey = 'form_' + targetTable;
-          const index = data.ConfigKey?.findIndex(k => k === configKey);
-          if (index !== undefined && index >= 0) {
-            formConfig = JSON.parse(data.ConfigData[index]);
-          }
+          const trouve = chercherConfigParTable(data, targetTable);
+          if (trouve) formConfig = trouve;
         } else {
           // Sinon, charger la config la plus récente ou celle des options
           const optionsTableId = formConfig.tableId;
           if (optionsTableId) {
-            const configKey = 'form_' + optionsTableId;
-            const index = data.ConfigKey?.findIndex(k => k === configKey);
-            if (index !== undefined && index >= 0) {
-              formConfig = JSON.parse(data.ConfigData[index]);
-            }
+            const trouve = chercherConfigParTable(data, optionsTableId);
+            if (trouve) formConfig = trouve;
           } else {
             // Charger la dernière config disponible
             formConfig = JSON.parse(data.ConfigData[data.ConfigData.length - 1]);
@@ -252,12 +252,6 @@ grist.onOptions(async function(options) {
     // Backward compat : ancienne config avec un seul champ URL
     const el = document.getElementById('cfg-proxy-url-' + currentProxyPlatform);
     if (el) el.value = formConfig.proxyUrl;
-  }
-  if (formConfig.proxySecrets) {
-    Object.entries(formConfig.proxySecrets).forEach(([p, secret]) => {
-      const el = document.getElementById('cfg-proxy-secret-' + p);
-      if (el) el.value = secret;
-    });
   }
   if (formConfig.docId) {
     const el = document.getElementById('cfg-doc-id');
@@ -806,7 +800,7 @@ function createImageElement(field) {
   if (field.imageData) {
     imageEl.innerHTML = `
       <button class="form-image-delete" title="Supprimer">×</button>
-      <img src="${field.imageData}" alt="${field.label}" draggable="false">
+      <img src="${field.imageData}" alt="${escHtml(field.label)}" draggable="false">
       <div class="form-field-resize"></div>
     `;
   } else {
@@ -899,7 +893,7 @@ function createTitleElement(field) {
   
   titleEl.innerHTML = `
     <button class="form-title-element-delete" title="Supprimer">×</button>
-    <span contenteditable="true" spellcheck="false">${field.label}</span>
+    <span contenteditable="true" spellcheck="false">${escHtml(field.label)}</span>
     <div class="resize-handle" title="Redimensionner"></div>
   `;
   
@@ -1080,7 +1074,7 @@ function createFormFieldElement(field) {
   
   switch (field.fieldType) {
     case 'textarea':
-      inputHtml = `<textarea class="form-field-input form-field-textarea" placeholder="${field.placeholder || 'Saisir...'}" readonly></textarea>`;
+      inputHtml = `<textarea class="form-field-input form-field-textarea" placeholder="${escHtml(field.placeholder || 'Saisir...')}" readonly></textarea>`;
       break;
     case 'select': {
       const isDynamic = field.dataSource && field.dataSource.mode === 'grist';
@@ -1094,8 +1088,8 @@ function createFormFieldElement(field) {
         </select>`;
       } else {
         inputHtml = `<select class="form-field-input" disabled>
-          <option>${field.placeholder || 'Sélectionner...'}</option>
-          ${field.options.map(o => `<option>${o}</option>`).join('')}
+          <option>${escHtml(field.placeholder || 'Sélectionner...')}</option>
+          ${field.options.map(o => `<option>${escHtml(o)}</option>`).join('')}
         </select>`;
       }
       break;
@@ -1114,7 +1108,7 @@ function createFormFieldElement(field) {
           ${field.options.slice(0, 3).map(o => `
             <label class="option-item">
               <input type="${field.fieldType === 'radio' ? 'radio' : 'checkbox'}" disabled>
-              <span>${o}</span>
+              <span>${escHtml(o)}</span>
             </label>
           `).join('')}
           ${field.options.length > 3 ? '<span style="font-size: 0.75em; color: #94a3b8;">...</span>' : ''}
@@ -1129,7 +1123,7 @@ function createFormFieldElement(field) {
       inputHtml = `<input type="date" class="form-field-input" disabled>`;
       break;
     default:
-      inputHtml = `<input type="${field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}" class="form-field-input" placeholder="${field.placeholder || 'Saisir...'}" readonly>`;
+      inputHtml = `<input type="${field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}" class="form-field-input" placeholder="${escHtml(field.placeholder || 'Saisir...')}" readonly>`;
   }
   
   // Appliquer le style selon la position du label et si le label est masqué
@@ -1144,7 +1138,7 @@ function createFormFieldElement(field) {
     fieldEl.innerHTML = `
       <button class="form-field-delete" title="Supprimer">×</button>
       <div style="display: flex; align-items: center; gap: 10px;">
-        <div class="form-field-label" style="flex-shrink: 0; margin-bottom: 0; min-width: 80px; max-width: 40%;">${field.label}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
+        <div class="form-field-label" style="flex-shrink: 0; margin-bottom: 0; min-width: 80px; max-width: 40%;">${escHtml(field.label)}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
         <div style="flex: 1;">${inputHtml}</div>
       </div>
       <div class="form-field-resize"></div>
@@ -1152,7 +1146,7 @@ function createFormFieldElement(field) {
   } else {
     fieldEl.innerHTML = `
       <button class="form-field-delete" title="Supprimer">×</button>
-      <div class="form-field-label">${field.label}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
+      <div class="form-field-label">${escHtml(field.label)}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
       ${inputHtml}
       <div class="form-field-resize"></div>
     `;
@@ -1197,7 +1191,7 @@ function createSectionElement(field) {
   
   sectionEl.innerHTML = `
     <button class="form-section-delete" title="Supprimer">×</button>
-    <div class="form-section-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${field.label}</div>
+    <div class="form-section-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${escHtml(field.label)}</div>
     <div class="form-field-resize"></div>
   `;
   
@@ -1530,7 +1524,7 @@ function renderPropertiesPanel() {
         <div class="property-label">Champ A</div>
         <select class="property-select" id="prop-calc-field-a">
           <option value="">-- Sélectionner --</option>
-          ${numberFields.map(field => `<option value="${field.id}" ${f.calcFieldA === field.id ? 'selected' : ''}>${field.label}</option>`).join('')}
+          ${numberFields.map(field => `<option value="${field.id}" ${f.calcFieldA === field.id ? 'selected' : ''}>${escHtml(field.label)}</option>`).join('')}
         </select>
       </div>
       <div class="property-group">
@@ -1538,7 +1532,7 @@ function renderPropertiesPanel() {
         <select class="property-select" id="prop-calc-field-b">
           <option value="">-- Sélectionner --</option>
           <option value="_constant" ${f.calcFieldB === '_constant' ? 'selected' : ''}>Valeur fixe</option>
-          ${numberFields.map(field => `<option value="${field.id}" ${f.calcFieldB === field.id ? 'selected' : ''}>${field.label}</option>`).join('')}
+          ${numberFields.map(field => `<option value="${field.id}" ${f.calcFieldB === field.id ? 'selected' : ''}>${escHtml(field.label)}</option>`).join('')}
         </select>
       </div>
       <div class="property-group" id="calc-constant-group" style="${f.calcFieldB === '_constant' ? '' : 'display: none;'}">
@@ -1788,7 +1782,7 @@ function renderPropertiesPanel() {
             <div class="property-label">Champ de référence</div>
             <select class="property-select" id="prop-condition-field">
               <option value="">-- Sélectionner --</option>
-              ${otherFields.map(field => `<option value="${field.id}" ${f.condition?.fieldId === field.id ? 'selected' : ''}>${field.label}</option>`).join('')}
+              ${otherFields.map(field => `<option value="${field.id}" ${f.condition?.fieldId === field.id ? 'selected' : ''}>${escHtml(field.label)}</option>`).join('')}
             </select>
           </div>
           <div class="property-group">
@@ -2683,6 +2677,31 @@ function renderPropertiesPanel() {
   });
 }
 
+/**
+ * Retrouve une configuration à partir du nom de sa table.
+ *
+ * Les clés de BM_FormConfig sont des slugs de TITRE (« form_suivi_des_demandes »),
+ * jamais « form_<table> » : saveConfigToTable écrit toujours config.formId, que
+ * generateFormId renseigne systématiquement. Chercher « form_<table> » ne
+ * trouvait donc jamais rien. On lit le contenu des configurations et on compare
+ * leur tableId, en retenant la plus récente.
+ */
+function chercherConfigParTable(data, tableId) {
+  if (!data || !data.ConfigData) return null;
+  for (let i = data.ConfigData.length - 1; i >= 0; i--) {
+    try {
+      const cfg = JSON.parse(data.ConfigData[i]);
+      if (cfg && cfg.tableId === tableId) return cfg;
+    } catch (e) { /* entrée illisible : on continue */ }
+  }
+  // Repli sur l'ancienne convention de clé, au cas où un document la porte encore.
+  const index = data.ConfigKey?.findIndex(k => k === 'form_' + tableId);
+  if (index !== undefined && index >= 0) {
+    try { return JSON.parse(data.ConfigData[index]); } catch (e) { return null; }
+  }
+  return null;
+}
+
 // Générer un formId unique à partir du titre
 function generateFormId(title) {
   const slug = (title || 'formulaire')
@@ -2705,13 +2724,14 @@ async function saveFormConfig() {
   
   const docIdInput = document.getElementById('cfg-doc-id');
 
+  // Plus de « secret de proxy » : aucun des proxys fournis n'en vérifie
+  // (ni config.php, ni server.js ne lisent PROXY_SECRET), et un secret placé
+  // dans un formulaire public serait de toute façon lisible par les répondants.
+  // Les proxys se protègent par ALLOWED_ORIGINS et la limitation de débit.
   const proxyUrls = {};
-  const proxySecrets = {};
   ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
     const urlEl = document.getElementById('cfg-proxy-url-' + p);
     if (urlEl) proxyUrls[p] = urlEl.value.trim();
-    const secEl = document.getElementById('cfg-proxy-secret-' + p);
-    if (secEl) proxySecrets[p] = secEl.value.trim();
   });
 
   const config = {
@@ -2720,7 +2740,6 @@ async function saveFormConfig() {
     responseTableId: responseTableId || null,
     proxyPlatform: currentProxyPlatform,
     proxyUrls: proxyUrls,
-    proxySecrets: proxySecrets,
     proxyUrl: proxyUrls[currentProxyPlatform] || '',
     docId: docIdInput ? docIdInput.value.trim() : '',
     fields: formFields,
@@ -2783,30 +2802,6 @@ async function saveConfigToTable(config) {
     console.log('Erreur sauvegarde table config:', error);
     // Ne pas bloquer si la sauvegarde dans la table échoue
   }
-}
-
-// Charger la config depuis la table Grist
-async function loadConfigFromTable(tableId) {
-  try {
-    const tables = await grist.docApi.listTables();
-    const configTableName = 'BM_FormConfig';
-    
-    if (!tables.includes(configTableName)) {
-      return null;
-    }
-    
-    const data = await grist.docApi.fetchTable(configTableName);
-    const configKey = 'form_' + (tableId || 'default');
-    
-    const index = data.ConfigKey?.findIndex(k => k === configKey);
-    
-    if (index !== undefined && index >= 0) {
-      return JSON.parse(data.ConfigData[index]);
-    }
-  } catch (error) {
-    console.log('Erreur chargement config table:', error);
-  }
-  return null;
 }
 
 // Créer un nouveau formulaire
@@ -2921,68 +2916,6 @@ function renderFormViewPageNav() {
   });
 }
 
-// Évaluer et appliquer les conditions d'affichage
-function evaluateConditions() {
-  if (!formConfig || !formConfig.fields) return;
-  
-  formConfig.fields.forEach(field => {
-    if (!field.condition || !field.condition.fieldId) return;
-    
-    const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
-    if (!group) return;
-    
-    const refField = formConfig.fields.find(f => f.id === field.condition.fieldId);
-    if (!refField) return;
-    
-    // Obtenir la valeur du champ de référence
-    let refValue = '';
-    if (refField.fieldType === 'radio') {
-      const container = document.getElementById(`input-${refField.id}`);
-      const checked = container?.querySelector('input:checked');
-      refValue = checked ? checked.value : '';
-    } else if (refField.fieldType === 'checkbox') {
-      const container = document.getElementById(`input-${refField.id}`);
-      const checked = container?.querySelectorAll('input:checked');
-      refValue = checked ? Array.from(checked).map(c => c.value).join(',') : '';
-    } else if (refField.fieldType === 'select') {
-      const select = document.getElementById(`input-${refField.id}`);
-      refValue = select ? select.value : '';
-    } else {
-      const input = document.getElementById(`input-${refField.id}`);
-      refValue = input ? input.value : '';
-    }
-    
-    // Évaluer la condition
-    let conditionMet = false;
-    const condValue = field.condition.value || '';
-    
-    switch (field.condition.operator) {
-      case 'equals':
-        conditionMet = refValue === condValue;
-        break;
-      case 'not-equals':
-        conditionMet = refValue !== condValue;
-        break;
-      case 'contains':
-        conditionMet = refValue.toLowerCase().includes(condValue.toLowerCase());
-        break;
-      case 'not-empty':
-        conditionMet = refValue !== '' && refValue !== null;
-        break;
-      case 'empty':
-        conditionMet = refValue === '' || refValue === null;
-        break;
-    }
-    
-    // Afficher ou masquer le champ
-    if (conditionMet) {
-      group.classList.remove('hidden');
-    } else {
-      group.classList.add('hidden');
-    }
-  });
-}
-
 // Afficher le formulaire de saisie
 function renderFormView() {
   if (!formConfig || !formConfig.fields || formConfig.fields.length === 0) {
@@ -3026,7 +2959,7 @@ function renderFormView() {
       } else if (field.bgColor) {
         sectionDiv.style.backgroundColor = field.bgColor;
       }
-      sectionDiv.innerHTML = `<div class="form-section-view-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${field.label}</div>`;
+      sectionDiv.innerHTML = `<div class="form-section-view-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${escHtml(field.label)}</div>`;
       formFieldsView.appendChild(sectionDiv);
       return;
     }
@@ -3046,7 +2979,7 @@ function renderFormView() {
         imageDiv.style.backgroundColor = field.bgColor;
       }
       if (field.imageData) {
-        imageDiv.innerHTML = `<img src="${field.imageData}" alt="${field.label}" style="width: 100%; height: 100%; object-fit: contain;">`;
+        imageDiv.innerHTML = `<img src="${field.imageData}" alt="${escHtml(field.label)}" style="width: 100%; height: 100%; object-fit: contain;">`;
       }
       formFieldsView.appendChild(imageDiv);
       return;
@@ -3154,20 +3087,20 @@ function renderFormView() {
     
     switch (field.fieldType) {
       case 'textarea':
-        inputHtml = `<textarea id="input-${field.id}" class="form-textarea-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''} style="min-height: 60px;"></textarea>`;
+        inputHtml = `<textarea id="input-${field.id}" class="form-textarea-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''} style="min-height: 60px;"></textarea>`;
         break;
       case 'select':
         inputHtml = `<select id="input-${field.id}" class="form-select" ${field.required ? 'required' : ''}>
-          <option value="">${field.placeholder || 'Sélectionner...'}</option>
-          ${field.options.map(o => `<option value="${o}">${o}</option>`).join('')}
+          <option value="">${escHtml(field.placeholder || 'Sélectionner...')}</option>
+          ${field.options.map(o => `<option value="${escHtml(o)}">${o}</option>`).join('')}
         </select>`;
         break;
       case 'radio':
         inputHtml = `<div class="form-radio-group" id="input-${field.id}">
           ${field.options.map((o, i) => `
             <label class="form-radio-item">
-              <input type="radio" name="radio-${field.id}" value="${o}">
-              <span>${o}</span>
+              <input type="radio" name="radio-${field.id}" value="${escHtml(o)}">
+              <span>${escHtml(o)}</span>
             </label>
           `).join('')}
         </div>`;
@@ -3176,8 +3109,8 @@ function renderFormView() {
         inputHtml = `<div class="form-checkbox-group" id="input-${field.id}">
           ${field.options.map(o => `
             <label class="form-checkbox-item">
-              <input type="checkbox" value="${o}">
-              <span>${o}</span>
+              <input type="checkbox" value="${escHtml(o)}">
+              <span>${escHtml(o)}</span>
             </label>
           `).join('')}
         </div>`;
@@ -3194,18 +3127,18 @@ function renderFormView() {
         inputHtml = `<input type="date" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
         break;
       case 'number':
-        inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+        inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
         break;
       case 'email':
-        inputHtml = `<input type="email" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+        inputHtml = `<input type="email" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
         break;
       case 'phone':
-        inputHtml = `<input type="tel" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+        inputHtml = `<input type="tel" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
         break;
       case 'lookup':
         inputHtml = `
           <div class="lookup-container" style="position: relative;">
-            <input type="text" id="input-${field.id}" class="form-input lookup-input" placeholder="${field.placeholder || 'Rechercher...'}" autocomplete="off" ${field.required ? 'required' : ''}>
+            <input type="text" id="input-${field.id}" class="form-input lookup-input" placeholder="${escHtml(field.placeholder || 'Rechercher...')}" autocomplete="off" ${field.required ? 'required' : ''}>
             <input type="hidden" id="input-${field.id}-value">
             <div class="lookup-dropdown" id="dropdown-${field.id}" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 0 0 6px 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 100;"></div>
           </div>
@@ -3219,7 +3152,7 @@ function renderFormView() {
         `;
         break;
       default:
-        inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${field.placeholder || ''}" ${field.required ? 'required' : ''}>`;
+        inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
     }
     
     // Appliquer le style selon la position du label et si le label est masqué
@@ -3232,7 +3165,7 @@ function renderFormView() {
     } else if (field.labelPosition === 'left') {
       group.innerHTML = `
         <div style="display: flex; align-items: flex-start; gap: 10px;">
-          <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 80px; max-width: 40%; padding-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${field.label}</label>
+          <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 80px; max-width: 40%; padding-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(field.label)}</label>
           <div style="flex: 1;">
             ${inputHtml}
             <div class="form-error" id="error-${field.id}"></div>
@@ -3241,7 +3174,7 @@ function renderFormView() {
       `;
     } else {
       group.innerHTML = `
-        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${field.label}</label>
+        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}">${escHtml(field.label)}</label>
         ${inputHtml}
         <div class="form-error" id="error-${field.id}"></div>
       `;
@@ -3434,8 +3367,8 @@ async function reloadFillDynamicField(field) {
   if (field.fieldType === 'select') {
     const sel = document.getElementById(`input-${field.id}`);
     if (!sel) return;
-    sel.innerHTML = `<option value="">${field.placeholder || 'Sélectionner...'}</option>` +
-      opts.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    sel.innerHTML = `<option value="">${escHtml(field.placeholder || 'Sélectionner...')}</option>` +
+      opts.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join('');
     sel.value = stillValid ? (Array.isArray(currentValue) ? currentValue[0] : currentValue) : '';
     sel.dispatchEvent(new Event('change'));
   } else if (field.fieldType === 'radio') {
@@ -3443,8 +3376,8 @@ async function reloadFillDynamicField(field) {
     if (!c) return;
     c.innerHTML = opts.map(o => `
       <label class="form-radio-item">
-        <input type="radio" name="radio-${field.id}" value="${o.value}" ${stillValid && currentValue === o.value ? 'checked' : ''}>
-        <span>${o.label}</span>
+        <input type="radio" name="radio-${field.id}" value="${escHtml(o.value)}" ${stillValid && currentValue === o.value ? 'checked' : ''}>
+        <span>${escHtml(o.label)}</span>
       </label>
     `).join('');
   } else if (field.fieldType === 'checkbox') {
@@ -3453,8 +3386,8 @@ async function reloadFillDynamicField(field) {
     const sel = Array.isArray(currentValue) ? currentValue : [];
     c.innerHTML = opts.map(o => `
       <label class="form-checkbox-item">
-        <input type="checkbox" value="${o.value}" ${sel.includes(o.value) ? 'checked' : ''}>
-        <span>${o.label}</span>
+        <input type="checkbox" value="${escHtml(o.value)}" ${sel.includes(o.value) ? 'checked' : ''}>
+        <span>${escHtml(o.label)}</span>
       </label>
     `).join('');
   }
@@ -3641,8 +3574,8 @@ async function initLookupFields() {
       }
       
       dropdown.innerHTML = filtered.map(opt => `
-        <div class="lookup-option" data-value="${opt.value}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;">
-          ${opt.display}
+        <div class="lookup-option" data-value="${escHtml(opt.value)}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;">
+          ${escHtml(opt.display)}
         </div>
       `).join('');
       
@@ -3791,11 +3724,27 @@ function initConditions() {
 
 // Soumettre le formulaire
 async function submitForm() {
-  console.log('[Form Builder] submitForm called. fields:', formConfig?.fields?.map(f => ({id: f.id, label: f.label, columnId: f.columnId, type: f.fieldType})));
+  // Le garde venait après la lecture de formConfig.responseTableId, qui aurait
+  // levé avant de pouvoir afficher le message.
+  if (!formConfig || !formConfig.fields) {
+    showToast('Configuration invalide : aucun formulaire chargé', 'error');
+    return;
+  }
   const destTable = formConfig.responseTableId || formConfig.tableId;
-  if (!formConfig || !destTable) {
+  if (!destTable) {
     showToast('Configuration invalide : aucune table de destination', 'error');
     return;
+  }
+  
+  // La ligne sélectionnée vient TOUJOURS de la table source : elle est fournie
+  // par grist.onRecord ou par le sélecteur, qui lisent formConfig.tableId. Si
+  // l'on écrit dans une table de réponses distincte, son identifiant n'y
+  // désigne pas la même ligne — on écrasait une ligne sans rapport. Dans ce cas
+  // on crée un enregistrement.
+  const metAJour = !!selectedRecordId && destTable === formConfig.tableId;
+  if (selectedRecordId && !metAJour) {
+    console.warn('[Form Builder] ligne #' + selectedRecordId + ' sélectionnée dans ' + formConfig.tableId
+      + ' mais écriture dans ' + destTable + ' : un nouvel enregistrement est créé.');
   }
   
   const record = {};
@@ -3906,21 +3855,25 @@ async function submitForm() {
     return;
   }
   
-  // Récupérer les métadonnées des colonnes pour identifier les formules
+  // Métadonnées de la table où l'on ÉCRIT — et non de la table source. Avec une
+  // table de réponses distincte, les colonnes de formule relevées étaient celles
+  // de l'autre table : elles n'étaient donc pas écartées et Grist refusait
+  // l'écriture.
   let formulaColumns = [];
+  let destColumns = null;
   try {
     const colMeta = await grist.docApi.fetchTable('_grist_Tables_column');
     const tableMeta = await grist.docApi.fetchTable('_grist_Tables');
     
-    // Trouver l'ID de la table cible
-    const tableIndex = tableMeta.tableId?.findIndex(t => t === formConfig.tableId);
+    const tableIndex = tableMeta.tableId?.findIndex(t => t === destTable);
     const tableRef = tableIndex >= 0 ? tableMeta.id[tableIndex] : null;
     
     if (tableRef && colMeta.colId) {
+      destColumns = {};
       for (let i = 0; i < colMeta.id.length; i++) {
-        if (colMeta.parentId[i] === tableRef && colMeta.isFormula[i]) {
-          formulaColumns.push(colMeta.colId[i]);
-        }
+        if (colMeta.parentId[i] !== tableRef) continue;
+        destColumns[colMeta.colId[i]] = true;
+        if (colMeta.isFormula[i]) formulaColumns.push(colMeta.colId[i]);
       }
     }
   } catch (e) {
@@ -3935,16 +3888,19 @@ async function submitForm() {
     }
   }
   
-  // Ajouter l'horodatage si la table de réponses a la colonne Soumis_le
-  if (formConfig.responseTableId && !selectedRecordId) {
+  // Horodatage : seulement si la colonne existe réellement. Il était ajouté dès
+  // qu'une table de réponses était configurée, ce qui faisait échouer l'écriture
+  // sur une table préexistante dépourvue de cette colonne. Quand les
+  // métadonnées n'ont pas pu être lues, on s'abstient plutôt que de risquer
+  // l'échec.
+  if (formConfig.responseTableId && !metAJour && destColumns && destColumns['Soumis_le']) {
     record['Soumis_le'] = Math.floor(Date.now() / 1000);
   }
   
-  console.log('[Form Builder] submitForm → destTable:', destTable, '| record:', JSON.stringify(record));
-  console.log('[Form Builder] formConfig.responseTableId:', formConfig.responseTableId, '| formConfig.tableId:', formConfig.tableId);
+  // Trace de débogage retirée : elle écrivait l'intégralité de l'enregistrement
+  // soumis dans la console, y compris des données personnelles.
   
   if (Object.keys(record).length === 0) {
-    hideLoading();
     showToast('Aucune donnée à enregistrer (vérifiez que les champs ont un columnId)', 'error');
     return;
   }
@@ -3952,7 +3908,7 @@ async function submitForm() {
   try {
     showLoading();
     
-    if (selectedRecordId) {
+    if (metAJour) {
       // Mode mise à jour : UpdateRecord
       await grist.docApi.applyUserActions([
         ['UpdateRecord', destTable, selectedRecordId, record]
@@ -4457,7 +4413,6 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
 // Auto-sauvegarde des paramètres de partage public
 ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
   document.getElementById('cfg-proxy-url-' + p)?.addEventListener('change', () => saveFormConfig());
-  document.getElementById('cfg-proxy-secret-' + p)?.addEventListener('change', () => saveFormConfig());
 });
 document.getElementById('cfg-doc-id')?.addEventListener('change', () => saveFormConfig());
 
@@ -4487,10 +4442,6 @@ function switchProxyPlatform(platform) {
 
 function getActiveProxyUrl() {
   return document.getElementById('cfg-proxy-url-' + currentProxyPlatform)?.value?.trim() || '';
-}
-
-function getActiveProxySecret() {
-  return document.getElementById('cfg-proxy-secret-' + currentProxyPlatform)?.value?.trim() || '';
 }
 
 document.getElementById('proxy-platform-tabs')?.addEventListener('click', (e) => {

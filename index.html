@@ -706,8 +706,6 @@
           </div>
           <div style="font-size: 0.78em; color: #047857; margin-bottom: 4px;">URL du serveur</div>
           <input type="text" class="table-select" id="cfg-proxy-url-node" placeholder="https://votre-serveur.fr/grist-form-proxy" style="margin-bottom: 8px; width: 100%; box-sizing: border-box;">
-          <div style="font-size: 0.78em; color: #047857; margin-bottom: 4px;">Secret d'authentification <span style="color: #94a3b8; font-weight: 400;">(optionnel — si PROXY_SECRET configuré)</span></div>
-          <input type="password" class="table-select" id="cfg-proxy-secret-node" placeholder="Laisser vide si non configuré" style="width: 100%; box-sizing: border-box;">
         </div>
 
         <!-- Deno -->
@@ -727,12 +725,10 @@
             <strong>Nextcloud / PHP</strong> — hébergé sur votre serveur<br>
             1. Copiez <code style="font-size: 0.82em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">proxy/nextcloud/</code> sur votre serveur<br>
             2. Renommez <code style="font-size: 0.82em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">config.example.php</code> → <code style="font-size: 0.82em; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">config.php</code><br>
-            3. Renseignez GRIST_URL, GRIST_API_KEY et PROXY_SECRET
+            3. Renseignez GRIST_URL, GRIST_API_KEY et ALLOWED_ORIGINS
           </div>
           <div style="font-size: 0.78em; color: #047857; margin-bottom: 4px;">URL du script PHP</div>
           <input type="text" class="table-select" id="cfg-proxy-url-nextcloud" placeholder="https://cloud.exemple.fr/proxy/grist-form-proxy.php" style="margin-bottom: 8px; width: 100%; box-sizing: border-box;">
-          <div style="font-size: 0.78em; color: #047857; margin-bottom: 4px;">PROXY_SECRET <span style="color: #94a3b8; font-weight: 400;">(optionnel — valeur dans config.php)</span></div>
-          <input type="password" class="table-select" id="cfg-proxy-secret-nextcloud" placeholder="Laisser vide si non configuré" style="width: 100%; box-sizing: border-box;">
         </div>
       </div>
 
@@ -785,7 +781,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=26"></script>
+<script src="widget.js?v=27"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>
