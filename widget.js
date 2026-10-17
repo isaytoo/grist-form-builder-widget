@@ -47,6 +47,10 @@ let selectedRecordData = null; // Données de l'enregistrement sélectionné
 let responseTableId = null; // Table séparée pour les réponses (si différente de tableId)
 
 // Éléments DOM
+// Référence de version de l'application, affichée dans l'en-tête.
+// À faire évoluer en même temps que le ?v= de index.html.
+const WIDGET_VERSION = 'V.28';
+
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
 const fieldsList = document.getElementById('fields-list');
@@ -258,14 +262,18 @@ grist.onOptions(async function(options) {
     if (el) el.value = formConfig.docId;
   }
   
+  // La table source est restaurée même si le formulaire n'a pas encore de
+  // champs : sinon l'onglet « Champs » restait sur « Sélectionnez une table »
+  // alors que la liste déroulante affichait bien une table.
+  if (formConfig.tableId) {
+    tableSelect.value = formConfig.tableId;
+    currentTable = formConfig.tableId;
+    await loadTableColumns(formConfig.tableId);
+  }
+
   if (formConfig.fields && formConfig.fields.length > 0) {
     formFields = formConfig.fields;
     fieldIdCounter = Math.max(...formFields.map(f => parseInt(f.id.replace('field_', '')) || 0)) + 1;
-    if (formConfig.tableId) {
-      tableSelect.value = formConfig.tableId;
-      currentTable = formConfig.tableId;
-      await loadTableColumns(formConfig.tableId);
-    }
     renderFormFields();
   }
   
@@ -483,6 +491,12 @@ function updateRecordModeIndicator() {
 }
 
 // Charger la liste des tables
+// Afficher la référence de version dans l'en-tête
+(function afficherVersion() {
+  const el = document.getElementById('app-version');
+  if (el) el.textContent = WIDGET_VERSION;
+})();
+
 async function loadTables() {
   try {
     const tables = await grist.docApi.listTables();
@@ -535,6 +549,11 @@ async function loadLookupData(field) {
 // Charger les colonnes d'une table
 async function loadTableColumns(tableId) {
   if (!tableId) {
+    // Sans ce nettoyage, tableColumns gardait les colonnes de la table
+    // précédente : « Lier à une colonne » proposait des colonnes d'une table
+    // qui n'était plus sélectionnée.
+    currentTable = null;
+    tableColumns = [];
     fieldsList.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em; padding: 10px;">Sélectionnez une table</p>';
     return;
   }
@@ -1391,7 +1410,7 @@ function renderPropertiesPanel() {
   let html = `
     <div class="property-group">
       <div class="property-label">${isTitle ? 'Texte' : 'Libellé'}</div>
-      <input type="text" class="property-input" id="prop-label" value="${f.label}">
+      <input type="text" class="property-input" id="prop-label" value="${escHtml(f.label)}">
     </div>
   `;
   
@@ -1480,7 +1499,7 @@ function renderPropertiesPanel() {
     html += `
       <div class="property-group">
         <div class="property-label">Contenu du QR Code</div>
-        <input type="text" class="property-input" id="prop-qr-content" value="${f.qrContent || 'https://gristup.fr'}" placeholder="URL ou texte">
+        <input type="text" class="property-input" id="prop-qr-content" value="${escHtml(f.qrContent || '')}" placeholder="URL ou texte">
       </div>
       <div class="property-group">
         <div class="property-label">Taille (px)</div>
@@ -1541,7 +1560,7 @@ function renderPropertiesPanel() {
       </div>
       <div class="property-group" id="calc-formula-group" style="${f.calcType === 'custom' ? '' : 'display: none;'}">
         <div class="property-label">Formule (ex: A * B / 100)</div>
-        <input type="text" class="property-input" id="prop-calc-formula" value="${f.calcFormula || ''}" placeholder="A * B">
+        <input type="text" class="property-input" id="prop-calc-formula" value="${escHtml(f.calcFormula || '')}" placeholder="A * B">
       </div>
       <div class="property-group">
         <div class="property-label">Décimales</div>
@@ -1549,7 +1568,7 @@ function renderPropertiesPanel() {
       </div>
       <div class="property-group">
         <div class="property-label">Suffixe (ex: €, %)</div>
-        <input type="text" class="property-input" id="prop-calc-suffix" value="${f.calcSuffix || ''}" placeholder="€">
+        <input type="text" class="property-input" id="prop-calc-suffix" value="${escHtml(f.calcSuffix || '')}" placeholder="€">
       </div>
     `;
   }
@@ -1561,7 +1580,7 @@ function renderPropertiesPanel() {
     let columnOptions = '<option value="">-- Sélectionner --</option>';
     if (f.lookupData) {
       const cols = Object.keys(f.lookupData).filter(c => c !== 'id' && c !== 'manualSort');
-      columnOptions += cols.map(c => `<option value="${c}">${c}</option>`).join('');
+      columnOptions += cols.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
     }
     
     html += `
@@ -1569,14 +1588,14 @@ function renderPropertiesPanel() {
         <div class="property-label">Table source</div>
         <select class="property-select" id="prop-lookup-table">
           <option value="">-- Sélectionner --</option>
-          ${availableTables.map(t => `<option value="${t}" ${f.lookupTable === t ? 'selected' : ''}>${t}</option>`).join('')}
+          ${availableTables.map(t => `<option value="${escHtml(t)}" ${f.lookupTable === t ? 'selected' : ''}>${escHtml(t)}</option>`).join('')}
         </select>
       </div>
       <div class="property-group" id="lookup-columns-group" style="${f.lookupTable ? '' : 'display:none;'}">
         <div class="property-label">Colonne à afficher</div>
         <select class="property-select" id="prop-lookup-display">
           <option value="">-- Sélectionner --</option>
-          ${f.lookupData ? Object.keys(f.lookupData).filter(c => c !== 'manualSort').map(c => `<option value="${c}" ${f.lookupDisplayColumn === c ? 'selected' : ''}>${c}</option>`).join('') : ''}
+          ${f.lookupData ? Object.keys(f.lookupData).filter(c => c !== 'manualSort').map(c => `<option value="${escHtml(c)}" ${f.lookupDisplayColumn === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('') : ''}
         </select>
         <div style="font-size: 0.75em; color: #64748b; margin-top: 4px;">💡 Séparez par virgule pour afficher plusieurs colonnes</div>
       </div>
@@ -1584,7 +1603,7 @@ function renderPropertiesPanel() {
         <div class="property-label">Colonne de valeur (à enregistrer)</div>
         <select class="property-select" id="prop-lookup-value">
           <option value="id" ${f.lookupValueColumn === 'id' || !f.lookupValueColumn ? 'selected' : ''}>id (recommandé pour références)</option>
-          ${f.lookupData ? Object.keys(f.lookupData).filter(c => c !== 'manualSort').map(c => `<option value="${c}" ${f.lookupValueColumn === c ? 'selected' : ''}>${c}</option>`).join('') : ''}
+          ${f.lookupData ? Object.keys(f.lookupData).filter(c => c !== 'manualSort').map(c => `<option value="${escHtml(c)}" ${f.lookupValueColumn === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('') : ''}
         </select>
       </div>
     `;
@@ -1638,6 +1657,8 @@ function renderPropertiesPanel() {
           <option value="radio" ${f.fieldType === 'radio' ? 'selected' : ''}>Boutons radio</option>
           <option value="checkbox" ${f.fieldType === 'checkbox' ? 'selected' : ''}>Cases à cocher</option>
           <option value="lookup" ${f.fieldType === 'lookup' ? 'selected' : ''}>Lookup (référence)</option>
+          <option value="signature" ${f.fieldType === 'signature' ? 'selected' : ''}>Signature</option>
+          <option value="calculated" ${f.fieldType === 'calculated' ? 'selected' : ''}>Champ calculé</option>
         </select>
       </div>
     `;
@@ -1646,7 +1667,7 @@ function renderPropertiesPanel() {
       html += `
         <div class="property-group">
           <div class="property-label">Colonne Grist</div>
-          <input type="text" class="property-input" value="${f.columnId}" disabled style="background: #f1f5f9;">
+          <input type="text" class="property-input" value="${escHtml(f.columnId)}" disabled style="background: #f1f5f9;">
         </div>
       `;
     } else {
@@ -1655,9 +1676,9 @@ function renderPropertiesPanel() {
           <div class="property-label" style="color: #f59e0b;">⚠️ Lier à une colonne</div>
           <select class="property-select" id="prop-column" style="border-color: #f59e0b;">
             <option value="">-- Non lié (données non sauvées) --</option>
-            ${tableColumns.map(c => `<option value="${c.id}" ${f.columnId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+            ${tableColumns.map(c => `<option value="${escHtml(c.id)}" ${f.columnId === c.id ? 'selected' : ''}>${escHtml(c.name)}</option>`).join('')}
           </select>
-          <button class="btn btn-secondary" id="btn-create-column" style="margin-top: 8px; font-size: 0.8em; padding: 4px 8px;">➕ Créer colonne "${f.label}"</button>
+          <button class="btn btn-secondary" id="btn-create-column" style="margin-top: 8px; font-size: 0.8em; padding: 4px 8px;">➕ Créer colonne "${escHtml(f.label)}"</button>
         </div>
       `;
     }
@@ -1665,7 +1686,7 @@ function renderPropertiesPanel() {
     html += `
       <div class="property-group">
         <div class="property-label">Placeholder</div>
-        <input type="text" class="property-input" id="prop-placeholder" value="${f.placeholder || ''}">
+        <input type="text" class="property-input" id="prop-placeholder" value="${escHtml(f.placeholder || '')}">
       </div>
     `;
     
@@ -1749,21 +1770,23 @@ function renderPropertiesPanel() {
         </div>
         <div class="property-group" id="custom-pattern-group" style="${f.patternPreset === 'custom' ? '' : 'display: none;'}">
           <div class="property-label">Regex personnalisé</div>
-          <input type="text" class="property-input" id="prop-pattern" value="${f.pattern || ''}" placeholder="^[A-Z]{2}[0-9]{3}$">
+          <input type="text" class="property-input" id="prop-pattern" value="${escHtml(f.pattern || '')}" placeholder="^[A-Z]{2}[0-9]{3}$">
         </div>
         <div class="property-group">
           <div class="property-label">Message d'erreur</div>
-          <input type="text" class="property-input" id="prop-error-message" value="${f.errorMessage || ''}" placeholder="Format invalide">
+          <input type="text" class="property-input" id="prop-error-message" value="${escHtml(f.errorMessage || '')}" placeholder="Format invalide">
         </div>
       `;
     }
   }
   
   // Conditions d'affichage (pour tous les champs sauf section)
-  if (!isSection && !isImage && !isQRCode) {
-    const otherFields = formFields.filter(field => 
-      field.id !== f.id && 
-      ['select', 'radio', 'checkbox', 'text', 'number'].includes(field.fieldType)
+  if (!isSection) {
+    // Tous les champs saisissables peuvent piloter une condition, et tous les
+    // éléments (y compris image et QR code) peuvent en porter une.
+    const condInputTypes = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'select', 'radio', 'checkbox'];
+    const otherFields = formFields.filter(field =>
+      field.id !== f.id && condInputTypes.includes(field.fieldType)
     );
     
     if (otherFields.length > 0) {
@@ -1797,7 +1820,7 @@ function renderPropertiesPanel() {
           </div>
           <div class="property-group" id="condition-value-group" style="${['not-empty', 'empty'].includes(f.condition?.operator) ? 'display: none;' : ''}">
             <div class="property-label">Valeur</div>
-            <input type="text" class="property-input" id="prop-condition-value" value="${f.condition?.value || ''}" placeholder="Valeur attendue">
+            <input type="text" class="property-input" id="prop-condition-value" value="${escHtml(f.condition?.value || '')}" placeholder="Valeur attendue">
           </div>
         </div>
       `;
@@ -1856,17 +1879,10 @@ function renderPropertiesPanel() {
     `;
   }
   
-  if (!isDecorative) {
-    html += `
-      <div class="property-group">
-        <label class="property-checkbox">
-          <input type="checkbox" id="prop-required" ${f.required ? 'checked' : ''}>
-          <span>Champ obligatoire</span>
-        </label>
-      </div>
-    `;
-  }
-  
+  // La case « Champ obligatoire » est rendue une seule fois, dans la section
+  // Validation ci-dessus : un second rendu portait le même id, donc
+  // getElementById ne voyait que le premier et la case du bas était inerte.
+
   // Options pour select/radio/checkbox — statique ou dynamique (Grist)
   if (hasOptions) {
     if (!f.dataSource) f.dataSource = { mode: 'static', tableId: '', labelColumn: '', valueColumn: '', filters: [] };
@@ -1892,7 +1908,7 @@ function renderPropertiesPanel() {
           <div class="options-editor" id="options-editor">
             ${f.options.map((opt, i) => `
               <div class="option-row">
-                <input type="text" value="${opt}" data-index="${i}">
+                <input type="text" value="${escHtml(opt)}" data-index="${i}">
                 <button data-index="${i}">×</button>
               </div>
             `).join('')}
@@ -1903,11 +1919,11 @@ function renderPropertiesPanel() {
     } else {
       // Mode dynamique : configuration de la source Grist
       const tableOptions = (availableTables || []).map(t =>
-        `<option value="${t}" ${ds.tableId === t ? 'selected' : ''}>${t}</option>`
+        `<option value="${escHtml(t)}" ${ds.tableId === t ? 'selected' : ''}>${escHtml(t)}</option>`
       ).join('');
       const cachedCols = (window.dsColumnsCache || {})[ds.tableId] || [];
       const colOptions = (selected) => `<option value="">-- Choisir --</option>` +
-        cachedCols.map(c => `<option value="${c}" ${selected === c ? 'selected' : ''}>${c}</option>`).join('');
+        cachedCols.map(c => `<option value="${escHtml(c)}" ${selected === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
 
       html += `
         <div class="property-group">
@@ -1934,7 +1950,7 @@ function renderPropertiesPanel() {
 
       ds.filters.forEach((filter, idx) => {
         const parentOpts = otherFieldsForFilter.map(of =>
-          `<option value="${of.id}" ${filter.parentFieldId === of.id ? 'selected' : ''}>${of.label}</option>`
+          `<option value="${escHtml(of.id)}" ${filter.parentFieldId === of.id ? 'selected' : ''}>${escHtml(of.label)}</option>`
         ).join('');
         const op = filter.operator || '=';
         html += `
@@ -1974,58 +1990,18 @@ function renderPropertiesPanel() {
     }
   }
   
-  // Validation
-  if (!isSection && f.fieldType !== 'signature') {
-    html += `
-      <div class="property-group">
-        <div class="property-label">Validation</div>
-        <select class="property-select" id="prop-validation-type">
-          <option value="">Aucune</option>
-          <option value="email" ${f.validation?.type === 'email' ? 'selected' : ''}>Email</option>
-          <option value="phone" ${f.validation?.type === 'phone' ? 'selected' : ''}>Téléphone</option>
-          <option value="min" ${f.validation?.type === 'min' ? 'selected' : ''}>Valeur minimum</option>
-          <option value="max" ${f.validation?.type === 'max' ? 'selected' : ''}>Valeur maximum</option>
-          <option value="regex" ${f.validation?.type === 'regex' ? 'selected' : ''}>Expression régulière</option>
-        </select>
-      </div>
-      <div class="property-group" id="validation-value-group" style="display: ${f.validation?.type && ['min', 'max', 'regex'].includes(f.validation.type) ? 'block' : 'none'};">
-        <div class="property-label">Valeur de validation</div>
-        <input type="text" class="property-input" id="prop-validation-value" value="${f.validation?.value || ''}">
-      </div>
-    `;
-  }
-  
-  // Condition d'affichage
-  if (!isSection) {
-    // Tous les champs saisissables peuvent piloter une condition (pas que ceux liés à une colonne)
-    const inputTypes = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'select', 'radio', 'checkbox'];
-    const otherFields = formFields.filter(of => of.id !== f.id && inputTypes.includes(of.fieldType));
-    html += `
-      <div class="property-group">
-        <div class="property-label">Condition d'affichage</div>
-        <select class="property-select" id="prop-condition-field">
-          <option value="">Toujours visible</option>
-          ${otherFields.map(of => `<option value="${of.id}" ${f.condition?.fieldId === of.id ? 'selected' : ''}>${of.label}</option>`).join('')}
-        </select>
-      </div>
-      <div id="condition-details" style="display: ${f.condition ? 'block' : 'none'};">
-        <div class="property-group">
-          <div class="property-label">Opérateur</div>
-          <select class="property-select" id="prop-condition-operator">
-            <option value="equals" ${f.condition?.operator === 'equals' ? 'selected' : ''}>Égal à</option>
-            <option value="not_equals" ${f.condition?.operator === 'not_equals' ? 'selected' : ''}>Différent de</option>
-            <option value="contains" ${f.condition?.operator === 'contains' ? 'selected' : ''}>Contient</option>
-            <option value="not_empty" ${f.condition?.operator === 'not_empty' ? 'selected' : ''}>Non vide</option>
-          </select>
-        </div>
-        <div class="property-group" id="condition-value-group">
-          <div class="property-label">Valeur</div>
-          <input type="text" class="property-input" id="prop-condition-value" value="${f.condition?.value || ''}">
-        </div>
-      </div>
-    `;
-  }
-  
+  // Le sélecteur « Validation » (Aucune / Email / Téléphone / min / max / regex)
+  // a été retiré : f.validation n'était lu ni par submitForm ni par form.html.
+  // La validation réellement appliquée est celle de la section Validation
+  // ci-dessus (obligatoire, min/max, longueurs, format).
+
+  // Le second bloc de condition d'affichage a été retiré : il portait les mêmes
+  // ids que « Affichage conditionnel » (prop-condition-field / -operator / -value),
+  // si bien que ses listes étaient inertes, et son vocabulaire d'opérateurs
+  // (not_equals, not_empty) ne correspondait pas à celui qu'évalue
+  // initConditions() (not-equals, not-empty) : la condition ne se déclenchait
+  // jamais quand ce bloc était seul à l'écran (image, QR code).
+
   propertiesContent.innerHTML = html;
   
   // Event listeners
@@ -2431,9 +2407,19 @@ function renderPropertiesPanel() {
   });
   
   document.getElementById('prop-condition-field')?.addEventListener('change', (e) => {
-    if (selectedField.condition) {
-      selectedField.condition.fieldId = e.target.value;
+    if (!e.target.value) {
+      selectedField.condition = null;
+      renderPropertiesPanel();
+      return;
     }
+    if (!selectedField.condition) {
+      selectedField.condition = { fieldId: '', operator: 'equals', value: '' };
+      const box = document.getElementById('condition-options');
+      if (box) box.style.display = '';
+      const chk = document.getElementById('prop-has-condition');
+      if (chk) chk.checked = true;
+    }
+    selectedField.condition.fieldId = e.target.value;
   });
   
   document.getElementById('prop-condition-operator')?.addEventListener('change', (e) => {
@@ -2472,7 +2458,10 @@ function renderPropertiesPanel() {
       return;
     }
     
-    const columnName = selectedField.label.replace(/[^a-zA-Z0-9_àâäéèêëïîôùûüç]/gi, '_');
+    // L'ancien nettoyage conservait les accents : Grist renommait la colonne à
+    // la création et selectedField.columnId pointait alors vers un identifiant
+    // inexistant. On normalise comme labelToColumnId, puis on relit la table.
+    const columnName = labelToColumnId(selectedField.label);
     
     // Déterminer le type de colonne Grist selon le type de champ
     let gristType = 'Text';
@@ -2488,16 +2477,17 @@ function renderPropertiesPanel() {
         ['AddColumn', currentTable, columnName, { type: gristType }]
       ]);
       
-      // Lier le champ à la nouvelle colonne
-      selectedField.columnId = columnName;
-      
-      // Recharger les colonnes
+      // Recharger les colonnes puis lier le champ à l'identifiant réellement
+      // créé par Grist (qui peut différer du nom demandé).
+      const avant = tableColumns.map(c => c.id);
       await loadTableColumns(currentTable);
+      const nouvelle = tableColumns.map(c => c.id).find(id => avant.indexOf(id) === -1);
+      selectedField.columnId = nouvelle || columnName;
       
       hideLoading();
       renderFormFields();
       selectField(selectedField.id);
-      showToast(`Colonne "${columnName}" créée et liée`, 'success');
+      showToast(`Colonne "${selectedField.columnId}" créée et liée`, 'success');
     } catch (error) {
       hideLoading();
       console.error('Erreur création colonne:', error);
@@ -2632,49 +2622,6 @@ function renderPropertiesPanel() {
     }
   }
 
-  // Validation
-  document.getElementById('prop-validation-type')?.addEventListener('change', (e) => {
-    const type = e.target.value;
-    selectedField.validation = type ? { type: type, value: '' } : {};
-    const valueGroup = document.getElementById('validation-value-group');
-    if (valueGroup) {
-      valueGroup.style.display = ['min', 'max', 'regex'].includes(type) ? 'block' : 'none';
-    }
-  });
-  
-  document.getElementById('prop-validation-value')?.addEventListener('input', (e) => {
-    if (selectedField.validation) {
-      selectedField.validation.value = e.target.value;
-    }
-  });
-  
-  // Conditions
-  document.getElementById('prop-condition-field')?.addEventListener('change', (e) => {
-    const fieldId = e.target.value;
-    if (fieldId) {
-      selectedField.condition = { fieldId: fieldId, operator: 'equals', value: '' };
-      document.getElementById('condition-details').style.display = 'block';
-    } else {
-      selectedField.condition = null;
-      document.getElementById('condition-details').style.display = 'none';
-    }
-  });
-  
-  document.getElementById('prop-condition-operator')?.addEventListener('change', (e) => {
-    if (selectedField.condition) {
-      selectedField.condition.operator = e.target.value;
-      const valueGroup = document.getElementById('condition-value-group');
-      if (valueGroup) {
-        valueGroup.style.display = e.target.value === 'not_empty' ? 'none' : 'block';
-      }
-    }
-  });
-  
-  document.getElementById('prop-condition-value')?.addEventListener('input', (e) => {
-    if (selectedField.condition) {
-      selectedField.condition.value = e.target.value;
-    }
-  });
 }
 
 /**
@@ -2821,7 +2768,7 @@ async function newForm() {
     currentPage = 1;
     formTitleInput.value = 'Nouveau formulaire';
     tableSelect.value = '';
-    currentTable = null;
+    await loadTableColumns('');
     updatePageIndicator();
     renderFormFields();
     renderPropertiesPanel();
@@ -3285,8 +3232,10 @@ async function fillFilterDsRows(rows, dataSource) {
       // Read raw value from parent field (no resolution)
       const rawParentValue = await fillReadFieldValue(parentField);
       if (rawParentValue === null || rawParentValue === '' || (Array.isArray(rawParentValue) && rawParentValue.length === 0)) {
-        keep = false;
-        break;
+        // Parent pas encore renseigné : on ignore ce filtre, comme l'annonce
+        // l'aide du panneau et comme le fait déjà le formulaire public.
+        // L'ancien « keep = false » vidait toute la liste.
+        continue;
       }
 
       // The sourceColumn in the child table may store a Grist reference (row ID).
@@ -3359,7 +3308,10 @@ async function reloadFillDynamicField(field) {
     opts.push({ value: String(v), label: String(l !== undefined ? l : v) });
   });
 
-  const currentValue = fillReadFieldValue(field);
+  // fillReadFieldValue est asynchrone : sans await, currentValue valait une
+  // Promise, stillValid était toujours faux et la sélection en cours était
+  // effacée à chaque rechargement (y compris à chaque frappe sur le parent).
+  const currentValue = await fillReadFieldValue(field);
   const stillValid = Array.isArray(currentValue)
     ? currentValue.every(v => opts.some(o => o.value === v))
     : opts.some(o => o.value === currentValue);
@@ -4546,8 +4498,15 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
       id: f.id, columnId: f.columnId, fieldType: f.fieldType,
       label: f.label, required: f.required, placeholder: f.placeholder,
       options: f.options || [], page: f.page, condition: f.condition,
-      labelPosition: f.labelPosition, minValue: f.minValue, maxValue: f.maxValue,
-      pattern: f.pattern, errorMessage: f.errorMessage
+      labelPosition: f.labelPosition, hideLabel: f.hideLabel,
+      minValue: f.minValue, maxValue: f.maxValue,
+      minLength: f.minLength, maxLength: f.maxLength,
+      pattern: f.pattern, patternPreset: f.patternPreset, errorMessage: f.errorMessage,
+      // Champs calculés : form.html sait les calculer mais ne recevait aucun
+      // des paramètres saisis dans le panneau de droite.
+      calcType: f.calcType, calcFieldA: f.calcFieldA, calcFieldB: f.calcFieldB,
+      calcConstant: f.calcConstant, calcFormula: f.calcFormula,
+      calcDecimals: f.calcDecimals, calcSuffix: f.calcSuffix
     };
     
     // Si le champ a une source dynamique, conserver dataSource et pré-charger la table

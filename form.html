@@ -1005,6 +1005,28 @@ async function submitForm() {
         }
       }
       
+      // Longueurs mini / maxi : réglables dans le panneau de droite et
+      // appliquées par l'onglet Saisie du constructeur, mais jamais vérifiées
+      // ici — le formulaire public les laissait passer.
+      if (typeof value === 'string' && value !== '') {
+        if (field.minLength && value.length < field.minLength) {
+          if (errorEl) {
+            errorEl.textContent = `Minimum ${field.minLength} caractères`;
+            errorEl.classList.add('show');
+          }
+          hasError = true;
+          return;
+        }
+        if (field.maxLength && value.length > field.maxLength) {
+          if (errorEl) {
+            errorEl.textContent = `Maximum ${field.maxLength} caractères`;
+            errorEl.classList.add('show');
+          }
+          hasError = true;
+          return;
+        }
+      }
+
       if (field.pattern && typeof value === 'string') {
         const regex = new RegExp(field.pattern);
         if (!regex.test(value)) {
