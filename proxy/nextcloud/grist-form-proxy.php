@@ -14,11 +14,26 @@
  *   return [
  *       'GRIST_URL'       => 'https://grist.gristup.fr',
  *       'GRIST_API_KEY'   => 'votre-clé-api',
- *       'ALLOWED_ORIGINS' => '*.github.io,*.gristup.fr',
+ *       'ALLOWED_ORIGINS' => 'https://votre-site.fr,*.github.io',  // obligatoire
  *       'RATE_LIMIT_MAX'  => 30,
  *       'RATE_LIMIT_WINDOW' => 60,  // secondes
  *   ];
  */
+
+// ─── Politique d'origines commune aux six proxys ──────────────────────────
+// 1. ALLOWED_ORIGINS est obligatoire. Absente ou vide, le proxy refuse tout
+//    avec un 500 qui la nomme : aucun défaut implicite, ni « * » ni « rien ».
+//    Un défaut « * » ferait de ce proxy un relais ouvert vers votre document
+//    Grist avec votre clé API.
+// 2. « * » reste possible, mais doit être écrit explicitement.
+// 3. Le préflight OPTIONS répond toujours 204 avec les en-têtes CORS, même
+//    pour une origine refusée : il n'accorde rien, et c'est lui qui permet au
+//    navigateur de lire la vraie réponse au lieu d'une erreur réseau opaque.
+// 4. Toute réponse, refus compris, porte Access-Control-Allow-Origin et
+//    Vary: Origin. Un refus d'origine devient ainsi lisible et diagnosticable.
+// 5. Les messages d'erreur sont identiques mot pour mot dans les six proxys,
+//    pour que le bouton « Tester » du widget les classe de la même façon.
+// ──────────────────────────────────────────────────────────────────────────
 
 // Charger la config
 $configFile = __DIR__ . '/config.php';
@@ -32,7 +47,7 @@ $config = require $configFile;
 
 $gristUrl   = rtrim($config['GRIST_URL'] ?? '', '/');
 $apiKey     = $config['GRIST_API_KEY'] ?? '';
-$allowedRaw = $config['ALLOWED_ORIGINS'] ?? '*';
+$allowedRaw = $config['ALLOWED_ORIGINS'] ?? '';
 $rateMax    = (int)($config['RATE_LIMIT_MAX'] ?? 30);
 $rateWindow = (int)($config['RATE_LIMIT_WINDOW'] ?? 60);
 
@@ -49,24 +64,30 @@ function originAllowed(string $origin, array $patterns): bool {
     return false;
 }
 
-$allowed = originAllowed($origin, $patterns);
-
-if ($allowed && $origin) {
+// L'origine est renvoyée même sur un refus : le corps ne dit alors que
+// « origine refusée », ce qui ne divulgue rien et rend la panne lisible.
+if ($origin) {
     header("Access-Control-Allow-Origin: $origin");
 }
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+header('Vary: Origin');
 header('Content-Type: application/json');
 
-// Preflight
+// Préflight : toujours accepté, il n'accorde aucun accès par lui-même.
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    if (!$allowed) { http_response_code(403); exit; }
     header('Access-Control-Max-Age: 86400');
     http_response_code(204);
     exit;
 }
 
-if (!$allowed) {
+if (count($patterns) === 0) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Proxy non configuré (ALLOWED_ORIGINS manquant).']);
+    exit;
+}
+
+if (!originAllowed($origin, $patterns)) {
     http_response_code(403);
     echo json_encode(['error' => 'Origin non autorisée.']);
     exit;

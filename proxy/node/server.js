@@ -3,19 +3,35 @@
  * Reçoit les soumissions de formulaires publics et les écrit dans Grist via API REST.
  *
  * Usage:
- *   GRIST_URL=https://docs.getgrist.com GRIST_API_KEY=xxx node server.js
+ *   GRIST_URL=https://docs.getgrist.com GRIST_API_KEY=xxx \
+ *   ALLOWED_ORIGINS=https://mon-site.fr node server.js
  *   PORT=8080 node server.js
  *
  * Production:
  *   pm2 start server.js --name grist-form-proxy
  */
 
+// ─── Politique d'origines commune aux six proxys ──────────────────────────
+// 1. ALLOWED_ORIGINS est obligatoire. Absente ou vide, le proxy refuse tout
+//    avec un 500 qui la nomme : aucun défaut implicite, ni « * » ni « rien ».
+//    Un défaut « * » ferait de ce proxy un relais ouvert vers votre document
+//    Grist avec votre clé API.
+// 2. « * » reste possible, mais doit être écrit explicitement.
+// 3. Le préflight OPTIONS répond toujours 204 avec les en-têtes CORS, même
+//    pour une origine refusée : il n'accorde rien, et c'est lui qui permet au
+//    navigateur de lire la vraie réponse au lieu d'une erreur réseau opaque.
+// 4. Toute réponse, refus compris, porte Access-Control-Allow-Origin et
+//    Vary: Origin. Un refus d'origine devient ainsi lisible et diagnosticable.
+// 5. Les messages d'erreur sont identiques mot pour mot dans les six proxys,
+//    pour que le bouton « Tester » du widget les classe de la même façon.
+// ──────────────────────────────────────────────────────────────────────────
+
 const http = require('http');
 
 const PORT = parseInt(process.env.PORT || '8080');
 const GRIST_URL = (process.env.GRIST_URL || '').replace(/\/$/, '');
 const GRIST_API_KEY = process.env.GRIST_API_KEY || '';
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',').map(o => o.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || '30');
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000');
 
@@ -52,12 +68,14 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin || '';
-  const allowed = originAllowed(origin);
 
   const setCors = () => {
-    if (allowed && origin) res.setHeader('Access-Control-Allow-Origin', origin);
+    // L'origine est renvoyée même sur un refus : le corps ne dit alors que
+    // « origine refusée », ce qui ne divulgue rien et rend la panne lisible.
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Vary', 'Origin');
   };
 
   const json = (status, data) => {
@@ -68,14 +86,18 @@ const server = http.createServer(async (req, res) => {
 
   setCors();
 
+  // Préflight : toujours accepté, il n'accorde aucun accès par lui-même.
   if (req.method === 'OPTIONS') {
-    if (!allowed) return json(403, { error: 'Origin non autorisée.' });
     res.setHeader('Access-Control-Max-Age', '86400');
     res.writeHead(204);
     return res.end();
   }
 
-  if (!allowed) return json(403, { error: 'Origin non autorisée.' });
+  if (ALLOWED_ORIGINS.length === 0) {
+    return json(500, { error: 'Proxy non configuré (ALLOWED_ORIGINS manquant).' });
+  }
+
+  if (!originAllowed(origin)) return json(403, { error: 'Origin non autorisée.' });
 
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   if (!checkRateLimit(ip)) return json(429, { error: 'Trop de soumissions. Réessayez dans une minute.' });
@@ -123,4 +145,5 @@ server.listen(PORT, () => {
   console.log(`Grist Form Proxy démarré sur http://localhost:${PORT}`);
   if (!GRIST_URL) console.warn('⚠️  GRIST_URL non défini');
   if (!GRIST_API_KEY) console.warn('⚠️  GRIST_API_KEY non défini');
+  if (ALLOWED_ORIGINS.length === 0) console.warn('⚠️  ALLOWED_ORIGINS non défini — toutes les requêtes seront refusées');
 });

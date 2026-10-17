@@ -11,6 +11,21 @@
  *   ALLOWED_ORIGINS - Origins autorisées (séparées par virgule)
  */
 
+// ─── Politique d'origines commune aux six proxys ──────────────────────────
+// 1. ALLOWED_ORIGINS est obligatoire. Absente ou vide, le proxy refuse tout
+//    avec un 500 qui la nomme : aucun défaut implicite, ni « * » ni « rien ».
+//    Un défaut « * » ferait de ce proxy un relais ouvert vers votre document
+//    Grist avec votre clé API.
+// 2. « * » reste possible, mais doit être écrit explicitement.
+// 3. Le préflight OPTIONS répond toujours 204 avec les en-têtes CORS, même
+//    pour une origine refusée : il n'accorde rien, et c'est lui qui permet au
+//    navigateur de lire la vraie réponse au lieu d'une erreur réseau opaque.
+// 4. Toute réponse, refus compris, porte Access-Control-Allow-Origin et
+//    Vary: Origin. Un refus d'origine devient ainsi lisible et diagnosticable.
+// 5. Les messages d'erreur sont identiques mot pour mot dans les six proxys,
+//    pour que le bouton « Tester » du widget les classe de la même façon.
+// ──────────────────────────────────────────────────────────────────────────
+
 const rateLimitMap = new Map<string, { count: number; start: number }>();
 
 function checkRateLimit(ip: string, max: number, windowMs: number): boolean {
@@ -36,32 +51,39 @@ function originAllowed(origin: string, patterns: string[]): boolean {
 function json(data: unknown, status: number, origin: string) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
   };
+  // L'origine est renvoyée même sur un refus : le corps ne dit alors que
+  // « origine refusée », ce qui ne divulgue rien et rend la panne lisible.
+  if (origin) headers['Access-Control-Allow-Origin'] = origin;
   return new Response(JSON.stringify(data), { status, headers });
 }
 
 Deno.serve({ port: parseInt(Deno.env.get('PORT') || '8080') }, async (req: Request) => {
   const origin = req.headers.get('Origin') || '';
-  const patterns = (Deno.env.get('ALLOWED_ORIGINS') || '*').split(',').map(o => o.trim()).filter(Boolean);
-  const allowed = originAllowed(origin, patterns);
+  const patterns = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(o => o.trim()).filter(Boolean);
 
+  // Préflight : toujours accepté, il n'accorde aucun accès par lui-même.
   if (req.method === 'OPTIONS') {
-    if (!allowed) return new Response(null, { status: 403 });
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': origin,
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
+    const headers: Record<string, string> = {
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
+    };
+    if (origin) headers['Access-Control-Allow-Origin'] = origin;
+    return new Response(null, { status: 204, headers });
   }
 
-  if (!allowed) return json({ error: 'Origin non autorisée.' }, 403, '');
+  if (patterns.length === 0) {
+    return json({ error: 'Proxy non configuré (ALLOWED_ORIGINS manquant).' }, 500, origin);
+  }
+
+  if (!originAllowed(origin, patterns)) {
+    return json({ error: 'Origin non autorisée.' }, 403, origin);
+  }
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
   const maxReq = parseInt(Deno.env.get('RATE_LIMIT_MAX') || '30');

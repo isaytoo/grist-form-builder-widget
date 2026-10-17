@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.29';
+const WIDGET_VERSION = 'V.30';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -4503,6 +4503,11 @@ document.getElementById('btn-test-proxy')?.addEventListener('click', async () =>
   } else if (res.status === 429) {
     afficherResultatProxy('doute',
       '⚠️ Le proxy répond mais limite le débit (' + msg + '). Réessayez dans une minute.');
+  } else if (res.status === 500 && /ALLOWED_ORIGINS/i.test(msg)) {
+    afficherResultatProxy('erreur',
+      '❌ Le proxy est joignable mais ALLOWED_ORIGINS n\'est pas renseignée, ' +
+      'et sans elle il refuse toutes les soumissions.\n' +
+      'Mettez-y ' + window.location.origin + ', puis redéployez.');
   } else if (res.status === 500 && /non configur|GRIST_URL|GRIST_API_KEY/i.test(msg)) {
     afficherResultatProxy('erreur',
       '❌ Le proxy est joignable mais incomplet : ' + msg +

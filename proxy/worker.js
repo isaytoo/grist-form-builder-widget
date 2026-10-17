@@ -2,6 +2,21 @@
 // Reçoit les soumissions de formulaires publics et les écrit dans Grist via API REST.
 // Secrets : GRIST_API_KEY (clé API Grist avec accès d'écriture au document)
 
+// ─── Politique d'origines commune aux six proxys ──────────────────────────
+// 1. ALLOWED_ORIGINS est obligatoire. Absente ou vide, le proxy refuse tout
+//    avec un 500 qui la nomme : aucun défaut implicite, ni « * » ni « rien ».
+//    Un défaut « * » ferait de ce proxy un relais ouvert vers votre document
+//    Grist avec votre clé API.
+// 2. « * » reste possible, mais doit être écrit explicitement.
+// 3. Le préflight OPTIONS répond toujours 204 avec les en-têtes CORS, même
+//    pour une origine refusée : il n'accorde rien, et c'est lui qui permet au
+//    navigateur de lire la vraie réponse au lieu d'une erreur réseau opaque.
+// 4. Toute réponse, refus compris, porte Access-Control-Allow-Origin et
+//    Vary: Origin. Un refus d'origine devient ainsi lisible et diagnosticable.
+// 5. Les messages d'erreur sont identiques mot pour mot dans les six proxys,
+//    pour que le bouton « Tester » du widget les classe de la même façon.
+// ──────────────────────────────────────────────────────────────────────────
+
 const rateLimitMap = new Map();
 
 function checkRateLimit(ip, maxRequests, windowMs) {
@@ -34,7 +49,9 @@ function originAllowed(origin, patterns) {
 }
 
 function json(data, status, origin) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'Vary': 'Origin' };
+  // L'origine est renvoyée même sur un refus : le corps ne dit alors que
+  // « origine refusée », ce qui ne divulgue rien et rend la panne lisible.
   if (origin) headers['Access-Control-Allow-Origin'] = origin;
   return new Response(JSON.stringify(data), { status, headers });
 }
@@ -43,24 +60,25 @@ export default {
   async fetch(request, env) {
     const origin   = request.headers.get('Origin') || '';
     const patterns = (env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
-    const allowed  = originAllowed(origin, patterns);
 
-    // CORS preflight
+    // Préflight : toujours accepté, il n'accorde aucun accès par lui-même.
     if (request.method === 'OPTIONS') {
-      if (!allowed) return new Response(null, { status: 403 });
-      return new Response(null, {
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Max-Age': '86400',
-        },
-      });
+      const headers = {
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin',
+      };
+      if (origin) headers['Access-Control-Allow-Origin'] = origin;
+      return new Response(null, { status: 204, headers });
     }
 
-    if (!allowed) {
-      return json({ error: 'Origin non autorisée.' }, 403, '');
+    if (patterns.length === 0) {
+      return json({ error: 'Proxy non configuré (ALLOWED_ORIGINS manquant).' }, 500, origin);
+    }
+
+    if (!originAllowed(origin, patterns)) {
+      return json({ error: 'Origin non autorisée.' }, 403, origin);
     }
 
     // Rate limiting par IP

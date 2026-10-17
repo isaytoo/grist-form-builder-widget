@@ -11,6 +11,21 @@
  *   ALLOWED_ORIGINS - Origins autorisées (séparées par virgule)
  */
 
+// ─── Politique d'origines commune aux six proxys ──────────────────────────
+// 1. ALLOWED_ORIGINS est obligatoire. Absente ou vide, le proxy refuse tout
+//    avec un 500 qui la nomme : aucun défaut implicite, ni « * » ni « rien ».
+//    Un défaut « * » ferait de ce proxy un relais ouvert vers votre document
+//    Grist avec votre clé API.
+// 2. « * » reste possible, mais doit être écrit explicitement.
+// 3. Le préflight OPTIONS répond toujours 204 avec les en-têtes CORS, même
+//    pour une origine refusée : il n'accorde rien, et c'est lui qui permet au
+//    navigateur de lire la vraie réponse au lieu d'une erreur réseau opaque.
+// 4. Toute réponse, refus compris, porte Access-Control-Allow-Origin et
+//    Vary: Origin. Un refus d'origine devient ainsi lisible et diagnosticable.
+// 5. Les messages d'erreur sont identiques mot pour mot dans les six proxys,
+//    pour que le bouton « Tester » du widget les classe de la même façon.
+// ──────────────────────────────────────────────────────────────────────────
+
 const rateLimitMap = new Map();
 
 function checkRateLimit(ip, max, windowMs) {
@@ -35,20 +50,26 @@ function originAllowed(origin, patterns) {
 
 export default async function handler(req, res) {
   const origin = req.headers.origin || '';
-  const patterns = (process.env.ALLOWED_ORIGINS || '*').split(',').map(o => o.trim()).filter(Boolean);
-  const allowed = originAllowed(origin, patterns);
+  const patterns = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 
-  res.setHeader('Access-Control-Allow-Origin', allowed ? origin : '');
+  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
 
+  // Préflight : toujours accepté, il n'accorde aucun accès par lui-même.
   if (req.method === 'OPTIONS') {
-    if (!allowed) return res.status(403).end();
     res.setHeader('Access-Control-Max-Age', '86400');
     return res.status(204).end();
   }
 
-  if (!allowed) return res.status(403).json({ error: 'Origin non autorisée.' });
+  if (patterns.length === 0) {
+    return res.status(500).json({ error: 'Proxy non configuré (ALLOWED_ORIGINS manquant).' });
+  }
+
+  if (!originAllowed(origin, patterns)) {
+    return res.status(403).json({ error: 'Origin non autorisée.' });
+  }
 
   const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
   const maxReq = parseInt(process.env.RATE_LIMIT_MAX || '30');

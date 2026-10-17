@@ -54,7 +54,7 @@ wrangler deploy
 |----------|-------------|---------|
 | `GRIST_URL` | URL de l'instance Grist (sans `/` final) | `https://docs.getgrist.com` |
 | `GRIST_API_KEY` | Clé API Grist (secret) | `xxxxxxxxxxxxxxxx` |
-| `ALLOWED_ORIGINS` | Origins autorisées (virgule) | `*.github.io,*.getgrist.com` |
+| `ALLOWED_ORIGINS` | **Obligatoire.** Origines autorisées, séparées par des virgules | `https://mon-site.fr,*.github.io` |
 | `RATE_LIMIT_MAX` | Max soumissions par IP par fenêtre | `30` |
 | `RATE_LIMIT_WINDOW_MS` | Fenêtre de temps (ms) | `60000` |
 
@@ -78,11 +78,40 @@ fetch('https://grist-form-proxy.votre-compte.workers.dev', {
 });
 ```
 
+## Politique d'origines — commune aux six proxys
+
+Les six implémentations (Cloudflare, Vercel, Netlify, Node.js, Deno, PHP) se
+comportent à l'identique :
+
+1. **`ALLOWED_ORIGINS` est obligatoire.** Absente ou vide, le proxy refuse
+   toute requête avec un `500 Proxy non configuré (ALLOWED_ORIGINS manquant).`
+   Il n'existe aucun défaut implicite : un défaut `*` ferait de ce proxy un
+   relais ouvert vers votre document Grist, avec votre clé API.
+2. **`*` reste possible**, mais doit être écrit explicitement.
+3. **Le préflight `OPTIONS` répond toujours `204`** avec les en-têtes CORS,
+   même pour une origine refusée. Il n'accorde rien par lui-même, et c'est lui
+   qui permet au navigateur de lire la vraie réponse plutôt qu'une erreur
+   réseau opaque.
+4. **Toute réponse, refus compris, porte `Access-Control-Allow-Origin` et
+   `Vary: Origin`.** Un refus d'origine devient donc lisible : le corps ne dit
+   que « origine refusée », ce qui ne divulgue rien.
+5. **Les messages d'erreur sont identiques mot pour mot** dans les six, pour
+   que le bouton « Tester » du Form Builder les classe de la même façon.
+6. Motifs acceptés, même algorithme partout : origine exacte
+   (`https://mon-site.fr`), suffixe (`*.github.io`), ou `*`.
+
+| Situation | Code | Message |
+|---|---|---|
+| `ALLOWED_ORIGINS` vide | 500 | `Proxy non configuré (ALLOWED_ORIGINS manquant).` |
+| Origine hors liste | 403 | `Origin non autorisée.` |
+| `GRIST_URL`/`GRIST_API_KEY` absent | 500 | `Proxy non configuré (GRIST_URL ou GRIST_API_KEY manquant).` |
+| Débit dépassé | 429 | `Trop de soumissions. Réessayez dans une minute.` |
+
 ## Sécurité
 
 - **Rate limiting** par IP (configurable)
-- **Vérification d'origin** (CORS strict)
-- **Clé API jamais exposée** au client (stockée comme secret Cloudflare)
+- **Vérification d'origine**, fermée par défaut (voir ci-dessus)
+- **Clé API jamais exposée** au client (stockée comme secret de la plateforme)
 - Pas de lecture des données — écriture uniquement (`POST /records`)
 
 ## Intégration avec le Form Builder

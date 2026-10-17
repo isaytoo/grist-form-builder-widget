@@ -13,6 +13,21 @@
  *   RATE_LIMIT_WINDOW_MS - Fenêtre en ms (défaut: 60000)
  */
 
+// ─── Politique d'origines commune aux six proxys ──────────────────────────
+// 1. ALLOWED_ORIGINS est obligatoire. Absente ou vide, le proxy refuse tout
+//    avec un 500 qui la nomme : aucun défaut implicite, ni « * » ni « rien ».
+//    Un défaut « * » ferait de ce proxy un relais ouvert vers votre document
+//    Grist avec votre clé API.
+// 2. « * » reste possible, mais doit être écrit explicitement.
+// 3. Le préflight OPTIONS répond toujours 204 avec les en-têtes CORS, même
+//    pour une origine refusée : il n'accorde rien, et c'est lui qui permet au
+//    navigateur de lire la vraie réponse au lieu d'une erreur réseau opaque.
+// 4. Toute réponse, refus compris, porte Access-Control-Allow-Origin et
+//    Vary: Origin. Un refus d'origine devient ainsi lisible et diagnosticable.
+// 5. Les messages d'erreur sont identiques mot pour mot dans les six proxys,
+//    pour que le bouton « Tester » du widget les classe de la même façon.
+// ──────────────────────────────────────────────────────────────────────────
+
 const rateLimitMap = new Map();
 
 function checkRateLimit(ip, maxRequests, windowMs) {
@@ -43,22 +58,26 @@ function originAllowed(origin, patterns) {
 
 exports.handler = async (event) => {
   const origin = event.headers.origin || event.headers.Origin || '';
-  const patterns = (process.env.ALLOWED_ORIGINS || '*').split(',').map(o => o.trim()).filter(Boolean);
-  const allowed = originAllowed(origin, patterns);
+  const patterns = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 
   const corsHeaders = {
-    'Access-Control-Allow-Origin': allowed ? origin : '',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
+    'Vary': 'Origin',
   };
+  if (origin) corsHeaders['Access-Control-Allow-Origin'] = origin;
 
+  // Préflight : toujours accepté, il n'accorde aucun accès par lui-même.
   if (event.httpMethod === 'OPTIONS') {
-    if (!allowed) return { statusCode: 403, headers: corsHeaders, body: '' };
     return { statusCode: 204, headers: { ...corsHeaders, 'Access-Control-Max-Age': '86400' }, body: '' };
   }
 
-  if (!allowed) {
+  if (patterns.length === 0) {
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Proxy non configuré (ALLOWED_ORIGINS manquant).' }) };
+  }
+
+  if (!originAllowed(origin, patterns)) {
     return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ error: 'Origin non autorisée.' }) };
   }
 
