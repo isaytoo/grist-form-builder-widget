@@ -1069,7 +1069,9 @@ async function submitForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      // Une réponse non JSON (page d'erreur de l'hébergeur, 502…) faisait
+      // échouer res.json() et le répondant voyait l'erreur de parsing.
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erreur ' + res.status);
     } else {
       // Mode Grist : écrire directement via l'API interne
@@ -1084,7 +1086,12 @@ async function submitForm() {
     
   } catch (error) {
     console.error('Erreur soumission:', error);
-    showToast('Erreur lors de l\'envoi : ' + error.message, 'error');
+    // Un échec réseau sur l'appel du proxy est presque toujours une origine
+    // absente d'ALLOWED_ORIGINS : le navigateur bloque alors la réponse.
+    const reseau = error instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(error.message || '');
+    showToast(isPublicMode && reseau
+      ? 'Envoi impossible : le proxy n\'a pas répondu (vérifiez son URL et que ' + window.location.origin + ' figure dans ALLOWED_ORIGINS).'
+      : 'Erreur lors de l\'envoi : ' + error.message, 'error');
   }
 }
 

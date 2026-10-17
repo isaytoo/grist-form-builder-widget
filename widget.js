@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.28';
+const WIDGET_VERSION = 'V.29';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -491,6 +491,12 @@ function updateRecordModeIndicator() {
 }
 
 // Charger la liste des tables
+// Renseigner l'origine réelle dans le rappel du modal proxy
+(function afficherOrigine() {
+  const el = document.getElementById('proxy-origin-hint');
+  if (el) el.textContent = window.location.origin;
+})();
+
 // Afficher la référence de version dans l'en-tête
 (function afficherVersion() {
   const el = document.getElementById('app-version');
@@ -2688,7 +2694,7 @@ async function saveFormConfig() {
     proxyPlatform: currentProxyPlatform,
     proxyUrls: proxyUrls,
     proxyUrl: proxyUrls[currentProxyPlatform] || '',
-    docId: docIdInput ? docIdInput.value.trim() : '',
+    docId: docIdInput ? normaliserDocId(docIdInput.value) : '',
     fields: formFields,
     title: title,
     templates: templates,
@@ -4366,7 +4372,12 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
 ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
   document.getElementById('cfg-proxy-url-' + p)?.addEventListener('change', () => saveFormConfig());
 });
-document.getElementById('cfg-doc-id')?.addEventListener('change', () => saveFormConfig());
+document.getElementById('cfg-doc-id')?.addEventListener('change', (e) => {
+  // Normaliser avant d'enregistrer : un lien Grist collé tel quel donnait un
+  // docId invalide, et le formulaire public échouait sans explication.
+  e.target.value = normaliserDocId(e.target.value);
+  saveFormConfig();
+});
 
 // ─── Proxy modal ────────────────────────────────────────────────
 const modalProxy = document.getElementById('modal-proxy');
@@ -4383,6 +4394,10 @@ modalProxy?.addEventListener('click', (e) => {
 
 function switchProxyPlatform(platform) {
   currentProxyPlatform = platform;
+  // Le résultat portait sur la plateforme précédente : le laisser affiché
+  // laissait croire que la nouvelle venait d'être testée.
+  const res = document.getElementById('proxy-test-result');
+  if (res) { res.style.display = 'none'; res.textContent = ''; }
   document.querySelectorAll('#proxy-platform-tabs button').forEach(b => {
     b.className = b.dataset.platform === platform ? 'btn btn-primary' : 'btn btn-secondary';
   });
@@ -4402,52 +4417,116 @@ document.getElementById('proxy-platform-tabs')?.addEventListener('click', (e) =>
   switchProxyPlatform(btn.dataset.platform);
 });
 
-// Test proxy connection
+// Normalise un identifiant de document : accepte aussi une URL Grist collée
+// (https://docs.getgrist.com/<docId>/Mon-Doc) dont on extrait le docId.
+function normaliserDocId(v) {
+  const brut = (v || '').trim();
+  if (!brut) return '';
+  const m = brut.match(/^https?:\/\/[^/]+\/(?:o\/[^/]+\/)?(?:doc\/)?([A-Za-z0-9_-]{8,})/);
+  return m ? m[1] : brut;
+}
+
+// Affiche le résultat du test avec le code couleur correspondant
+function afficherResultatProxy(etat, texte) {
+  const el = document.getElementById('proxy-test-result');
+  if (!el) return;
+  const styles = {
+    ok:      ['#ecfdf5', '#065f46', '#10b981'],
+    doute:   ['#fffbeb', '#92400e', '#f59e0b'],
+    erreur:  ['#fef2f2', '#991b1b', '#ef4444'],
+    attente: ['#f0f9ff', '#1e40af', '#3b82f6'],
+  };
+  const [bg, fg, bord] = styles[etat] || styles.attente;
+  el.style.display = 'block';
+  el.style.background = bg;
+  el.style.color = fg;
+  el.style.borderLeft = '4px solid ' + bord;
+  el.style.whiteSpace = 'pre-line'; // les messages tiennent sur plusieurs lignes
+  el.style.lineHeight = '1.6';
+  el.textContent = texte;
+}
+
+// Test de la chaîne de publication.
+//
+// L'ancien test envoyait docId « _test » et affichait « ✅ Proxy accessible »
+// dès qu'une réponse HTTP arrivait, quel qu'en soit le code : une origine
+// refusée, une clé API invalide ou un proxy non configuré passaient pour un
+// succès, et le « document not found » affiché à côté du ✅ ne venait que du
+// faux docId envoyé par le test lui-même.
+//
+// On envoie maintenant le vrai docId et un nom de table impossible (préfixe
+// réservé par Grist) : rien ne peut être écrit, et un « table introuvable »
+// prouve que l'URL, l'origine, la clé API et l'accès au document sont bons.
 document.getElementById('btn-test-proxy')?.addEventListener('click', async () => {
-  const resultEl = document.getElementById('proxy-test-result');
   const proxyUrl = getActiveProxyUrl();
+  const docIdEl = document.getElementById('cfg-doc-id');
+  const docId = normaliserDocId(docIdEl ? docIdEl.value : '');
+  if (docIdEl && docId !== docIdEl.value.trim()) docIdEl.value = docId;
+
   if (!proxyUrl) {
-    if (resultEl) {
-      resultEl.style.display = 'block';
-      resultEl.style.background = '#fef2f2';
-      resultEl.style.color = '#991b1b';
-      resultEl.style.borderLeft = '4px solid #ef4444';
-      resultEl.textContent = '❌ Veuillez entrer une URL de proxy';
-    }
+    afficherResultatProxy('erreur', '❌ Renseignez d\'abord l\'URL du proxy.');
     return;
   }
-  if (resultEl) {
-    resultEl.style.display = 'block';
-    resultEl.style.background = '#f0f9ff';
-    resultEl.style.color = '#1e40af';
-    resultEl.style.borderLeft = '4px solid #3b82f6';
-    resultEl.textContent = '⏳ Test en cours...';
+  if (!docId) {
+    afficherResultatProxy('erreur', '❌ Renseignez l\'ID du document Grist : le test et le formulaire public en ont besoin.');
+    return;
   }
+
+  afficherResultatProxy('attente', '⏳ Test en cours…');
+
+  const TABLE_SONDE = '_FormBuilderSonde';
+  let res, data;
   try {
-    const res = await fetch(proxyUrl, {
+    res = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ docId: '_test', tableId: '_test', record: {} })
+      body: JSON.stringify({ docId: docId, tableId: TABLE_SONDE, record: { _sonde: 1 } })
     });
-    const data = await res.json().catch(() => ({}));
-    if (resultEl) {
-      // Toute réponse HTTP = proxy accessible (4xx = proxy rejette la requête test, normal)
-      resultEl.style.background = '#ecfdf5';
-      resultEl.style.color = '#065f46';
-      resultEl.style.borderLeft = '4px solid #10b981';
-      if (res.ok) {
-        resultEl.textContent = '✅ Proxy accessible et fonctionnel !';
-      } else {
-        resultEl.textContent = '✅ Proxy accessible ! (' + (data.error || 'HTTP ' + res.status) + ')';
-      }
-    }
+    data = await res.json().catch(() => ({}));
   } catch (err) {
-    if (resultEl) {
-      resultEl.style.background = '#fef2f2';
-      resultEl.style.color = '#991b1b';
-      resultEl.style.borderLeft = '4px solid #ef4444';
-      resultEl.textContent = '❌ Impossible de contacter le proxy : ' + err.message;
-    }
+    afficherResultatProxy('erreur',
+      '❌ Le proxy n\'a pas répondu. Deux causes possibles :\n' +
+      '• l\'URL est incorrecte ou le proxy n\'est pas déployé ;\n' +
+      '• l\'origine de ce widget n\'est pas autorisée par le proxy — ajoutez ' +
+      window.location.origin + ' à ALLOWED_ORIGINS, puis redéployez.\n' +
+      '(' + err.message + ')');
+    return;
+  }
+
+  const msg = String(data.error || '');
+  const bas = msg.toLowerCase();
+
+  if (res.status === 403 && /origin/i.test(msg)) {
+    afficherResultatProxy('erreur',
+      '❌ Origine refusée par le proxy. Ajoutez ' + window.location.origin +
+      ' à ALLOWED_ORIGINS, puis redéployez le proxy.');
+  } else if (res.status === 429) {
+    afficherResultatProxy('doute',
+      '⚠️ Le proxy répond mais limite le débit (' + msg + '). Réessayez dans une minute.');
+  } else if (res.status === 500 && /non configur|GRIST_URL|GRIST_API_KEY/i.test(msg)) {
+    afficherResultatProxy('erreur',
+      '❌ Le proxy est joignable mais incomplet : ' + msg +
+      '\nRenseignez GRIST_URL et GRIST_API_KEY côté serveur.');
+  } else if (res.status === 401 || (res.status === 403 && !/origin/i.test(msg))) {
+    afficherResultatProxy('erreur',
+      '❌ Grist refuse la clé API du proxy (' + (msg || 'HTTP ' + res.status) +
+      ').\nVérifiez GRIST_API_KEY et son droit d\'écriture sur le document.');
+  } else if (res.status === 404 && /table/.test(bas)) {
+    afficherResultatProxy('ok',
+      '✅ Chaîne complète validée : proxy joignable, origine autorisée, clé API acceptée ' +
+      'et document ' + docId + ' accessible en écriture.');
+  } else if (res.status === 404) {
+    afficherResultatProxy('erreur',
+      '❌ Document introuvable (' + (msg || 'HTTP 404') + ').\n' +
+      'Vérifiez l\'ID « ' + docId +' » et que la clé API du proxy y a accès.');
+  } else if (res.ok) {
+    afficherResultatProxy('doute',
+      '⚠️ Le proxy a accepté une écriture sur une table qui ne devrait pas exister. ' +
+      'Vérifiez qu\'aucune table « ' + TABLE_SONDE + ' » n\'a été créée dans le document.');
+  } else {
+    afficherResultatProxy('doute',
+      '⚠️ Le proxy répond mais la réponse n\'est pas concluante : ' +
+      (msg || 'HTTP ' + res.status) + '.');
   }
 });
 
