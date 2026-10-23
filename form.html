@@ -297,6 +297,11 @@ const urlParams = new URLSearchParams(window.location.search);
 const publicProxyUrl = urlParams.get('proxy');   // URL du Cloudflare Worker proxy
 const publicDocId    = urlParams.get('docId');    // ID du document Grist
 const publicConfig   = urlParams.get('config');   // Config encodée en base64
+// Lien interne « Partager » : ?mode=form&formId=<clé>. La configuration n'est PAS dans les
+// options de la vue mais dans la table BM_FormConfig, où l'éditeur l'écrit (ConfigKey /
+// ConfigData). C'est la seule source fiable : Grist efface les options d'une vue dès que
+// l'URL du widget change, et ce lien crée justement un widget neuf.
+const lienFormId     = urlParams.get('formId');
 const isPublicMode   = !!(publicProxyUrl && publicDocId && publicConfig);
 
 // Cache des tables pour sources dynamiques (initialisé ici pour mode public)
@@ -352,20 +357,69 @@ if (isPublicMode) {
     }
   }, 3000);
 
-  // Charger la configuration depuis Grist
-  grist.onOptions(async function(options) {
-    clearTimeout(gristTimeout);
-    formConfig = options || {};
-    
-    loading.style.display = 'none';
-    
-    if (!formConfig.fields || formConfig.fields.length === 0) {
-      noForm.style.display = 'block';
-      return;
+  /**
+    * Configuration rangée dans la table BM_FormConfig par l'éditeur.
+    * Même lecture que widget.js : on retrouve la ligne dont ConfigKey vaut le formId du lien.
+    */
+  async function configDepuisTable(formId) {
+    const tables = await grist.docApi.listTables();
+    if (!tables.includes('BM_FormConfig')) {
+      throw new Error("La table BM_FormConfig n'existe pas dans ce document. "
+        + "Ouvrez le widget Form Builder Pro et enregistrez le formulaire une fois.");
     }
-    
-    initFormDisplay();
-  });
+    const data = await grist.docApi.fetchTable('BM_FormConfig');
+    const i = (data.ConfigKey || []).findIndex(k => k === formId);
+    if (i < 0) {
+      const cles = (data.ConfigKey || []).filter(Boolean);
+      throw new Error(`Aucune configuration nommée « ${formId} » dans BM_FormConfig.`
+        + (cles.length ? ` Clés présentes : ${cles.join(', ')}.` : ' La table est vide.'));
+    }
+    return JSON.parse(data.ConfigData[i]);
+  }
+
+  function echecChargement(message) {
+    clearTimeout(gristTimeout);
+    loading.style.display = 'none';
+    noForm.innerHTML = '<div class="no-form-icon">⚠️</div>'
+      + '<p><strong>Formulaire introuvable</strong></p>'
+      + `<p style="margin-top:10px;font-size:.9em;max-width:460px;margin-left:auto;margin-right:auto;">${escHtml(message)}</p>`;
+    noForm.style.display = 'block';
+  }
+
+  if (lienFormId) {
+    // Le lien désigne une configuration précise : on la lit dans la table, sans attendre
+    // onOptions, qui n'a rien à dire sur un widget fraîchement ajouté.
+    grist.onOptions(function () {});
+    (async function () {
+      try {
+        formConfig = await configDepuisTable(lienFormId);
+        clearTimeout(gristTimeout);
+        loading.style.display = 'none';
+        if (!formConfig.fields || formConfig.fields.length === 0) {
+          echecChargement(`La configuration « ${lienFormId} » ne contient aucun champ.`);
+          return;
+        }
+        initFormDisplay();
+      } catch (err) {
+        echecChargement(err && err.message ? err.message : String(err));
+      }
+    })();
+  } else {
+    // Sans formId : ancien comportement, la configuration vient des options de la vue.
+    grist.onOptions(async function(options) {
+      clearTimeout(gristTimeout);
+      formConfig = options || {};
+
+      loading.style.display = 'none';
+
+      if (!formConfig.fields || formConfig.fields.length === 0) {
+        noForm.style.display = 'block';
+        return;
+      }
+
+      initFormDisplay();
+    });
+  }
 }
 
 function initFormDisplay() {
