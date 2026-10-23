@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.46';
+const WIDGET_VERSION = 'V.47';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -5107,6 +5107,40 @@ function basePubliqueValide(raw) {
   return u.origin + chemin;
 }
 
+/**
+ * Colonnes d'une table réellement utilisées par le formulaire public.
+ *
+ * Trois usages seulement : le libellé affiché, la valeur enregistrée, et les colonnes citées
+ * par les filtres en cascade — côté table source (`sourceColumn`, `sourceColumnMax`) comme côté
+ * table du parent (`parentColumn`). `id` est toujours emporté : l'opérateur « fait partie de »
+ * compare des identifiants de ligne.
+ *
+ * Tout le reste — manualSort, gristHelper_Display, colonnes métier non affichées — ne sert à
+ * rien dans le formulaire public et ne fait que gonfler l'adresse.
+ */
+function colonnesUtiles(tableId, champs) {
+  const set = new Set();
+  (champs || []).forEach(f => {
+    const ds = f.dataSource;
+    if (!ds || ds.mode !== 'grist') return;
+    if (ds.tableId === tableId) {
+      if (ds.labelColumn) set.add(ds.labelColumn);
+      if (ds.valueColumn) set.add(ds.valueColumn);
+      (ds.filters || []).forEach(x => {
+        if (x.sourceColumn) set.add(x.sourceColumn);
+        if (x.sourceColumnMax) set.add(x.sourceColumnMax);
+      });
+    }
+    // Cette table est-elle celle d'un parent cité par un filtre « fait partie de » ?
+    (ds.filters || []).forEach(x => {
+      if (!x.parentColumn) return;
+      const pf = (champs || []).find(y => y.id === x.parentFieldId);
+      if (pf && pf.dataSource && pf.dataSource.tableId === tableId) set.add(x.parentColumn);
+    });
+  });
+  return Array.from(set);
+}
+
 // Partager le formulaire
 document.getElementById('btn-share-form')?.addEventListener('click', async () => {
   if (formFields.length === 0) {
@@ -5169,10 +5203,14 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
         try {
           const data = await grist.docApi.fetchTable(tId);
           if (data && data.id) {
-            // Convertir en array d'objets (format compact)
-            const rows = data.id.map((id, i) => {
-              const r = { id };
-              Object.keys(data).forEach(k => { if (k !== 'id') r[k] = data[k][i]; });
+            // On n'emporte QUE les colonnes dont le formulaire public se sert. Emporter
+            // toute la table gonflait l'adresse de 79 % — mesuré sur un cas réel : 23 960
+            // octets au lieu de 5 256, pour une limite serveur à ~8 192. Le lien partait
+            // alors en 414 (URI Too Long) sans que rien ne le signale.
+            const utiles = colonnesUtiles(tId, formConfig.fields);
+            const rows = data.id.map((i, k) => {
+              const r = { id: i };
+              utiles.forEach(c => { if (data[c] !== undefined) r[c] = data[c][k]; });
               return r;
             });
             dsTablesData[tId] = rows;
@@ -5239,8 +5277,22 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     // Un repli silencieux sur l'hébergeur courant donnerait un lien qui s'ouvre chez
     // l'auteur et nulle part ailleurs : on dit d'où part ce lien, et on signale une
     // adresse refusée au lieu de l'ignorer.
+    // Au-delà de cette taille, les serveurs répondent 414 (URI Too Long). GitHub Pages et la
+    // plupart des hébergeurs coupent vers 8 Ko. Mieux vaut le dire que livrer un lien mort.
+    const LIMITE_URL = 7800;
     const note = document.getElementById('share-public-host');
-    if (note && !publicUrl) {
+    if (note && publicUrl && publicUrl.length > LIMITE_URL) {
+      const lignes = Object.values(dsTablesData).reduce((n, r) => n + r.length, 0);
+      note.textContent = `Lien public trop long : ${publicUrl.length} caractères pour une limite d\u2019environ ${LIMITE_URL}. `
+        + `Il embarque les ${lignes} ligne(s) des tables sources, nécessaires aux listes déroulantes. `
+        + `Réduisez le nombre d\u2019options (filtrez la table source dans Grist), ou utilisez le lien interne, qui lit les données en direct et n\u2019a pas cette limite.`;
+      note.style.color = '#b45309';
+      note.style.display = '';
+      if (sharePublicInput) {
+        sharePublicInput.parentElement.style.display = 'none';
+        sharePublicInput.value = '';
+      }
+    } else if (note && !publicUrl) {
       // Le bloc vert promettait « accessible par n'importe qui » en n'affichant aucun lien et
       // sans dire pourquoi. On énonce ce qui manque, et laquelle des deux voies ouvrir.
       const manque = [];
