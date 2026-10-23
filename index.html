@@ -153,6 +153,20 @@
     .form-field-view { position: absolute; background: white; padding: 8px; box-sizing: border-box; }
     .form-field-view .form-label { margin-bottom: 4px; }
     .form-field-view .form-input, .form-field-view .form-select, .form-field-view .form-textarea-input { padding: 8px 10px; font-size: 0.9em; }
+    /* Liste déroulante cherchable : le <select> est masqué, ce bloc le remplace à l'écran. */
+    .fb-rech { position: relative; }
+    .fb-rech-input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 0.9em;
+      border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: inherit;
+      font-family: inherit; }
+    .fb-rech-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.18); }
+    .fb-rech-panel { position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 2px);
+      max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1;
+      border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); }
+    .fb-rech-item { padding: 7px 10px; font-size: 0.9em; cursor: pointer; line-height: 1.3; }
+    .fb-rech-item:hover { background: #eff6ff; }
+    .fb-rech-item.sel { background: #dbeafe; font-weight: 600; }
+    .fb-rech-vide { padding: 7px 10px; font-size: 0.85em; color: #64748b; font-style: italic; }
+
     .form-image { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; overflow: visible; cursor: move; }
     .form-image img { width: 100%; height: 100%; object-fit: contain; }
     .form-image-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f8fafc; color: #94a3b8; font-size: 2em; }
@@ -789,7 +803,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=35"></script>
+<script src="widget.js?v=36"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>

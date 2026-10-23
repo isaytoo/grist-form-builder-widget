@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.35';
+const WIDGET_VERSION = 'V.36';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -3185,6 +3185,7 @@ function renderFormView() {
 
   // Initialiser les sources d'options dynamiques (cascade)
   initFillModeDynamicSources();
+  activerRecherche();
 }
 
 // =============================================================================
@@ -3456,6 +3457,9 @@ async function reloadFillDynamicField(field) {
     sel.title = hint || '';
     sel.style.borderColor = hint ? '#f59e0b' : '';
     sel.value = stillValid ? (Array.isArray(currentValue) ? currentValue[0] : currentValue) : '';
+    // Une liste alimentée par cascade n'a ses options qu'ici : c'est le moment de décider
+    // si elle mérite une recherche.
+    rendreCherchable(sel);
     sel.dispatchEvent(new Event('change'));
   } else if (field.fieldType === 'radio') {
     const c = document.getElementById(`input-${field.id}`);
@@ -3479,6 +3483,104 @@ async function reloadFillDynamicField(field) {
       </label>
     `).join('');
   }
+}
+
+// Au-delà de ce nombre d'options, une liste déroulante devient cherchable.
+var RECHERCHE_SEUIL = 8;
+// Au-delà, on tronque l'affichage : un panneau de mille lignes ne sert personne, et la
+// recherche est justement là pour affiner.
+var RECHERCHE_MAX = 200;
+
+/**
+ * Transforme une liste déroulante longue en liste cherchable.
+ *
+ * Le <select> natif RESTE le porteur de la valeur : tout le reste du code lit et écrit
+ * `document.getElementById('input-<id>').value`, les cascades réécrivent ses <option>, et le
+ * chargement d'un enregistrement y repose aussi. On ne le remplace donc pas — on le masque et
+ * on pose par-dessus un champ de recherche et un panneau de résultats qui pilotent sa valeur.
+ * Aucune autre fonction n'a eu à changer.
+ *
+ * Le panneau se lit directement dans `sel.options` à chaque ouverture : rien n'est mis en
+ * cache, donc une cascade qui réécrit les options est prise en compte sans rien resynchroniser.
+ * Les libellés passent par textContent, jamais par innerHTML.
+ */
+function rendreCherchable(sel) {
+  // parentNode peut manquer si la liste n'est pas (encore) attachée au document : sans cette
+  // garde, insertBefore lèverait et ferait échouer tout le rechargement du champ.
+  if (!sel || !sel.parentNode || !sel.dataset || sel.dataset.cherchable === '1') return;
+  if (sel.options.length - 1 < RECHERCHE_SEUIL) return;
+  sel.dataset.cherchable = '1';
+
+  var box = document.createElement('div');
+  box.className = 'fb-rech';
+  sel.parentNode.insertBefore(box, sel);
+  box.appendChild(sel);
+  sel.style.display = 'none';
+
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'fb-rech-input';
+  inp.autocomplete = 'off';
+  var pan = document.createElement('div');
+  pan.className = 'fb-rech-panel';
+  pan.hidden = true;
+  box.appendChild(inp);
+  box.appendChild(pan);
+
+  // Le placeholder et l'infobulle du <select> portent les diagnostics (liste vide, colonne
+  // de références…) : on les recopie pour ne pas les perdre en le masquant.
+  function sync() {
+    var o = sel.selectedOptions[0];
+    inp.value = (o && o.value) ? o.text : '';
+    inp.placeholder = sel.options[0] ? sel.options[0].text : 'Rechercher...';
+    inp.title = sel.title || '';
+    inp.style.borderColor = sel.style.borderColor || '';
+  }
+
+  function ligne(texte, cls, onPick) {
+    var d = document.createElement('div');
+    d.className = cls;
+    d.textContent = texte;
+    if (onPick) d.addEventListener('mousedown', function (e) { e.preventDefault(); onPick(); });
+    pan.appendChild(d);
+  }
+
+  function ouvrir(q) {
+    var t = String(q || '').trim().toLowerCase();
+    var tous = Array.prototype.slice.call(sel.options, 1);
+    var trouves = t ? tous.filter(function (o) { return o.text.toLowerCase().indexOf(t) !== -1; }) : tous;
+    pan.innerHTML = '';
+    if (!trouves.length) {
+      ligne(tous.length ? 'Aucun résultat' : 'Aucune option', 'fb-rech-vide');
+    }
+    trouves.slice(0, RECHERCHE_MAX).forEach(function (o) {
+      ligne(o.text, 'fb-rech-item' + (o.value === sel.value ? ' sel' : ''), function () {
+        sel.value = o.value;
+        sync();
+        pan.hidden = true;
+        sel.dispatchEvent(new Event('change'));
+      });
+    });
+    if (trouves.length > RECHERCHE_MAX) {
+      ligne('… et ' + (trouves.length - RECHERCHE_MAX) + ' autre(s) — affinez la recherche', 'fb-rech-vide');
+    }
+    pan.hidden = false;
+  }
+
+  inp.addEventListener('focus', function () { ouvrir(''); });
+  inp.addEventListener('input', function () { ouvrir(inp.value); });
+  // Le clic sur une ligne passe par mousedown : au moment du blur, la valeur est déjà posée.
+  inp.addEventListener('blur', function () { setTimeout(function () { pan.hidden = true; sync(); }, 120); });
+  inp.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { pan.hidden = true; inp.blur(); }
+  });
+  sel.addEventListener('change', sync);
+  sync();
+}
+
+/** Applique la recherche à toutes les listes du formulaire rendu. */
+function activerRecherche() {
+  Array.prototype.forEach.call(document.querySelectorAll('select.form-select'), rendreCherchable);
 }
 
 function initFillModeDynamicSources() {
