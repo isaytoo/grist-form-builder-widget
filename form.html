@@ -583,18 +583,40 @@ function renderSection(field) {
 
 function renderTitle(field) {
   const title = document.createElement('div');
-  title.style.cssText = `font-size: ${field.fontSize || 1.2}em; font-weight: 600; color: ${field.textColor || '#1e293b'}; margin-bottom: 15px;`;
+  // Mêmes règles que l'éditeur, à la ligne près : fontSize est exprimé en POINTS, comme
+  // l'annonce le panneau « Taille (pt) ». Il était ici interprété en `em`, avec un défaut de
+  // 1,2 — un titre réglé à 14 s'affichait donc en 14 em, soit une dizaine de centimètres.
+  title.style.fontSize = (field.fontSize || 14) + 'pt';
+  title.style.fontWeight = field.fontWeight || '600';
+  title.style.color = field.textColor || '#1e293b';
+  if (field.fontFamily) title.style.fontFamily = field.fontFamily;
+  if (field.fontStyle) title.style.fontStyle = field.fontStyle;
+  if (field.textDecoration) title.style.textDecoration = field.textDecoration;
+  if (field.textAlign) title.style.textAlign = field.textAlign;
+  if (field.lineHeight) title.style.lineHeight = field.lineHeight;
+  if (field.transparent) title.style.backgroundColor = 'transparent';
+  else if (field.bgColor) {
+    title.style.backgroundColor = field.bgColor;
+    title.style.padding = '8px 12px';
+    title.style.borderRadius = '6px';
+  }
+  title.style.marginBottom = '12px';
   title.textContent = field.label;
   formFields.appendChild(title);
 }
 
 function renderImage(field) {
+  // Un cadre est posé même sans image : il porte les dimensions voulues, et le canevas reste
+  // fidèle. Sans lui, l'emplacement disparaissait et ce qui suivait remontait d'autant.
+  const cadre = document.createElement('div');
+  cadre.style.marginBottom = '12px';
   if (field.imageData) {
     const img = document.createElement('img');
     img.src = field.imageData;
-    img.style.cssText = 'max-width: 100%; height: auto; margin-bottom: 20px; border-radius: 8px;';
-    formFields.appendChild(img);
+    img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; border-radius: 8px; display: block;';
+    cadre.appendChild(img);
   }
+  formFields.appendChild(cadre);
 }
 
 function renderField(field) {
