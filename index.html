@@ -693,15 +693,50 @@
           <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">🔒 Qui voit quoi</h3>
             <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
-              Le widget distingue les <strong>propriétaires</strong> du document des autres. Pour le vérifier, utilise « Voir en tant que » dans Grist.
+              Le widget lit le rôle de chacun dans le document. Pour vérifier ce que voit un collègue, utilise <strong>« Voir en tant que »</strong> dans Grist : c'est le seul test fiable.
             </p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.88em;">
-              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
-                <strong style="color:#047857;">Propriétaire</strong><br>tout : Édition, Templates, Nouveau, Sauvegarder, Vider, Partager, Proxy
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; font-size: 0.88em;">
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #a7f3d0; color: #475569; line-height: 1.7;">
+                <strong style="color:#047857;">Propriétaire</strong><br>Tout : Édition, Templates, Nouveau, Sauvegarder, Vider, Partager, Proxy.
               </div>
               <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
-                <strong style="color:#b45309;">Éditeur ou lecteur</strong><br>Saisie, Guide, PDF — il remplit le formulaire, il ne le construit pas
+                <strong style="color:#b45309;">Éditeur</strong><br>Saisie, Guide, PDF. Il remplit, il ne construit pas — <em>sauf si le propriétaire l'y autorise</em>.
               </div>
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
+                <strong style="color:#b45309;">Lecteur</strong><br>Saisie, Guide, PDF. Jamais la construction, quel que soit le réglage.
+              </div>
+            </div>
+
+            <div style="margin-top: 14px; background: #eef2ff; border-radius: 8px; padding: 14px; border-left: 4px solid #6366f1;">
+              <div style="font-weight: 700; color: #3730a3; margin-bottom: 6px; font-size: 0.95em;">🔑 Ouvrir la construction aux éditeurs</div>
+              <p style="color: #4338ca; line-height: 1.6; font-size: 0.88em; margin-bottom: 8px;">
+                Un propriétaire peut confier la construction de formulaires à tous les éditeurs du document. L'interrupteur est en haut du modal <strong>Proxy</strong> :
+              </p>
+              <div style="background: white; border-radius: 6px; padding: 10px 14px; font-size: 0.88em; color: #475569; line-height: 1.6; margin-bottom: 8px;">
+                ☐ Autoriser les <strong>éditeurs</strong> du document à construire des formulaires
+              </div>
+              <p style="color: #4338ca; line-height: 1.6; font-size: 0.88em;">
+                Coché, tout éditeur retrouve Édition, Templates, Nouveau et Sauvegarder. Décoché, seuls les propriétaires construisent. <strong>Les lecteurs n'y accèdent jamais</strong>, dans les deux cas — ils ne peuvent de toute façon pas enregistrer.
+              </p>
+              <div style="margin-top: 10px; padding: 9px 13px; background: #ecfdf5; border-left: 3px solid #10b981; border-radius: 4px; font-size: 0.85em; color: #065f46; line-height: 1.6;">
+                <strong>Ce réglage n'est pas contournable.</strong> Il est rangé dans une table <code>BM_FormPerms</code> protégée par une règle d'accès Grist réservant l'écriture aux propriétaires. Un éditeur ne peut donc ni s'autoriser lui-même, ni autoriser quelqu'un d'autre. La règle apparaît dans <em>Permissions avancées</em>, avec le mémo « Form Builder Pro ».
+              </div>
+              <div style="margin-top: 8px; padding: 9px 13px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.85em; color: #92400e; line-height: 1.6;">
+                <strong>À savoir :</strong> le changement prend effet au <strong>prochain chargement</strong> du widget. Après avoir coché ou décoché, demande à la personne de recharger sa page.
+              </div>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">📏 Limite du lien public</h3>
+            <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
+              Le lien public emporte les données des tables sources dans son adresse, pour que les listes déroulantes fonctionnent hors de Grist. Les serveurs refusent les adresses au-delà d'environ <strong>8 000 caractères</strong> — au-delà, le lien s'ouvre sur une erreur <code>414</code>.
+            </p>
+            <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
+              Le widget n'emporte que les colonnes dont le formulaire se sert, ce qui suffit dans la plupart des cas. S'il dépasse quand même, <strong>il refuse d'afficher le lien</strong> et te dit sa taille et le nombre de lignes embarquées, plutôt que de te livrer une adresse morte.
+            </p>
+            <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; font-size: 0.88em; line-height: 1.7;">
+              <strong>Que faire alors :</strong> réduire le nombre d'options (filtrer la table source dans Grist), ou passer par le <strong>lien interne</strong>, qui lit les données en direct et n'a aucune limite de taille.
             </div>
           </div>
 
@@ -972,7 +1007,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=47"></script>
+<script src="widget.js?v=48"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>
