@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.45';
+const WIDGET_VERSION = 'V.46';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -172,6 +172,106 @@ async function sondeProprietaire() {
   } catch (e) {
     return false;
   }
+}
+
+// ─── Droit de construire accordé aux éditeurs ────────────────────────────────────────────
+//
+// Par défaut, seul un propriétaire construit des formulaires. Un propriétaire peut ouvrir ce
+// droit à tous les éditeurs du document par un interrupteur.
+//
+// Le réglage vit dans SA PROPRE table, pas dans BM_FormConfig : celle-ci doit rester
+// accessible en écriture aux éditeurs — sans quoi ils ne pourraient pas enregistrer les
+// formulaires qu'on vient de les autoriser à construire.
+//
+// Une règle d'accès réserve l'écriture de cette table aux propriétaires. Sans elle, le
+// réglage ne serait qu'un confort : un éditeur s'autoriserait lui-même en modifiant la table
+// dans Grist. Recette identique au widget Accueil — ressource et règle dans un SEUL
+// applyUserActions, la règle désignant la ressource par un identifiant temporaire négatif que
+// Grist résout à l'intérieur de l'appel.
+const TABLE_PERMS = 'BM_FormPerms';
+const CLE_PERMS = 'editeursPeuventConstruire';
+const MEMO_PERMS = 'Form Builder Pro';
+
+let editeursAutorises = false;
+
+async function lireDroitConstruire() {
+  try {
+    const tables = await grist.docApi.listTables();
+    if (!tables.includes(TABLE_PERMS)) return false;
+    const d = await grist.docApi.fetchTable(TABLE_PERMS);
+    const i = (d.Cle || []).indexOf(CLE_PERMS);
+    return i >= 0 && String(d.Valeur[i] === undefined ? '' : d.Valeur[i]).trim() === 'oui';
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Puis-je écrire les données du document ? Distingue un éditeur d'un lecteur.
+ *
+ * Mise à jour d'une ligne existante de BM_FormConfig avec la valeur qu'elle porte déjà :
+ * aucun changement, mais Grist applique la règle d'écriture. Un lecteur se voit refuser.
+ */
+async function sondeEditeur() {
+  try {
+    const d = await grist.docApi.fetchTable('BM_FormConfig');
+    if (!d || !d.id || !d.id.length) return false;
+    await grist.docApi.applyUserActions([
+      ['UpdateRecord', 'BM_FormConfig', d.id[0], { ConfigKey: d.ConfigKey[0] }]
+    ]);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Pose la règle réservant l'écriture de BM_FormPerms aux propriétaires. */
+async function poserReglePerms() {
+  const lire = async (t) => {
+    const d = await grist.docApi.fetchTable(t);
+    return (d.id || []).map((id, i) => {
+      const o = { id };
+      Object.keys(d).forEach(k => { if (k !== 'id') o[k] = d[k][i]; });
+      return o;
+    });
+  };
+  const [ressources, regles] = await Promise.all([
+    lire('_grist_ACLResources'), lire('_grist_ACLRules')
+  ]);
+  const deja = regles.some(r => String(r.memo || '').includes(MEMO_PERMS)
+    && ressources.some(res => res.id === r.resource && res.tableId === TABLE_PERMS));
+  if (deja) return true;
+  const idTemporaire = -1000;
+  await grist.docApi.applyUserActions([
+    ['AddRecord', '_grist_ACLResources', idTemporaire, { tableId: TABLE_PERMS, colIds: '*' }],
+    ['AddRecord', '_grist_ACLRules', null, {
+      resource: idTemporaire,
+      aclFormula: 'user.Access != "owners"',
+      permissionsText: '-CUD',
+      memo: MEMO_PERMS + " : droit de construire, écriture réservée aux propriétaires",
+    }],
+  ]);
+  return true;
+}
+
+/** Enregistre l'interrupteur. Réservé aux propriétaires : la règle d'accès le garantit. */
+async function ecrireDroitConstruire(ouvert) {
+  const tables = await grist.docApi.listTables();
+  if (!tables.includes(TABLE_PERMS)) {
+    await grist.docApi.applyUserActions([
+      ['AddTable', TABLE_PERMS, [{ id: 'Cle', type: 'Text' }, { id: 'Valeur', type: 'Text' }]]
+    ]);
+  }
+  const d = await grist.docApi.fetchTable(TABLE_PERMS);
+  const i = (d.Cle || []).indexOf(CLE_PERMS);
+  const valeur = ouvert ? 'oui' : 'non';
+  await grist.docApi.applyUserActions([
+    i >= 0
+      ? ['UpdateRecord', TABLE_PERMS, d.id[i], { Valeur: valeur }]
+      : ['AddRecord', TABLE_PERMS, null, { Cle: CLE_PERMS, Valeur: valeur }]
+  ]);
+  // Posée après la première écriture : une règle posée avant bloquerait sa propre écriture.
+  await poserReglePerms();
 }
 
 // Appliquer les restrictions selon le rôle
@@ -348,7 +448,13 @@ grist.onOptions(async function(options) {
     // formulaire public, et en usage normal tout le monde voyait l'édition, le partage et la
     // configuration du proxy. On interroge désormais le document.
     isOwner = await sondeProprietaire();
-    if (!isOwner) applyRoleRestrictions();
+    if (!isOwner) {
+      // Le propriétaire a peut-être ouvert la construction aux éditeurs. On vérifie aussi
+      // que la personne EST éditrice : un lecteur verrait sinon une interface d'édition dont
+      // chaque enregistrement échouerait.
+      editeursAutorises = await lireDroitConstruire() && await sondeEditeur();
+      if (!editeursAutorises) applyRoleRestrictions();
+    }
   }
 });
 
@@ -4715,6 +4821,34 @@ async function creerPageReception() {
   }
 }
 document.getElementById('btn-creer-reception')?.addEventListener('click', creerPageReception);
+
+/** Interrupteur « les éditeurs peuvent construire ». Visible du seul propriétaire. */
+async function initDroitConstruire() {
+  const bloc = document.getElementById('cfg-editeurs-construisent');
+  const etat = document.getElementById('cfg-editeurs-state');
+  if (!bloc) return;
+  const dire = (t, c) => { if (etat) { etat.textContent = t; etat.style.color = c; } };
+  bloc.checked = await lireDroitConstruire();
+  dire(bloc.checked
+    ? 'Les éditeurs voient l\u2019interface de construction.'
+    : 'Seuls les propriétaires construisent.', '#4338ca');
+  bloc.addEventListener('change', async () => {
+    const voulu = bloc.checked;
+    dire('Enregistrement…', '#64748b');
+    try {
+      await ecrireDroitConstruire(voulu);
+      dire(voulu
+        ? 'Autorisé. Le réglage est protégé par une règle d\u2019accès : un éditeur ne peut pas le modifier.'
+        : 'Retiré. Les éditeurs ne verront plus l\u2019interface de construction au prochain chargement.', '#047857');
+    } catch (err) {
+      bloc.checked = !voulu;
+      dire('Échec : ' + ((err && err.message) || String(err))
+        + ' — ce réglage est réservé aux propriétaires.', '#b45309');
+    }
+  });
+}
+document.getElementById('btn-proxy-config')?.addEventListener('click', initDroitConstruire);
+
 
 document.getElementById('cfg-share-link')?.addEventListener('input', etatLienPartage);
 document.getElementById('cfg-share-link')?.addEventListener('change', () => { etatLienPartage(); saveFormConfig(); });

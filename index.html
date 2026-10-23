@@ -794,6 +794,16 @@
   
   <div class="modal-overlay hidden" id="modal-proxy">
     <div class="modal" style="max-width: 560px;">
+      <div style="background: #eef2ff; border-radius: 8px; padding: 15px; margin-bottom: 18px; border-left: 4px solid #6366f1;">
+        <div style="font-weight: 600; color: #3730a3; margin-bottom: 8px; font-size: 0.9em;">🔑 Qui peut construire des formulaires</div>
+        <label style="display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font-size: 0.85em; color: #4338ca; line-height: 1.5;">
+          <input type="checkbox" id="cfg-editeurs-construisent" style="margin-top: 2px; flex: none;">
+          <span>Autoriser les <strong>éditeurs</strong> du document à construire des formulaires.<br>
+          <span style="font-size: 0.92em; color: #6366f1;">Décoché, seuls les propriétaires y accèdent. Les lecteurs n'y accèdent jamais.</span></span>
+        </label>
+        <div id="cfg-editeurs-state" style="font-size: 0.78em; margin-top: 8px; line-height: 1.5;"></div>
+      </div>
+
       <div class="modal-title">🌐 Soumission du formulaire public</div>
       <p style="font-size: 0.85em; color: #64748b; margin-bottom: 15px;">Comment les réponses d'un répondant <b>sans compte Grist</b> arrivent dans le document. Deux voies possibles — la première est préférable quand elle est disponible.</p>
 
@@ -962,7 +972,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=45"></script>
+<script src="widget.js?v=46"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>
