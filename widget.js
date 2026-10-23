@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.34';
+const WIDGET_VERSION = 'V.35';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -1995,7 +1995,7 @@ function renderPropertiesPanel() {
             ` : `
               <div class="property-label" style="margin-top:6px;">${op === 'between' ? 'Colonne minimum (source)' : `Colonne source (dans ${escHtml(ds.tableId || 'la table source')})`}</div>
               <select class="property-select ds-filter-srccol" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumn)}</select>
-              ${pTableId ? `<div class="property-hint">La colonne cherchée est dans <b>${escHtml(pTableId)}</b> et non ici ? Si elle est de type « Référence multiple », choisissez l'opérateur <b>∈ fait partie de</b> : ce sélecteur basculera alors sur les colonnes de ${escHtml(pTableId)}.</div>` : ''}
+              ${pTableId ? `<div class="property-hint">La colonne cherchée est dans <b>${escHtml(pTableId)}</b> et non ici ? Si elle est de type « Référence multiple », choisissez l'opérateur <b>∈ fait partie de</b> : ce sélecteur basculera alors sur les colonnes de la table ${escHtml(pTableId)}.</div>` : ''}
               ${op === 'between' ? `
                 <div class="property-label" style="margin-top:6px;">Colonne maximum (source)</div>
                 <select class="property-select ds-filter-srccolmax" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumnMax)}</select>
