@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.31';
+const WIDGET_VERSION = 'V.32';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -3370,6 +3370,42 @@ async function fillFilterDsRows(rows, dataSource) {
   return filtered;
 }
 
+// Encadré jaune affiché à la place des cases à cocher ou des boutons radio quand il n'y a
+// rien à proposer : eux n'ont pas de placeholder où loger l'explication.
+function emptyHintHtml(hint) {
+  return `<div style="border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:6px;`
+    + `padding:7px 9px;font-size:12px;line-height:1.4;">${escHtml(hint)}</div>`;
+}
+
+/**
+ * Pourquoi un champ dynamique n'a aucune option.
+ *
+ * Une liste vide ressemble exactement à une liste filtrée à zéro : dans les deux cas on ne
+ * voit que « Sélectionner… », sans aucun moyen de savoir si la table est vide, si le filtre
+ * est trop restrictif, ou si la colonne choisie n'est pas la bonne. Ce silence a déjà coûté
+ * plusieurs allers-retours. On dit donc ce qui s'est passé, à la place du placeholder.
+ */
+async function fillEmptyHint(field, ds, rows, filtered) {
+  if (!rows.length) return `Aucune ligne dans la table ${ds.tableId}`;
+  if (filtered.length) return `Colonne ${ds.valueColumn || ds.labelColumn} vide sur les ${filtered.length} ligne(s) retenue(s)`;
+  const causes = [];
+  for (const f of (ds.filters || [])) {
+    if (!f.parentFieldId) continue;
+    const pf = formFields.find(x => x.id === f.parentFieldId);
+    if (!pf) continue;
+    const v = await fillReadFieldValue(pf);
+    if (v === null || v === '' || (Array.isArray(v) && !v.length)) continue;
+    const txt = Array.isArray(v) ? v.join(', ') : String(v);
+    const pTable = (pf.dataSource && pf.dataSource.tableId) || '?';
+    causes.push(f.operator === 'in-list'
+      ? `${pf.label} « ${txt} » → ${pTable}.${f.parentColumn || '?'}`
+      : `${pf.label} « ${txt} » ${f.operator || '='} ${ds.tableId}.${f.sourceColumn || '?'}`);
+  }
+  return causes.length
+    ? `Aucun résultat : ${causes.join(' et ')} — ${rows.length} ligne(s) écartée(s)`
+    : `Aucune option exploitable dans ${ds.tableId} (${rows.length} ligne(s))`;
+}
+
 async function reloadFillDynamicField(field) {
   const ds = field.dataSource;
   if (!ds || ds.mode !== 'grist' || !ds.tableId || !ds.labelColumn) return;
@@ -3397,16 +3433,22 @@ async function reloadFillDynamicField(field) {
     ? currentValue.every(v => opts.some(o => o.value === v))
     : opts.some(o => o.value === currentValue);
 
+  const hint = opts.length ? '' : await fillEmptyHint(field, ds, rows, filtered);
+
   if (field.fieldType === 'select') {
     const sel = document.getElementById(`input-${field.id}`);
     if (!sel) return;
-    sel.innerHTML = `<option value="">${escHtml(field.placeholder || 'Sélectionner...')}</option>` +
+    sel.innerHTML = `<option value="">${escHtml(hint || field.placeholder || 'Sélectionner...')}</option>` +
       opts.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join('');
+    // Un <select> tronque son texte : l'infobulle porte la phrase entière.
+    sel.title = hint || '';
+    sel.style.borderColor = hint ? '#f59e0b' : '';
     sel.value = stillValid ? (Array.isArray(currentValue) ? currentValue[0] : currentValue) : '';
     sel.dispatchEvent(new Event('change'));
   } else if (field.fieldType === 'radio') {
     const c = document.getElementById(`input-${field.id}`);
     if (!c) return;
+    if (hint) { c.innerHTML = emptyHintHtml(hint); return; }
     c.innerHTML = opts.map(o => `
       <label class="form-radio-item">
         <input type="radio" name="radio-${field.id}" value="${escHtml(o.value)}" ${stillValid && currentValue === o.value ? 'checked' : ''}>
@@ -3417,6 +3459,7 @@ async function reloadFillDynamicField(field) {
     const c = document.getElementById(`input-${field.id}`);
     if (!c) return;
     const sel = Array.isArray(currentValue) ? currentValue : [];
+    if (hint) { c.innerHTML = emptyHintHtml(hint); return; }
     c.innerHTML = opts.map(o => `
       <label class="form-checkbox-item">
         <input type="checkbox" value="${escHtml(o.value)}" ${sel.includes(o.value) ? 'checked' : ''}>
