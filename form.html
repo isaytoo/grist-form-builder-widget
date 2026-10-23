@@ -286,6 +286,66 @@ let totalPages = 1;
 
 // Éléments DOM
 const loading = document.getElementById('loading');
+// ─── Mise en page : reproduire le canevas de l'éditeur ───────────────────────────────────
+//
+// L'éditeur est un outil de mise en page : chaque élément porte des coordonnées x/y et une
+// largeur, sur une page A4. Le formulaire publié, lui, se contentait d'empiler les éléments
+// dans leur ordre de création — deux champs côte à côte se retrouvaient l'un sous l'autre, et
+// un titre placé en haut atterrissait en bas.
+//
+// On pose donc une couche de positionnement PAR-DESSUS le rendu existant, plutôt que de
+// réécrire un second moteur de rendu qui finirait par diverger du premier.
+//
+// Sous la largeur d'une page A4, on retombe sur l'empilement : une page positionnée au pixel
+// près est illisible sur téléphone. L'ordre suivi est alors celui de la LECTURE — de haut en
+// bas, puis de gauche à droite — et non l'ordre de création.
+const PAGE_LARGEUR = 794;   // 210 mm à 3,78 px/mm, comme l'éditeur
+const PAGE_HAUTEUR = 1123;  // 297 mm
+
+/** Ordre de lecture : par ligne, puis de gauche à droite. Deux éléments sont sur la même
+ *  ligne si leurs sommets sont à moins de 24 px — l'alignement à la main n'est jamais exact. */
+function ordreLecture(a, b) {
+  const ay = typeof a.y === 'number' ? a.y : 0, by = typeof b.y === 'number' ? b.y : 0;
+  if (Math.abs(ay - by) > 24) return ay - by;
+  return (typeof a.x === 'number' ? a.x : 0) - (typeof b.x === 'number' ? b.x : 0);
+}
+
+function peutPositionner(champs) {
+  if (!champs.some(f => typeof f.x === 'number' && typeof f.y === 'number')) return false;
+  // On se fie à la largeur de la FENÊTRE : le conteneur est élargi juste après, on ne peut
+  // donc pas décider à partir de sa largeur courante — elle vaut encore celle de l'empilement.
+  // 60 px de marge pour les rembourrages de la carte et du corps de page.
+  return window.innerWidth >= PAGE_LARGEUR + 60;
+}
+
+function hauteurCanevas(champs) {
+  let bas = PAGE_HAUTEUR;
+  champs.forEach(f => {
+    const h = (typeof f.y === 'number' ? f.y : 0) + (f.height || 90);
+    if (h > bas) bas = h;
+  });
+  return bas + 60;
+}
+
+/** Les sections sont des cadres posés DERRIÈRE les champs qu'elles regroupent. */
+function positionner(noeud, field) {
+  if (!noeud || typeof field.x !== 'number' || typeof field.y !== 'number') return;
+  noeud.style.position = 'absolute';
+  noeud.style.left = field.x + 'px';
+  noeud.style.top = field.y + 'px';
+  noeud.style.margin = '0';
+  noeud.style.boxSizing = 'border-box';
+  if (field.width) noeud.style.width = field.width + 'px';
+  if (field.height && ['section', 'image', 'divider'].includes(field.fieldType)) {
+    noeud.style.height = field.height + 'px';
+  }
+  noeud.style.zIndex = field.fieldType === 'section' ? '0' : '1';
+  if (field.fieldType === 'section') {
+    if (field.transparent) noeud.style.background = 'transparent';
+    else if (field.bgColor) noeud.style.background = field.bgColor;
+  }
+}
+
 const noForm = document.getElementById('no-form');
 const formContent = document.getElementById('form-content');
 const formFields = document.getElementById('form-fields');
@@ -332,8 +392,16 @@ if (isPublicMode) {
     loading.style.display = 'none';
     initFormDisplay();
   } catch (e) {
+    // Ce bloc englobe le décodage du lien ET le premier rendu. Annoncer « lien invalide »
+    // masquait donc les erreurs de rendu : une faute de code passait pour un lien corrompu.
+    // On distingue les deux, et on montre la cause.
+    console.error('[form] échec du mode public :', e);
+    const decodage = !formConfig || !formConfig.fields;
     loading.style.display = 'none';
-    noForm.innerHTML = '<div class="no-form-icon">⚠️</div><p><strong>Lien de formulaire invalide</strong></p>';
+    noForm.innerHTML = '<div class="no-form-icon">⚠️</div><p><strong>'
+      + (decodage ? 'Lien de formulaire invalide' : 'Affichage du formulaire impossible')
+      + '</strong></p><p style="margin-top:10px;font-size:0.9em;max-width:460px;margin-left:auto;margin-right:auto;">'
+      + escHtml((e && e.message) || String(e)) + '</p>';
     noForm.style.display = 'block';
   }
 } else {
@@ -444,66 +512,6 @@ function initFormDisplay() {
   renderForm();
 }
 
-
-// ─── Mise en page : reproduire le canevas de l'éditeur ───────────────────────────────────
-//
-// L'éditeur est un outil de mise en page : chaque élément porte des coordonnées x/y et une
-// largeur, sur une page A4. Le formulaire publié, lui, se contentait d'empiler les éléments
-// dans leur ordre de création — deux champs côte à côte se retrouvaient l'un sous l'autre, et
-// un titre placé en haut atterrissait en bas.
-//
-// On pose donc une couche de positionnement PAR-DESSUS le rendu existant, plutôt que de
-// réécrire un second moteur de rendu qui finirait par diverger du premier.
-//
-// Sous la largeur d'une page A4, on retombe sur l'empilement : une page positionnée au pixel
-// près est illisible sur téléphone. L'ordre suivi est alors celui de la LECTURE — de haut en
-// bas, puis de gauche à droite — et non l'ordre de création.
-const PAGE_LARGEUR = 794;   // 210 mm à 3,78 px/mm, comme l'éditeur
-const PAGE_HAUTEUR = 1123;  // 297 mm
-
-/** Ordre de lecture : par ligne, puis de gauche à droite. Deux éléments sont sur la même
- *  ligne si leurs sommets sont à moins de 24 px — l'alignement à la main n'est jamais exact. */
-function ordreLecture(a, b) {
-  const ay = typeof a.y === 'number' ? a.y : 0, by = typeof b.y === 'number' ? b.y : 0;
-  if (Math.abs(ay - by) > 24) return ay - by;
-  return (typeof a.x === 'number' ? a.x : 0) - (typeof b.x === 'number' ? b.x : 0);
-}
-
-function peutPositionner(champs) {
-  if (!champs.some(f => typeof f.x === 'number' && typeof f.y === 'number')) return false;
-  // On se fie à la largeur de la FENÊTRE : le conteneur est élargi juste après, on ne peut
-  // donc pas décider à partir de sa largeur courante — elle vaut encore celle de l'empilement.
-  // 60 px de marge pour les rembourrages de la carte et du corps de page.
-  return window.innerWidth >= PAGE_LARGEUR + 60;
-}
-
-function hauteurCanevas(champs) {
-  let bas = PAGE_HAUTEUR;
-  champs.forEach(f => {
-    const h = (typeof f.y === 'number' ? f.y : 0) + (f.height || 90);
-    if (h > bas) bas = h;
-  });
-  return bas + 60;
-}
-
-/** Les sections sont des cadres posés DERRIÈRE les champs qu'elles regroupent. */
-function positionner(noeud, field) {
-  if (!noeud || typeof field.x !== 'number' || typeof field.y !== 'number') return;
-  noeud.style.position = 'absolute';
-  noeud.style.left = field.x + 'px';
-  noeud.style.top = field.y + 'px';
-  noeud.style.margin = '0';
-  noeud.style.boxSizing = 'border-box';
-  if (field.width) noeud.style.width = field.width + 'px';
-  if (field.height && ['section', 'image', 'divider'].includes(field.fieldType)) {
-    noeud.style.height = field.height + 'px';
-  }
-  noeud.style.zIndex = field.fieldType === 'section' ? '0' : '1';
-  if (field.fieldType === 'section') {
-    if (field.transparent) noeud.style.background = 'transparent';
-    else if (field.bgColor) noeud.style.background = field.bgColor;
-  }
-}
 
 function renderForm() {
   formFields.innerHTML = '';
