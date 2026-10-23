@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.37';
+const WIDGET_VERSION = 'V.38';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -256,6 +256,10 @@ grist.onOptions(async function(options) {
     // Backward compat : ancienne config avec un seul champ URL
     const el = document.getElementById('cfg-proxy-url-' + currentProxyPlatform);
     if (el) el.value = formConfig.proxyUrl;
+  }
+  if (formConfig.publicBaseUrl) {
+    const el = document.getElementById('cfg-public-base');
+    if (el) el.value = formConfig.publicBaseUrl;
   }
   if (formConfig.docId) {
     const el = document.getElementById('cfg-doc-id');
@@ -495,6 +499,8 @@ function updateRecordModeIndicator() {
 (function afficherOrigine() {
   const el = document.getElementById('proxy-origin-hint');
   if (el) el.textContent = window.location.origin;
+  const base = document.getElementById('public-base-hint');
+  if (base) base.textContent = window.location.origin;
 })();
 
 // Afficher la référence de version dans l'en-tête
@@ -2730,6 +2736,9 @@ async function saveFormConfig() {
     proxyUrls: proxyUrls,
     proxyUrl: proxyUrls[currentProxyPlatform] || '',
     docId: docIdInput ? normaliserDocId(docIdInput.value) : '',
+    // Hébergeur du formulaire public, quand il doit différer de celui qui sert ce widget
+    // (widget sur un intranet, formulaire destiné à l'extérieur, ou l'inverse).
+    publicBaseUrl: (document.getElementById('cfg-public-base')?.value || '').trim(),
     fields: formFields,
     title: title,
     templates: templates,
@@ -4604,6 +4613,7 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
 ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
   document.getElementById('cfg-proxy-url-' + p)?.addEventListener('change', () => saveFormConfig());
 });
+document.getElementById('cfg-public-base')?.addEventListener('change', () => saveFormConfig());
 document.getElementById('cfg-doc-id')?.addEventListener('change', (e) => {
   // Normaliser avant d'enregistrer : un lien Grist collé tel quel donnait un
   // docId invalide, et le formulaire public échouait sans explication.
@@ -4777,6 +4787,28 @@ btnSubmit.addEventListener('click', submitForm);
 btnResetForm.addEventListener('click', resetFormInputs);
 btnExportPdf.addEventListener('click', exportPdf);
 
+/**
+ * Valide l'URL de base saisie pour le formulaire public.
+ *
+ * Elle part dans un lien distribué à des tiers : on ne recopie donc pas ce qui a été tapé.
+ * Seuls http(s) sont acceptés, sans identifiant intégré (`https://user:pass@…` placerait un
+ * secret dans un lien public), et le chemin doit désigner form.html — c'est la seule page qui
+ * sait afficher un formulaire. Requête et fragment sont écartés : le lien ajoute les siens.
+ *
+ * Une saisie invalide ne bloque pas le partage : on retombe sur l'hébergeur courant, et
+ * l'interface le signale.
+ */
+function basePubliqueValide(raw) {
+  const brut = String(raw || '').trim();
+  if (!brut) return '';
+  let u;
+  try { u = new URL(brut); } catch (e) { return ''; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password) return '';
+  const chemin = u.pathname.replace(/\/+$/, '');
+  if (!/\/form\.html$/.test(chemin)) return '';
+  return u.origin + chemin;
+}
+
 // Partager le formulaire
 document.getElementById('btn-share-form')?.addEventListener('click', async () => {
   if (formFields.length === 0) {
@@ -4796,9 +4828,15 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   const formId = generateFormId(title);
   const cacheBuster = Date.now();
   const baseUrl = window.location.href.split('?')[0].replace(/index\.html$/, '') + 'form.html';
-  
-  // Lien interne (depuis Grist)
+
+  // Le lien INTERNE reste toujours sur cette page : il est ouvert depuis Grist, donc par
+  // quelqu'un qui atteint déjà cet hébergeur.
   const internalUrl = `${baseUrl}?_cb=${cacheBuster}&mode=form&formId=${encodeURIComponent(formId)}`;
+
+  // Le lien PUBLIC peut devoir partir ailleurs : le widget est parfois servi depuis un
+  // intranet alors que le formulaire vise l'extérieur, ou l'inverse. `publicBaseUrl`, réglé
+  // dans le modal Proxy, désigne alors l'hébergeur qui sert le même form.html.
+  const publicBase = basePubliqueValide(formConfig.publicBaseUrl) || baseUrl;
   
   // Lien public (via proxy) — nécessite proxyUrl et docId configurés
   const proxyUrl = formConfig.proxyUrl || '';
@@ -4873,7 +4911,7 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   
   let publicUrl = '';
   if (proxyUrl && docId) {
-    publicUrl = `${baseUrl}?_cb=${cacheBuster}&proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
+    publicUrl = `${publicBase}?_cb=${cacheBuster}&proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
   }
   
   // Afficher la modale de partage
@@ -4891,6 +4929,30 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
         sharePublicInput.parentElement.style.display = 'none';
         sharePublicInput.value = '';
       }
+    }
+    // Un repli silencieux sur l'hébergeur courant donnerait un lien qui s'ouvre chez
+    // l'auteur et nulle part ailleurs : on dit d'où part ce lien, et on signale une
+    // adresse refusée au lieu de l'ignorer.
+    const note = document.getElementById('share-public-host');
+    if (note) {
+      const saisi = (formConfig.publicBaseUrl || '').trim();
+      const retenu = basePubliqueValide(saisi);
+      if (saisi && !retenu) {
+        note.textContent = 'Adresse d\u2019h\u00e9bergement refus\u00e9e (' + saisi
+          + ') : elle doit \u00eatre en http(s), sans identifiant, et se terminer par /form.html. '
+          + 'Le lien part donc de ' + new URL(publicBase).origin + '.';
+        note.style.color = '#b45309';
+      } else if (retenu) {
+        note.textContent = 'Ce lien pointe vers ' + new URL(retenu).origin
+          + ', r\u00e9gl\u00e9 dans le modal Proxy. V\u00e9rifiez que vos destinataires l\u2019atteignent.';
+        note.style.color = '#4338ca';
+      } else {
+        note.textContent = 'Ce lien pointe vers ' + window.location.origin
+          + ', l\u2019h\u00e9bergeur de cette page. Si vos destinataires ne l\u2019atteignent pas, '
+          + 'indiquez une autre adresse dans le modal Proxy.';
+        note.style.color = '#64748b';
+      }
+      note.style.display = publicUrl ? '' : 'none';
     }
     shareModal.classList.remove('hidden');
   }
