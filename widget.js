@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.41';
+const WIDGET_VERSION = 'V.42';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -183,15 +183,22 @@ function applyRoleRestrictions() {
     btnClear.style.display = 'none';
     btnTemplates.style.display = 'none';
     
-    // Masquer aussi Partager, Guide et PDF en mode formulaire
+    // « Nouveau » vide le formulaire — champs, titre, table. C'est une action d'édition, la
+    // seule qui restait ouverte alors que tout le reste est fermé. Sauvegarder étant masqué,
+    // un éditeur ne pouvait pas persister la perte, mais il blanchissait son écran sans
+    // comprendre pourquoi.
+    const btnNouveau = document.getElementById('btn-new-form');
+    if (btnNouveau) btnNouveau.style.display = 'none';
+
     document.getElementById('btn-share-form').style.display = 'none';
     // Le modal Proxy porte l'adresse du relais, l'identifiant du document et la clé de
     // partage : autant d'éléments d'une chaîne d'écriture publique. Seul un propriétaire
     // a à les voir ou à les changer.
     const btnProxy = document.getElementById('btn-proxy-config');
     if (btnProxy) btnProxy.style.display = 'none';
-    document.getElementById('btn-mode-guide').style.display = 'none';
-    document.getElementById('btn-export-pdf').style.display = 'none';
+    // Guide et PDF restent accessibles : l'un est de la documentation, l'autre exporte un
+    // formulaire que l'éditeur a le droit de remplir. Les masquer ne protégeait rien et
+    // privait d'outils utiles — c'était du code jamais exécuté jusqu'à V.41.
     
     // Forcer le mode Saisie
     switchMode('fill');
