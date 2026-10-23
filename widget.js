@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.30';
+const WIDGET_VERSION = 'V.31';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -1959,6 +1959,14 @@ function renderPropertiesPanel() {
           `<option value="${escHtml(of.id)}" ${filter.parentFieldId === of.id ? 'selected' : ''}>${escHtml(of.label)}</option>`
         ).join('');
         const op = filter.operator || '=';
+        // Le filtre « fait partie de » puise sa colonne dans la table qui alimente le champ
+        // PARENT, pas dans la table source : c'est elle qui porte la relation.
+        const pField = formFields.find(of => of.id === filter.parentFieldId);
+        const pTableId = (pField && pField.dataSource && pField.dataSource.mode === 'grist')
+          ? (pField.dataSource.tableId || '') : '';
+        const pCols = (window.dsColumnsCache || {})[pTableId] || [];
+        const parentColOptions = (selected) => `<option value="">-- Choisir --</option>` +
+          pCols.map(c => `<option value="${escHtml(c)}" ${selected === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
         html += `
           <div class="ds-filter-card" data-filter-idx="${idx}">
             <div class="ds-filter-header">
@@ -1976,13 +1984,22 @@ function renderPropertiesPanel() {
               <option value=">=" ${op === '>=' ? 'selected' : ''}>≥ (sup. ou égal)</option>
               <option value="<=" ${op === '<=' ? 'selected' : ''}>≤ (inf. ou égal)</option>
               <option value="between" ${op === 'between' ? 'selected' : ''}>entre deux colonnes</option>
+              <option value="in-list" ${op === 'in-list' ? 'selected' : ''}>∈ fait partie de (liste du parent)</option>
             </select>
-            <div class="property-label" style="margin-top:6px;">${op === 'between' ? 'Colonne minimum (source)' : 'Colonne source'}</div>
-            <select class="property-select ds-filter-srccol" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumn)}</select>
-            ${op === 'between' ? `
-              <div class="property-label" style="margin-top:6px;">Colonne maximum (source)</div>
-              <select class="property-select ds-filter-srccolmax" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumnMax)}</select>
-            ` : ''}
+            ${op === 'in-list' ? `
+              <div class="property-label" style="margin-top:6px;">Colonne liste (table du parent)</div>
+              <select class="property-select ds-filter-parentcol" data-filter-idx="${idx}" ${!pTableId ? 'disabled' : ''}>${parentColOptions(filter.parentColumn)}</select>
+              <div class="property-hint">${pTableId
+                ? `Colonne de <b>${escHtml(pTableId)}</b> qui référence <b>${escHtml(ds.tableId || 'la table source')}</b> (type Référence ou Liste de références).`
+                : 'Choisissez un champ parent alimenté par une table Grist.'}</div>
+            ` : `
+              <div class="property-label" style="margin-top:6px;">${op === 'between' ? 'Colonne minimum (source)' : 'Colonne source'}</div>
+              <select class="property-select ds-filter-srccol" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumn)}</select>
+              ${op === 'between' ? `
+                <div class="property-label" style="margin-top:6px;">Colonne maximum (source)</div>
+                <select class="property-select ds-filter-srccolmax" data-filter-idx="${idx}" ${!ds.tableId ? 'disabled' : ''}>${colOptions(filter.sourceColumnMax)}</select>
+              ` : ''}
+            `}
           </div>
         `;
       });
@@ -2580,7 +2597,7 @@ function renderPropertiesPanel() {
 
     // Ajouter un filtre
     document.getElementById('ds-add-filter')?.addEventListener('click', () => {
-      selectedField.dataSource.filters.push({ parentFieldId: '', operator: '=', sourceColumn: '', sourceColumnMax: '' });
+      selectedField.dataSource.filters.push({ parentFieldId: '', operator: '=', sourceColumn: '', sourceColumnMax: '', parentColumn: '' });
       renderPropertiesPanel();
     });
 
@@ -2598,6 +2615,9 @@ function renderPropertiesPanel() {
       sel.addEventListener('change', (e) => {
         const idx = parseInt(e.target.dataset.filterIdx);
         selectedField.dataSource.filters[idx].parentFieldId = e.target.value;
+        // La colonne liste appartient à la table du parent : changer de parent la périme.
+        selectedField.dataSource.filters[idx].parentColumn = '';
+        renderPropertiesPanel();
       });
     });
     document.querySelectorAll('.ds-filter-operator').forEach(sel => {
@@ -2606,6 +2626,7 @@ function renderPropertiesPanel() {
         selectedField.dataSource.filters[idx].operator = e.target.value;
         // Si on quitte 'between', oublier la colonne max
         if (e.target.value !== 'between') selectedField.dataSource.filters[idx].sourceColumnMax = '';
+        if (e.target.value !== 'in-list') selectedField.dataSource.filters[idx].parentColumn = '';
         renderPropertiesPanel();
       });
     });
@@ -2621,11 +2642,24 @@ function renderPropertiesPanel() {
         selectedField.dataSource.filters[idx].sourceColumnMax = e.target.value;
       });
     });
+    document.querySelectorAll('.ds-filter-parentcol').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.filterIdx);
+        selectedField.dataSource.filters[idx].parentColumn = e.target.value;
+      });
+    });
 
     // Pré-charge les colonnes au render si la table est déjà sélectionnée
     if (selectedField.dataSource?.mode === 'grist' && selectedField.dataSource.tableId && !window.dsColumnsCache[selectedField.dataSource.tableId]) {
       loadDsColumns(selectedField.dataSource.tableId);
     }
+    // Idem pour les tables qui alimentent les champs parents : le filtre « fait partie de »
+    // y choisit sa colonne de références, et sans ce pré-chargement la liste resterait vide.
+    (selectedField.dataSource?.filters || []).forEach(f => {
+      const pf = formFields.find(of => of.id === f.parentFieldId);
+      const pt = (pf && pf.dataSource && pf.dataSource.mode === 'grist') ? pf.dataSource.tableId : '';
+      if (pt && !window.dsColumnsCache[pt]) loadDsColumns(pt);
+    });
   }
 
 }
@@ -3226,13 +3260,31 @@ function fillCompareValues(a, op, b) {
   }
 }
 
+/**
+ * Identifiants portés par une colonne Référence ou Liste de références.
+ *
+ * `fetchTable` encode une liste de références en `['L', 3, 7, 12]` et une référence simple
+ * en nombre. Une cellule vide vaut 0 ou null : ni l'un ni l'autre ne désigne une ligne.
+ */
+function refIdsOf(value) {
+  if (Array.isArray(value)) {
+    const items = value[0] === 'L' ? value.slice(1) : value;
+    return items.map(Number).filter(n => Number.isFinite(n) && n > 0);
+  }
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? [n] : [];
+}
+
 async function fillFilterDsRows(rows, dataSource) {
   if (!dataSource.filters || dataSource.filters.length === 0) return rows;
   const filtered = [];
   for (const row of rows) {
     let keep = true;
     for (const filter of dataSource.filters) {
-      if (!filter.parentFieldId || !filter.sourceColumn) continue;
+      if (!filter.parentFieldId) continue;
+      // « fait partie de » se règle sur une colonne de la table PARENTE, les autres
+      // opérateurs sur une colonne de la table source.
+      if (filter.operator === 'in-list' ? !filter.parentColumn : !filter.sourceColumn) continue;
       const parentField = formFields.find(f => f.id === filter.parentFieldId);
       if (!parentField) continue;
       // Read raw value from parent field (no resolution)
@@ -3241,6 +3293,29 @@ async function fillFilterDsRows(rows, dataSource) {
         // Parent pas encore renseigné : on ignore ce filtre, comme l'annonce
         // l'aide du panneau et comme le fait déjà le formulaire public.
         // L'ancien « keep = false » vidait toute la liste.
+        continue;
+      }
+
+      // « fait partie de » : la relation n'est pas dans la table source mais dans celle du
+      // parent, sous forme de Référence ou de Liste de références. On retrouve la ligne du
+      // parent, on lit cette colonne, et on ne garde l'enfant que si son id y figure.
+      //
+      // C'est le seul filtre qui marche quand la table source ne porte AUCUNE colonne vers le
+      // parent — le cas d'un AGENTS.Affectation -> COLLEGES, où COLLEGES ignore tout des agents.
+      if (filter.operator === 'in-list') {
+        const pDs = parentField.dataSource;
+        if (!pDs || pDs.mode !== 'grist' || !pDs.tableId) { keep = false; break; }
+        let ids = [];
+        try {
+          const pRows = await fillFetchDsTable(pDs.tableId);
+          const vCol = pDs.valueColumn || pDs.labelColumn;
+          const match = pRows.find(r => String(r[vCol]) === String(rawParentValue));
+          ids = refIdsOf(match ? match[filter.parentColumn] : null);
+        } catch (err) {
+          console.warn('[cascade] Lecture de la liste du parent impossible :', err);
+          keep = false; break;
+        }
+        if (!ids.includes(Number(row.id))) { keep = false; break; }
         continue;
       }
 

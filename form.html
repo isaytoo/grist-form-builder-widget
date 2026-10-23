@@ -706,16 +706,45 @@ function compareValues(a, op, b) {
   }
 }
 
+/**
+ * Identifiants portés par une colonne Référence ou Liste de références.
+ *
+ * `fetchTable` encode une liste de références en `['L', 3, 7, 12]` et une référence simple
+ * en nombre. Une cellule vide vaut 0 ou null : ni l'un ni l'autre ne désigne une ligne.
+ */
+function refIdsOf(value) {
+  if (Array.isArray(value)) {
+    const items = value[0] === 'L' ? value.slice(1) : value;
+    return items.map(Number).filter(n => Number.isFinite(n) && n > 0);
+  }
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? [n] : [];
+}
+
 // Filtre les lignes d'une table source selon les filtres définis sur le champ
 function filterDsRows(rows, dataSource) {
   if (!dataSource.filters || dataSource.filters.length === 0) return rows;
   return rows.filter(row => {
     for (const filter of dataSource.filters) {
-      if (!filter.parentFieldId || !filter.sourceColumn) continue;
+      if (!filter.parentFieldId) continue;
+      if (filter.operator === 'in-list' ? !filter.parentColumn : !filter.sourceColumn) continue;
       const parentField = formConfig.fields.find(f => f.id === filter.parentFieldId);
       if (!parentField) continue;
       const parentValue = readFieldValue(parentField);
       if (parentValue === null || parentValue === '' || (Array.isArray(parentValue) && parentValue.length === 0)) continue;
+
+      // « fait partie de » : voir le commentaire détaillé dans widget.js. Les lignes de la
+      // table parente sont dans le cache — reloadDynamicField les y met avant de filtrer.
+      if (filter.operator === 'in-list') {
+        const pDs = parentField.dataSource;
+        if (!pDs || pDs.mode !== 'grist' || !pDs.tableId) return false;
+        const pRows = dsTableCache[pDs.tableId];
+        if (!pRows) return false;
+        const vCol = pDs.valueColumn || pDs.labelColumn;
+        const match = pRows.find(r => String(r[vCol]) === String(parentValue));
+        if (!refIdsOf(match ? match[filter.parentColumn] : null).includes(Number(row.id))) return false;
+        continue;
+      }
 
       let rowValue = row[filter.sourceColumn];
 
@@ -752,6 +781,14 @@ async function reloadDynamicField(field) {
   const ds = field.dataSource;
   if (!ds || ds.mode !== 'grist' || !ds.tableId || !ds.labelColumn) return;
   const rows = await fetchDsTable(ds.tableId);
+  // filterDsRows est synchrone : les tables dont elle a besoin doivent déjà être en cache.
+  // Sans ça, un filtre « fait partie de » viderait la liste au premier affichage.
+  for (const f of (ds.filters || [])) {
+    if (f.operator !== 'in-list') continue;
+    const pf = formConfig.fields.find(x => x.id === f.parentFieldId);
+    const pt = (pf && pf.dataSource && pf.dataSource.mode === 'grist') ? pf.dataSource.tableId : '';
+    if (pt && !dsTableCache[pt]) await fetchDsTable(pt);
+  }
   const filtered = filterDsRows(rows, ds);
 
   // Dédoublonnage par valeur
