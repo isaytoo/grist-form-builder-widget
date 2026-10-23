@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.53';
+const WIDGET_VERSION = 'V.54';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -4889,7 +4889,15 @@ function etatLienPartage() {
     el.style.color = '#b45309';
     return;
   }
-  el.textContent = 'Les r\u00e9ponses seront d\u00e9pos\u00e9es dans ' + table + ' via ' + new URL(url).origin + '. Aucun proxy n\u2019est n\u00e9cessaire.';
+  // Une clé n'autorise que la table de SON formulaire publié. Changer de table de réponses
+  // sans recoller un lien laisse une clé périmée, et Grist refuse l'écriture sans dire
+  // laquelle des deux est en cause.
+  el.innerHTML = 'Les r\u00e9ponses seront d\u00e9pos\u00e9es dans <b>' + escHtml(table) + '</b> via '
+    + escHtml(new URL(url).origin) + '. Aucun proxy n\u2019est n\u00e9cessaire.'
+    + '<br><b>Le formulaire Grist publi\u00e9 doit \u00eatre celui de ' + escHtml(table) + '</b> : '
+    + 'une cl\u00e9 n\u2019autorise l\u2019\u00e9criture que dans sa propre table. '
+    + 'Si vous venez de changer de table de r\u00e9ponses, publiez un formulaire sur la nouvelle '
+    + 'et recollez SON lien \u2014 l\u2019ancienne cl\u00e9 sera refus\u00e9e.';
   el.style.color = '#047857';
 }
 document.getElementById('cfg-doc-id')?.addEventListener('change', (e) => {
