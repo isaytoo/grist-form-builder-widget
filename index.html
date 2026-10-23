@@ -666,8 +666,23 @@
   
   <div class="modal-overlay hidden" id="modal-proxy">
     <div class="modal" style="max-width: 560px;">
-      <div class="modal-title">🌐 Configuration du Proxy</div>
-      <p style="font-size: 0.85em; color: #64748b; margin-bottom: 15px;">Le proxy permet de soumettre des formulaires publics sans compte Grist. Choisissez une plateforme et configurez-la.</p>
+      <div class="modal-title">🌐 Soumission du formulaire public</div>
+      <p style="font-size: 0.85em; color: #64748b; margin-bottom: 15px;">Comment les réponses d'un répondant <b>sans compte Grist</b> arrivent dans le document. Deux voies possibles — la première est préférable quand elle est disponible.</p>
+
+      <div style="background: #ecfdf5; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #10b981;">
+        <div style="font-weight: 600; color: #065f46; margin-bottom: 6px; font-size: 0.9em;">① Clé de partage Grist <span style="font-weight:400; font-size:0.85em;">— recommandé, aucun serveur</span></div>
+        <div style="font-size: 0.78em; color: #047857; margin-bottom: 8px; line-height: 1.5;">
+          Publiez un formulaire Grist sur la table de réponses, puis collez ici son lien de partage. Les réponses y seront déposées directement, sans clé d'API ni hébergeur intermédiaire.
+        </div>
+        <input type="text" class="table-select" id="cfg-share-link" placeholder="https://docs.getgrist.com/forms/aBcD1234.../20" style="width: 100%; box-sizing: border-box;">
+        <div id="cfg-share-state" style="font-size: 0.78em; margin-top: 8px; line-height: 1.5;"></div>
+      </div>
+
+      <div style="font-size: 0.82em; color: #64748b; margin: 0 0 15px; text-align: center;">— ou, si la voie ① est fermée sur votre instance —</div>
+
+      <div style="background: #fffbeb; border-radius: 8px; padding: 12px 15px; margin-bottom: 15px; border-left: 4px solid #f59e0b; font-size: 0.8em; color: #92400e; line-height: 1.5;">
+        <b>② Proxy</b> — un petit service qui détient une clé d'API et relaie les réponses. Nécessaire sur <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">grist.grandlyon.fr</code>, dont le portail d'authentification intercepte les adresses de partage (mesuré : <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">302</code> sur <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/api/s/</code> et <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/forms/</code>). À éviter ailleurs : la clé d'API qu'il détient porte les droits de son créateur sur toute l'instance.
+      </div>
 
       <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
         <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">Plateforme</div>
@@ -813,7 +828,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=38"></script>
+<script src="widget.js?v=39"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>

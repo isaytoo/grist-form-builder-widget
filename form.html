@@ -302,7 +302,11 @@ const publicConfig   = urlParams.get('config');   // Config encodée en base64
 // ConfigData). C'est la seule source fiable : Grist efface les options d'une vue dès que
 // l'URL du widget change, et ce lien crée justement un widget neuf.
 const lienFormId     = urlParams.get('formId');
-const isPublicMode   = !!(publicProxyUrl && publicDocId && publicConfig);
+// Soumission directe par clé de partage Grist : l'adresse d'écriture du formulaire publié,
+// construite côté éditeur. Aucun proxy, aucune clé d'API — la portée se limite aux tables de
+// ce formulaire. Voie préférée quand l'instance ne place pas /api/s/ derrière un portail.
+const publicPostUrl  = urlParams.get('post');
+const isPublicMode   = !!(publicConfig && (publicPostUrl || (publicProxyUrl && publicDocId)));
 
 // Cache des tables pour sources dynamiques (initialisé ici pour mode public)
 const dsTableCache = {};
@@ -1315,17 +1319,31 @@ async function submitForm() {
   
   try {
     if (isPublicMode) {
-      // Mode public : appeler le proxy Cloudflare Worker
-      const payload = { docId: publicDocId, tableId: destTable, record: record };
-      const res = await fetch(publicProxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      // Une réponse non JSON (page d'erreur de l'hébergeur, 502…) faisait
-      // échouer res.json() et le répondant voyait l'erreur de parsing.
+      let res;
+      if (publicPostUrl) {
+        // Voie ① : dépôt direct dans Grist par la clé de partage du formulaire publié.
+        // Forme imposée par l'API REST de Grist : {"records":[{"fields":{…}}]}.
+        res = await fetch(publicPostUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ records: [{ fields: record }] })
+        });
+      } else {
+        // Voie ② : le proxy relaie avec sa clé d'API.
+        res = await fetch(publicProxyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ docId: publicDocId, tableId: destTable, record: record })
+        });
+      }
+      // Une réponse non JSON (page d'erreur de l'hébergeur, 502, redirection d'un portail
+      // d'authentification…) faisait échouer res.json() et le répondant voyait l'erreur de
+      // parsing plutôt que la cause.
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Erreur ' + res.status);
+      if (!res.ok) {
+        const detail = (data && (data.error || (data.details && data.details.userError))) || '';
+        throw new Error(detail || 'Erreur ' + res.status + (res.status === 404 ? ' — clé de partage inconnue ou table absente' : ''));
+      }
     } else {
       // Mode Grist : écrire directement via l'API interne
       await grist.docApi.applyUserActions([
@@ -1343,7 +1361,10 @@ async function submitForm() {
     // absente d'ALLOWED_ORIGINS : le navigateur bloque alors la réponse.
     const reseau = error instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(error.message || '');
     showToast(isPublicMode && reseau
-      ? 'Envoi impossible : le proxy n\'a pas répondu (vérifiez son URL et que ' + window.location.origin + ' figure dans ALLOWED_ORIGINS).'
+      ? (publicPostUrl
+          ? 'Envoi impossible : ' + (function(){ try { return new URL(publicPostUrl).origin; } catch (e) { return 'le serveur Grist'; } })()
+            + ' n\'a pas répondu. Si cette instance est derrière un portail d\'authentification, les adresses /api/s/ sont interceptées : il faut passer par le proxy.'
+          : 'Envoi impossible : le proxy n\'a pas répondu (vérifiez son URL et que ' + window.location.origin + ' figure dans ALLOWED_ORIGINS).')
       : 'Erreur lors de l\'envoi : ' + error.message, 'error');
   }
 }

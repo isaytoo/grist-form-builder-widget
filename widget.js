@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.38';
+const WIDGET_VERSION = 'V.39';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -260,6 +260,10 @@ grist.onOptions(async function(options) {
   if (formConfig.publicBaseUrl) {
     const el = document.getElementById('cfg-public-base');
     if (el) el.value = formConfig.publicBaseUrl;
+  }
+  if (formConfig.shareLink) {
+    const el = document.getElementById('cfg-share-link');
+    if (el) el.value = formConfig.shareLink;
   }
   if (formConfig.docId) {
     const el = document.getElementById('cfg-doc-id');
@@ -2739,6 +2743,8 @@ async function saveFormConfig() {
     // Hébergeur du formulaire public, quand il doit différer de celui qui sert ce widget
     // (widget sur un intranet, formulaire destiné à l'extérieur, ou l'inverse).
     publicBaseUrl: (document.getElementById('cfg-public-base')?.value || '').trim(),
+    // Lien d'un formulaire Grist publié : voie de soumission sans proxy ni clé d'API.
+    shareLink: (document.getElementById('cfg-share-link')?.value || '').trim(),
     fields: formFields,
     title: title,
     templates: templates,
@@ -4614,6 +4620,32 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
   document.getElementById('cfg-proxy-url-' + p)?.addEventListener('change', () => saveFormConfig());
 });
 document.getElementById('cfg-public-base')?.addEventListener('change', () => saveFormConfig());
+document.getElementById('cfg-share-link')?.addEventListener('input', etatLienPartage);
+document.getElementById('cfg-share-link')?.addEventListener('change', () => { etatLienPartage(); saveFormConfig(); });
+
+/** Dit tout de suite si le lien collé est exploitable, plutôt que d'attendre le partage. */
+function etatLienPartage() {
+  const el = document.getElementById('cfg-share-state');
+  if (!el) return;
+  const lien = (document.getElementById('cfg-share-link')?.value || '').trim();
+  const table = responseTableId || currentTable || '';
+  if (!lien) {
+    el.textContent = table
+      ? `Sans ce lien, les réponses passeront par le proxy. Table visée : ${table}.`
+      : 'Choisissez d\u2019abord une table source.';
+    el.style.color = '#64748b';
+    return;
+  }
+  const url = adresseEcriturePartage(lien, table);
+  if (!url) {
+    el.textContent = 'Lien non reconnu. Attendu : https://<instance>/forms/<cl\u00e9>/<num\u00e9ro>, '
+      + 'tel que donn\u00e9 par « Partager » sous un formulaire Grist publi\u00e9.';
+    el.style.color = '#b45309';
+    return;
+  }
+  el.textContent = 'Les r\u00e9ponses seront d\u00e9pos\u00e9es dans ' + table + ' via ' + new URL(url).origin + '. Aucun proxy n\u2019est n\u00e9cessaire.';
+  el.style.color = '#047857';
+}
 document.getElementById('cfg-doc-id')?.addEventListener('change', (e) => {
   // Normaliser avant d'enregistrer : un lien Grist collé tel quel donnait un
   // docId invalide, et le formulaire public échouait sans explication.
@@ -4788,6 +4820,34 @@ btnResetForm.addEventListener('click', resetFormInputs);
 btnExportPdf.addEventListener('click', exportPdf);
 
 /**
+ * Adresse d'écriture dérivée du lien d'un formulaire Grist publié.
+ *
+ * Un formulaire publié expose « https://<instance>[/o/<équipe>]/forms/<clé>/<n> ». La même clé
+ * donne une adresse d'écriture anonyme : « …/api/s/<clé>/tables/<table>/records ». C'est le
+ * mécanisme natif de Grist — aucune clé d'API, aucun serveur intermédiaire, et la portée est
+ * limitée aux tables de ce formulaire, là où une clé d'API porte les droits de son créateur sur
+ * toute l'instance.
+ *
+ * ⚠️ Sur grist.grandlyon.fr le portail d'authentification intercepte /api/s/ et /forms/ (302
+ * vers connexion.grandlyon.fr, mesuré le 17 puis le 23/10/2026). Cette voie y est donc fermée
+ * tant que ces deux chemins ne sont pas exclus du portail. Le proxy reste le contournement.
+ *
+ * On ne recopie jamais le lien tel quel : on en extrait les seuls éléments reconnus et on
+ * réécrit l'adresse. Tout paramètre, fragment ou chemin détourné disparaît au passage.
+ */
+function adresseEcriturePartage(lien, table) {
+  const brut = String(lien || '').trim();
+  if (!brut || !table) return '';
+  let u;
+  try { u = new URL(brut); } catch (e) { return ''; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password) return '';
+  const m = u.pathname.match(/^(\/o\/[A-Za-z0-9_-]{1,64})?\/forms\/([A-Za-z0-9]{8,64})\/\d{1,9}\/?$/);
+  if (!m) return '';
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(table)) return '';
+  return `${u.origin}${m[1] || ''}/api/s/${m[2]}/tables/${table}/records`;
+}
+
+/**
  * Valide l'URL de base saisie pour le formulaire public.
  *
  * Elle part dans un lien distribué à des tiers : on ne recopie donc pas ce qui a été tapé.
@@ -4909,9 +4969,17 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   };
   const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(publicConfig))));
   
-  let publicUrl = '';
-  if (proxyUrl && docId) {
+  // Deux voies de soumission. La clé de partage passe en premier : elle n'expose aucune clé
+  // d'API et ne demande aucun hébergeur. Le proxy ne sert que si elle est absente ou refusée.
+  const tableReponses = responseTableId || currentTable || '';
+  const urlPartage = adresseEcriturePartage(formConfig.shareLink, tableReponses);
+  let publicUrl = '', voiePublique = '';
+  if (urlPartage) {
+    publicUrl = `${publicBase}?_cb=${cacheBuster}&post=${encodeURIComponent(urlPartage)}&config=${configB64}`;
+    voiePublique = 'partage';
+  } else if (proxyUrl && docId) {
     publicUrl = `${publicBase}?_cb=${cacheBuster}&proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
+    voiePublique = 'proxy';
   }
   
   // Afficher la modale de partage
@@ -4934,25 +5002,40 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     // l'auteur et nulle part ailleurs : on dit d'où part ce lien, et on signale une
     // adresse refusée au lieu de l'ignorer.
     const note = document.getElementById('share-public-host');
-    if (note) {
+    if (note && !publicUrl) {
+      // Le bloc vert promettait « accessible par n'importe qui » en n'affichant aucun lien et
+      // sans dire pourquoi. On énonce ce qui manque, et laquelle des deux voies ouvrir.
+      const manque = [];
+      if ((formConfig.shareLink || '').trim()) manque.push('le lien de partage collé n\u2019est pas reconnu');
+      if (!proxyUrl) manque.push('aucune URL de proxy');
+      if (!docId) manque.push('aucun identifiant de document');
+      note.textContent = 'Aucun lien public : ' + manque.join(', ')
+        + '. Ouvrez « Proxy » et renseignez soit le lien d\u2019un formulaire Grist publié (voie ①, sans serveur), '
+        + 'soit l\u2019URL du proxy ET l\u2019identifiant du document (voie ②).';
+      note.style.color = '#b45309';
+      note.style.display = '';
+    } else if (note) {
       const saisi = (formConfig.publicBaseUrl || '').trim();
       const retenu = basePubliqueValide(saisi);
+      const voie = voiePublique === 'partage'
+        ? 'Soumission par clé de partage Grist — aucun proxy. '
+        : 'Soumission via le proxy. ';
       if (saisi && !retenu) {
-        note.textContent = 'Adresse d\u2019h\u00e9bergement refus\u00e9e (' + saisi
+        note.textContent = voie + 'Adresse d\u2019h\u00e9bergement refus\u00e9e (' + saisi
           + ') : elle doit \u00eatre en http(s), sans identifiant, et se terminer par /form.html. '
           + 'Le lien part donc de ' + new URL(publicBase).origin + '.';
         note.style.color = '#b45309';
       } else if (retenu) {
-        note.textContent = 'Ce lien pointe vers ' + new URL(retenu).origin
+        note.textContent = voie + 'Ce lien pointe vers ' + new URL(retenu).origin
           + ', r\u00e9gl\u00e9 dans le modal Proxy. V\u00e9rifiez que vos destinataires l\u2019atteignent.';
         note.style.color = '#4338ca';
       } else {
-        note.textContent = 'Ce lien pointe vers ' + window.location.origin
+        note.textContent = voie + 'Ce lien pointe vers ' + window.location.origin
           + ', l\u2019h\u00e9bergeur de cette page. Si vos destinataires ne l\u2019atteignent pas, '
           + 'indiquez une autre adresse dans le modal Proxy.';
         note.style.color = '#64748b';
       }
-      note.style.display = publicUrl ? '' : 'none';
+      note.style.display = '';
     }
     shareModal.classList.remove('hidden');
   }
