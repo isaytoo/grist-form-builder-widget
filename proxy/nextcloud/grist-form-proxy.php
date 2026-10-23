@@ -14,7 +14,7 @@
  *   return [
  *       'GRIST_URL'       => 'https://grist.gristup.fr',
  *       'GRIST_API_KEY'   => 'votre-clé-api',
- *       'ALLOWED_ORIGINS' => 'https://votre-site.fr,*.github.io',  // obligatoire
+ *       'ALLOWED_ORIGINS' => 'https://votre-site.fr,*.github.io,*.forge-pages.grandlyon.com',  // obligatoire
  *       'RATE_LIMIT_MAX'  => 30,
  *       'RATE_LIMIT_WINDOW' => 60,  // secondes
  *   ];

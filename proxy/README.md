@@ -55,6 +55,12 @@ wrangler deploy
 | `GRIST_URL` | URL de l'instance Grist (sans `/` final) | `https://docs.getgrist.com` |
 | `GRIST_API_KEY` | Clé API Grist (secret) | `xxxxxxxxxxxxxxxx` |
 | `ALLOWED_ORIGINS` | **Obligatoire.** Origines autorisées, séparées par des virgules | `https://mon-site.fr,*.github.io` |
+
+GitLab Pages de la forge de la Métropole sert chaque projet sur un sous-domaine qui lui est
+propre — `<projet>-<hash>.forge-pages.grandlyon.com` — imprévisible à l'avance. C'est pourquoi
+la configuration d'exemple y autorise le suffixe `*.forge-pages.grandlyon.com` plutôt qu'une
+origine exacte. Pour restreindre à un seul projet, remplacer par son domaine complet, lisible
+dans Pages > Paramètres du projet.
 | `RATE_LIMIT_MAX` | Max soumissions par IP par fenêtre | `30` |
 | `RATE_LIMIT_WINDOW_MS` | Fenêtre de temps (ms) | `60000` |
 

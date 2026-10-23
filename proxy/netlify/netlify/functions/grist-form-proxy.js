@@ -8,7 +8,7 @@
  * Env vars (Netlify dashboard → Site Settings → Environment Variables):
  *   GRIST_URL       - URL de l'instance Grist (ex: https://docs.getgrist.com)
  *   GRIST_API_KEY   - Clé API Grist avec droit d'écriture
- *   ALLOWED_ORIGINS - Origins autorisées, séparées par virgule (ex: *.github.io,*.gristup.fr)
+ *   ALLOWED_ORIGINS - Origins autorisées, séparées par virgule (ex: *.github.io,*.forge-pages.grandlyon.com)
  *   RATE_LIMIT_MAX  - Max soumissions par IP par fenêtre (défaut: 30)
  *   RATE_LIMIT_WINDOW_MS - Fenêtre en ms (défaut: 60000)
  */

@@ -11,7 +11,7 @@ GRIST_URL = "https://docs.getgrist.com"
 # il n'y a pas de défaut « * », qui ferait de ce worker un relais ouvert vers
 # votre document Grist avec votre clé API.
 # Mettez-y l'origine d'où le formulaire public est servi.
-ALLOWED_ORIGINS = "*.github.io,*.getgrist.com,*.vercel.app,https://isaytoo.github.io"
+ALLOWED_ORIGINS = "*.github.io,*.getgrist.com,*.vercel.app,*.forge-pages.grandlyon.com,https://isaytoo.github.io"
 
 # Rate limiting : max soumissions par IP par fenêtre de temps
 RATE_LIMIT_MAX = "30"           # 30 soumissions max

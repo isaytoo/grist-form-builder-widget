@@ -8,7 +8,7 @@ GRIST_URL = "https://grist.gristup.fr"
 
 # Origins autorisées (séparées par virgule)
 # Obligatoire : vide, le worker refuse tout (pas de défaut « * »).
-ALLOWED_ORIGINS = "*.github.io,*.getgrist.com,*.vercel.app,https://isaytoo.github.io"
+ALLOWED_ORIGINS = "*.github.io,*.getgrist.com,*.vercel.app,*.forge-pages.grandlyon.com,https://isaytoo.github.io"
 
 # Rate limiting : max soumissions par IP par fenêtre de temps
 RATE_LIMIT_MAX = "30"           # 30 soumissions max
