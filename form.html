@@ -610,9 +610,11 @@ function renderImage(field) {
   // fidèle. Sans lui, l'emplacement disparaissait et ce qui suivait remontait d'autant.
   const cadre = document.createElement('div');
   cadre.style.marginBottom = '12px';
-  if (field.imageData) {
+  const src = /^https?:\/\//i.test(String(field.imageUrl || '').trim())
+    ? String(field.imageUrl).trim() : (field.imageData || '');
+  if (src) {
     const img = document.createElement('img');
-    img.src = field.imageData;
+    img.src = src;
     img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; border-radius: 8px; display: block;';
     cadre.appendChild(img);
   }

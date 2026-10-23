@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.51';
+const WIDGET_VERSION = 'V.52';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -999,7 +999,7 @@ function createImageElement(field) {
   if (field.imageData) {
     imageEl.innerHTML = `
       <button class="form-image-delete" title="Supprimer">×</button>
-      <img src="${field.imageData}" alt="${escHtml(field.label)}" draggable="false">
+      <img src="${escHtml(sourceImage(field))}" alt="${escHtml(field.label)}" draggable="false">
       <div class="form-field-resize"></div>
     `;
   } else {
@@ -1600,7 +1600,10 @@ function renderPropertiesPanel() {
       <div class="property-group">
         <div class="property-label">Image</div>
         <input type="file" id="prop-image-upload" accept="image/*" style="font-size: 0.85em;">
-        ${f.imageData ? '<p style="color: #10b981; font-size: 0.8em; margin-top: 5px;">✓ Image chargée</p>' : ''}
+        ${f.imageData ? '<p style="color: #10b981; font-size: 0.8em; margin-top: 5px;">✓ Image chargée (fichier)</p>' : ''}
+        <div class="property-label" style="margin-top: 10px;">ou adresse de l'image</div>
+        <input type="text" class="property-input" id="prop-image-url" value="${escHtml(f.imageUrl || '')}" placeholder="https://…/logo.png">
+        <div class="property-hint">Une image <b>déposée en fichier</b> est stockée dans le formulaire : elle ne peut pas voyager dans un lien public, qu'elle ferait exploser (une adresse tient dans environ 7 800 caractères, une image en fait des dizaines de milliers). Une image <b>par adresse</b> ne coûte que sa longueur et s'affiche partout. Hébergez-la à côté du widget — sur les Pages de la forge, par exemple.</div>
       </div>
     `;
   }
@@ -2290,6 +2293,11 @@ function renderPropertiesPanel() {
   });
   
   // Upload image
+  document.getElementById('prop-image-url')?.addEventListener('change', (e) => {
+    if (!selectedField) return;
+    selectedField.imageUrl = (e.target.value || '').trim();
+    renderFormFields();
+  });
   document.getElementById('prop-image-upload')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -3145,8 +3153,8 @@ function renderFormView() {
       } else if (field.bgColor) {
         imageDiv.style.backgroundColor = field.bgColor;
       }
-      if (field.imageData) {
-        imageDiv.innerHTML = `<img src="${field.imageData}" alt="${escHtml(field.label)}" style="width: 100%; height: 100%; object-fit: contain;">`;
+      if (sourceImage(field)) {
+        imageDiv.innerHTML = `<img src="${escHtml(sourceImage(field))}" alt="${escHtml(field.label)}" style="width: 100%; height: 100%; object-fit: contain;">`;
       }
       formFieldsView.appendChild(imageDiv);
       return;
@@ -5118,6 +5126,14 @@ function basePubliqueValide(raw) {
  * Tout le reste — manualSort, gristHelper_Display, colonnes métier non affichées — ne sert à
  * rien dans le formulaire public et ne fait que gonfler l'adresse.
  */
+// Source d'une image : un fichier déposé (stocké dans le formulaire) ou une adresse.
+// L'adresse est préférée quand les deux existent : elle est plus légère et voyage partout.
+function sourceImage(field) {
+  const url = String((field && field.imageUrl) || '').trim();
+  if (/^https?:\/\//i.test(url)) return url;
+  return (field && field.imageData) || '';
+}
+
 function colonnesUtiles(tableId, champs) {
   const set = new Set();
   (champs || []).forEach(f => {
@@ -5199,7 +5215,9 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
       x: f.x, y: f.y, width: f.width, height: f.height,
       // Apparence. imageData portait l'image déposée, fontSize et textColor le style d'un
       // titre : form.html savait les afficher, mais ne les recevait jamais.
-      imageData: f.imageData, fontSize: f.fontSize, fontFamily: f.fontFamily,
+      // L'image DÉPOSÉE n'est pas transmise : elle pèse des dizaines de milliers de
+      // caractères pour une adresse qui en tolère 7 800. Seule l'adresse voyage.
+      imageUrl: f.imageUrl, fontSize: f.fontSize, fontFamily: f.fontFamily,
       fontWeight: f.fontWeight, fontStyle: f.fontStyle, textDecoration: f.textDecoration,
       textAlign: f.textAlign, lineHeight: f.lineHeight,
       textColor: f.textColor, bgColor: f.bgColor, transparent: f.transparent,
@@ -5341,6 +5359,20 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
           + ', l\u2019h\u00e9bergeur de cette page. Si vos destinataires ne l\u2019atteignent pas, '
           + 'indiquez une autre adresse dans le modal Proxy.';
         note.style.color = '#64748b';
+      }
+      // Ajouté APRÈS les textContent ci-dessus, qui remplacent tout le contenu du nœud.
+      // Une image déposée en fichier ne part jamais dans le lien public : on le dit, plutôt
+      // que de laisser découvrir un emplacement vide chez le destinataire.
+      const deposees = formConfig.fields.filter(f =>
+        f.fieldType === 'image' && f.imageData
+        && !/^https?:\/\//i.test(String(f.imageUrl || '').trim())).length;
+      if (deposees) {
+        const avis = document.createElement('div');
+        avis.style.cssText = 'margin-top:8px;color:#b45309;';
+        avis.textContent = deposees + ' image(s) déposée(s) en fichier ne figureront pas dans ce lien : '
+          + 'une image ne tient pas dans une adresse. Renseignez « ou adresse de l\u2019image » dans '
+          + 'les propriétés de l\u2019élément, en l\u2019hébergeant à côté du widget.';
+        note.appendChild(avis);
       }
       note.style.display = '';
     }
