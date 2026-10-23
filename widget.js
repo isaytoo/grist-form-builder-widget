@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.40';
+const WIDGET_VERSION = 'V.41';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -134,6 +134,44 @@ function showNotInGristMessage() {
   `;
 }
 
+/**
+ * Suis-je propriétaire du document ?
+ *
+ * Grist n'expose aucun rôle aux widgets. La seule chose qui distingue vraiment un
+ * propriétaire d'un éditeur est le droit de **modifier le schéma** : dans le modèle de
+ * permissions de Grist, les éditeurs écrivent les données mais pas la structure.
+ *
+ * On tente donc une modification de schéma inoffensive — redéclarer une colonne dans le type
+ * qu'elle a déjà. Elle aboutit chez un propriétaire, elle est refusée ailleurs.
+ *
+ * ⚠️ C'est la seule sonde qui honore « Voir en tant que » : une lecture de règles d'accès ou
+ * une liste de webhooks répond selon le compte réel, pas selon le rôle simulé — un
+ * propriétaire testant son document en tant qu'éditeur verrait donc l'interface du
+ * propriétaire. Établi en construisant le widget Accueil.
+ *
+ * Contrepartie assumée : l'action apparaît dans l'historique du document à chaque ouverture.
+ */
+async function sondeProprietaire() {
+  const TABLE = 'BM_FormConfig';
+  try {
+    const tables = await grist.docApi.listTables();
+    if (tables.includes(TABLE)) {
+      await grist.docApi.applyUserActions([
+        ['ModifyColumn', TABLE, 'ConfigData', { type: 'Text' }]
+      ]);
+      return true;
+    }
+    // Table absente : la créer est aussi une modification de schéma, donc le même test.
+    // Le widget en a besoin de toute façon pour enregistrer quoi que ce soit.
+    await grist.docApi.applyUserActions([
+      ['AddTable', TABLE, [{ id: 'ConfigKey', type: 'Text' }, { id: 'ConfigData', type: 'Text' }]]
+    ]);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Appliquer les restrictions selon le rôle
 function applyRoleRestrictions() {
   if (!isOwner) {
@@ -147,6 +185,11 @@ function applyRoleRestrictions() {
     
     // Masquer aussi Partager, Guide et PDF en mode formulaire
     document.getElementById('btn-share-form').style.display = 'none';
+    // Le modal Proxy porte l'adresse du relais, l'identifiant du document et la clé de
+    // partage : autant d'éléments d'une chaîne d'écriture publique. Seul un propriétaire
+    // a à les voir ou à les changer.
+    const btnProxy = document.getElementById('btn-proxy-config');
+    if (btnProxy) btnProxy.style.display = 'none';
     document.getElementById('btn-mode-guide').style.display = 'none';
     document.getElementById('btn-export-pdf').style.display = 'none';
     
@@ -291,6 +334,12 @@ grist.onOptions(async function(options) {
   if (isFormMode) {
     isOwner = false;
     applyRoleRestrictions();
+  } else {
+    // isOwner n'était JAMAIS mis à vrai : applyRoleRestrictions() ne s'exécutait qu'en mode
+    // formulaire public, et en usage normal tout le monde voyait l'édition, le partage et la
+    // configuration du proxy. On interroge désormais le document.
+    isOwner = await sondeProprietaire();
+    if (!isOwner) applyRoleRestrictions();
   }
 });
 
@@ -4620,6 +4669,44 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
   document.getElementById('cfg-proxy-url-' + p)?.addEventListener('change', () => saveFormConfig());
 });
 document.getElementById('cfg-public-base')?.addEventListener('change', () => saveFormConfig());
+
+/**
+ * Crée dans le document la page de formulaire Grist qui servira de réception.
+ *
+ * Cette page n'est pas destinée à être remplie : son seul rôle est de produire une clé de
+ * partage, seul moyen d'écrire dans un document sans clé d'API ni serveur. On épargne à
+ * l'utilisateur la construction manuelle ; publier et copier le lien restent à sa charge,
+ * car la clé n'est pas lisible par programme (_grist_Shares.linkId n'est pas la clé publique).
+ *
+ * `CreateViewSection(table_ref, view_ref, section_type, groupby_colrefs, table_id)` avec
+ * view_ref à 0 crée une page neuve. Vérifié dans useractions.py de grist-core, où 'form' est
+ * un type de section accepté.
+ */
+async function creerPageReception() {
+  const etat = document.getElementById('creer-reception-state');
+  const table = responseTableId || currentTable || '';
+  const dire = (texte, couleur) => { if (etat) { etat.textContent = texte; etat.style.color = couleur; } };
+  if (!table) { dire('Choisissez d\u2019abord une table source.', '#b45309'); return; }
+  dire('Création en cours…', '#64748b');
+  try {
+    const meta = await grist.docApi.fetchTable('_grist_Tables');
+    const i = (meta.tableId || []).indexOf(table);
+    if (i < 0) throw new Error(`La table ${table} est introuvable dans ce document.`);
+    await grist.docApi.applyUserActions([
+      ['CreateViewSection', meta.id[i], 0, 'form', null, table]
+    ]);
+    dire(`Page créée sur ${table}. Ouvrez-la dans la barre latérale, cliquez sur « Publier », `
+      + 'puis copiez le lien en /forms/… et collez-le ci-dessous. '
+      + 'Grist n\u2019y met que les 9 premières colonnes, hors formules et pièces jointes.', '#047857');
+  } catch (err) {
+    // Un échec ici est presque toujours un défaut de droits : créer une page modifie la
+    // structure du document, ce que seul un propriétaire peut faire.
+    dire('Création impossible : ' + (err && err.message ? err.message : String(err))
+      + ' — créer une page est une modification de structure, réservée aux propriétaires.', '#b45309');
+  }
+}
+document.getElementById('btn-creer-reception')?.addEventListener('click', creerPageReception);
+
 document.getElementById('cfg-share-link')?.addEventListener('input', etatLienPartage);
 document.getElementById('cfg-share-link')?.addEventListener('change', () => { etatLienPartage(); saveFormConfig(); });
 
