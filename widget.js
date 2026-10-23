@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.32';
+const WIDGET_VERSION = 'V.33';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -3412,6 +3412,14 @@ async function reloadFillDynamicField(field) {
   const rows = await fillFetchDsTable(ds.tableId);
   const filtered = await fillFilterDsRows(rows, ds);
 
+
+  // Une colonne « Référence multiple » vaut ['L', 16, 10] : passée en texte, elle donnerait
+  // « L,16,10 » comme libellé d'option. Ce n'est jamais ce qu'on veut montrer — c'est le signe
+  // qu'on a pris la table du PARENT comme source au lieu de la table référencée. On le dit,
+  // au lieu d'afficher des identifiants internes que personne ne peut interpréter.
+  const colListe = [ds.labelColumn, ds.valueColumn].filter(Boolean)
+    .find(c => filtered.some(r => Array.isArray(r[c])));
+
   const valueCol = ds.valueColumn || ds.labelColumn;
   const seen = new Set();
   const opts = [];
@@ -3424,6 +3432,7 @@ async function reloadFillDynamicField(field) {
     seen.add(key);
     opts.push({ value: String(v), label: String(l !== undefined ? l : v) });
   });
+  if (colListe) opts.length = 0;
 
   // fillReadFieldValue est asynchrone : sans await, currentValue valait une
   // Promise, stillValid était toujours faux et la sélection en cours était
@@ -3433,7 +3442,9 @@ async function reloadFillDynamicField(field) {
     ? currentValue.every(v => opts.some(o => o.value === v))
     : opts.some(o => o.value === currentValue);
 
-  const hint = opts.length ? '' : await fillEmptyHint(field, ds, rows, filtered);
+  const hint = colListe
+    ? `Colonne ${colListe} : c'est une liste de références, pas un libellé. Prenez la table référencée comme table source, et mettez ${colListe} dans un filtre « ∈ fait partie de ».`
+    : (opts.length ? '' : await fillEmptyHint(field, ds, rows, filtered));
 
   if (field.fieldType === 'select') {
     const sel = document.getElementById(`input-${field.id}`);
