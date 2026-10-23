@@ -49,7 +49,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.39';
+const WIDGET_VERSION = 'V.40';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -4638,8 +4638,16 @@ function etatLienPartage() {
   }
   const url = adresseEcriturePartage(lien, table);
   if (!url) {
-    el.textContent = 'Lien non reconnu. Attendu : https://<instance>/forms/<cl\u00e9>/<num\u00e9ro>, '
-      + 'tel que donn\u00e9 par « Partager » sous un formulaire Grist publi\u00e9.';
+    // Confusion naturelle : les deux liens s'appellent « lien de partage ». Celui du widget
+    // ouvre le formulaire, celui de Grist autorise l'écriture. On nomme l'erreur.
+    const sienne = /[?&](mode=form|formId=)/.test(lien) || /form\.html/i.test(lien);
+    el.textContent = sienne
+      ? 'C\u2019est le lien interne de Form Builder Pro, celui qui OUVRE le formulaire. '
+        + 'Il faut ici le lien d\u2019un formulaire natif Grist, qui AUTORISE l\u2019\u00e9criture : '
+        + 'ajoutez une page avec un widget Formulaire sur la table ' + (table || 'de r\u00e9ponses')
+        + ', publiez-la, et copiez son lien en /forms/<cl\u00e9>/<num\u00e9ro>.'
+      : 'Lien non reconnu. Attendu : https://<instance>/forms/<cl\u00e9>/<num\u00e9ro>, '
+        + 'tel que donn\u00e9 par « Partager » sous un formulaire Grist publi\u00e9.';
     el.style.color = '#b45309';
     return;
   }
