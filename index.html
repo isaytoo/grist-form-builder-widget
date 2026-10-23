@@ -685,7 +685,7 @@
                 <strong>① Clé de partage Grist — à préférer.</strong> Le bouton « Créer la page de réception » crée la page de formulaire Grist sur ta table de réponses ; tu la publies, tu copies son lien en <code>/forms/…</code>, tu le colles. Aucun serveur, aucune clé d'API. Grist ne met dans ce formulaire que les 9 premières colonnes, hors formules et pièces jointes.
               </div>
               <div style="padding: 10px 14px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #f59e0b; color: #92400e; line-height: 1.6;">
-                <strong>② Proxy — quand ① est fermée.</strong> C'est le cas sur <code>grist.grandlyon.fr</code>, dont le portail d'authentification intercepte les adresses de partage. Un petit service détient alors une clé d'API et relaie les réponses.
+                <strong>② Proxy — quand ① est fermée.</strong> Un petit service détient une clé d'API et relaie les réponses. Utile quand l'instance n'autorise pas les formulaires publiés, ou pour écrire dans plusieurs tables sans rapport.
               </div>
             </div>
           </div>
@@ -811,7 +811,8 @@
       <div style="font-size: 0.82em; color: #64748b; margin: 0 0 15px; text-align: center;">— ou, si la voie ① est fermée sur votre instance —</div>
 
       <div style="background: #fffbeb; border-radius: 8px; padding: 12px 15px; margin-bottom: 15px; border-left: 4px solid #f59e0b; font-size: 0.8em; color: #92400e; line-height: 1.5;">
-        <b>② Proxy</b> — un petit service qui détient une clé d'API et relaie les réponses. Nécessaire sur <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">grist.grandlyon.fr</code>, dont le portail d'authentification intercepte les adresses de partage (mesuré : <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">302</code> sur <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/api/s/</code> et <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/forms/</code>). À éviter ailleurs : la clé d'API qu'il détient porte les droits de son créateur sur toute l'instance.
+        <b>② Proxy</b> — un petit service qui détient une clé d'API et relaie les réponses. À éviter quand ① est possible : la clé qu'il détient porte les droits de son créateur sur toute l'instance.<br><br>
+        ⚠️ <b>Ni ① ni ② ne fonctionnent sur <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">grist.grandlyon.fr</code></b> depuis internet : le portail d'authentification intercepte <b>tous</b> les chemins, y compris les appels d'API porteurs d'une clé (mesuré le 23/10/2026 : <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">302</code> vers connexion.grandlyon.fr sur <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/api/s/</code>, <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/forms/</code> et <code style="background:#fef3c7; padding:1px 5px; border-radius:3px;">/api/docs/</code> avec en-tête Bearer ; témoin getgrist : 401 de Grist lui-même). Un formulaire public y suppose d'exclure ces chemins du portail — demande à faire à l'équipe qui exploite l'instance.
       </div>
 
       <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
@@ -961,7 +962,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=44"></script>
+<script src="widget.js?v=45"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>
