@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.48';
+const WIDGET_VERSION = 'V.49';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -5192,8 +5192,25 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
       // des paramètres saisis dans le panneau de droite.
       calcType: f.calcType, calcFieldA: f.calcFieldA, calcFieldB: f.calcFieldB,
       calcConstant: f.calcConstant, calcFormula: f.calcFormula,
-      calcDecimals: f.calcDecimals, calcSuffix: f.calcSuffix
+      calcDecimals: f.calcDecimals, calcSuffix: f.calcSuffix,
+      // Mise en page. Sans ces coordonnées, le formulaire public empilait tout
+      // verticalement dans l'ordre de création : deux champs côte à côte se retrouvaient
+      // l'un sous l'autre, et un titre placé en haut atterrissait en bas.
+      x: f.x, y: f.y, width: f.width, height: f.height,
+      // Apparence. imageData portait l'image déposée, fontSize et textColor le style d'un
+      // titre : form.html savait les afficher, mais ne les recevait jamais.
+      imageData: f.imageData, fontSize: f.fontSize, fontFamily: f.fontFamily,
+      fontWeight: f.fontWeight, fontStyle: f.fontStyle, textDecoration: f.textDecoration,
+      textAlign: f.textAlign, lineHeight: f.lineHeight,
+      textColor: f.textColor, bgColor: f.bgColor, transparent: f.transparent,
+      dividerStyle: f.dividerStyle, dividerColor: f.dividerColor, dividerHeight: f.dividerHeight
     };
+    // Les propriétés non renseignées partiraient en « null » dans l'adresse — 331 octets par
+    // champ pour ne rien dire, sur une limite d'environ 7 800. On ne garde que le renseigné.
+    // `false` et `0` sont des valeurs, pas des absences : ils restent.
+    Object.keys(fieldOut).forEach(k => {
+      if (fieldOut[k] === undefined || fieldOut[k] === null || fieldOut[k] === '') delete fieldOut[k];
+    });
     
     // Si le champ a une source dynamique, conserver dataSource et pré-charger la table
     if (f.dataSource && f.dataSource.mode === 'grist' && f.dataSource.tableId && f.dataSource.labelColumn) {
