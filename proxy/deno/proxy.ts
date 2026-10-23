@@ -2,7 +2,8 @@
  * Grist Form Proxy - Deno Deploy
  * Reçoit les soumissions de formulaires publics et les écrit dans Grist via API REST.
  *
- * Deploy: push to GitHub + connect on dash.deno.com
+ * Deploy: console.deno.com (nouvelle console) — « New app », dépôt GitHub, entrypoint
+ *         proxy/deno/proxy.ts. dash.deno.com est l'ancienne console (Deploy Classic).
  * Local:  deno run --allow-net --allow-env proxy.ts
  *
  * Env vars (Deno Deploy dashboard):
@@ -61,7 +62,13 @@ function json(data: unknown, status: number, origin: string) {
   return new Response(JSON.stringify(data), { status, headers });
 }
 
-Deno.serve({ port: parseInt(Deno.env.get('PORT') || '8080') }, async (req: Request) => {
+// La plateforme impose le port par la variable PORT. Quand elle ne la fournit pas — un
+// `deno run` local, ou Deploy Classic qui ignore l'option — on laisse Deno choisir son défaut
+// plutôt que d'imposer 8080, qu'aucun hébergeur ne sonde.
+const portEnv = Number(Deno.env.get('PORT'));
+const serveOpts = Number.isFinite(portEnv) && portEnv > 0 ? { port: portEnv } : {};
+
+Deno.serve(serveOpts, async (req: Request) => {
   const origin = req.headers.get('Origin') || '';
   const patterns = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(o => o.trim()).filter(Boolean);
 

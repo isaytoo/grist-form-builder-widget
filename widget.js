@@ -25,7 +25,9 @@ function escHtml(v) {
 }
 
 // Variables globales
-let currentProxyPlatform = 'cloudflare';
+// Deno par défaut : c'est la plateforme retenue pour Form Builder Pro. Le choix reste
+// modifiable, et une configuration déjà enregistrée le rétablit au chargement.
+let currentProxyPlatform = 'deno';
 let availableTables = [];
 let currentTable = null;
 let tableColumns = [];
@@ -49,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.43';
+const WIDGET_VERSION = 'V.44';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
