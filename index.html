@@ -422,8 +422,8 @@
           
           <div style="background: #faf5ff; border-radius: 10px; padding: 20px; border-left: 4px solid #8b5cf6;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">👥 Plusieurs formulaires</h3>
-            <p style="color: #475569; line-height: 1.7;">Chaque formulaire est lié à une table. L'URL de partage contient le paramètre <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;">table=NomTable</code>.</p>
-            <p style="color: #475569; margin-top: 10px;">Exemple : <code style="background:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:0.85em;">...?mode=form&table=Clients</code></p>
+            <p style="color: #475569; line-height: 1.7;">Chaque formulaire est lié à une table. L'URL de partage contient le paramètre <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;">formId=<em>identifiant</em></code>.</p>
+            <p style="color: #475569; margin-top: 10px;">Exemple : <code style="background:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:0.85em;">...?mode=form&formId=form_suivi_des_demandes</code></p>
           </div>
           
           <div style="background: #ecfeff; border-radius: 10px; padding: 20px; border-left: 4px solid #06b6d4;">
@@ -473,7 +473,7 @@
             </div>
 
             <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
-              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🧮 Les 4 opérateurs disponibles</div>
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🧮 Les 5 opérateurs disponibles</div>
               <div style="display: grid; gap: 8px; font-size: 0.88em;">
                 <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
                   <strong style="color: #0891b2;">= (égal à)</strong> — la colonne source vaut exactement la valeur du parent.<br>
@@ -491,7 +491,56 @@
                   <strong style="color: #0891b2;">entre deux colonnes</strong> — la valeur du parent est entre deux colonnes (min/max) de la table source.<br>
                   <span style="font-style: italic; color: #64748b;">Ex. produit.age_min ≤ âge_saisi ≤ produit.age_max</span>
                 </div>
+                <div style="padding: 8px 12px; background: #ecfdf5; border-radius: 4px; color: #065f46; margin-top: 6px; border-left: 3px solid #10b981;">
+                  <strong style="color: #047857;">∈ fait partie de (liste du parent)</strong> — à utiliser quand le lien est porté par la table du <strong>parent</strong>, sous forme de <em>Référence</em> ou de <em>Référence multiple</em>.<br>
+                  <span style="font-style: italic; color: #047857;">Ex. un agent a une colonne <code>College</code> listant ses collèges → choisir l'agent n'affiche que ceux-là.</span>
+                </div>
               </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🧭 Quel opérateur choisir ?</div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 8px;">
+                Tout dépend de <strong>laquelle des deux tables porte le lien</strong>. C'est la question à se poser en premier.
+              </p>
+              <div style="display: grid; gap: 8px; font-size: 0.88em;">
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong>La table source a une colonne qui désigne le parent</strong> → les quatre premiers opérateurs.<br>
+                  <span style="font-style: italic; color: #64748b;">Ex. COMMUNES a une colonne <code>departement</code> → <code>=</code> sur <code>departement</code>.</span>
+                </div>
+                <div style="padding: 8px 12px; background: #ecfdf5; border-radius: 4px; color: #065f46;">
+                  <strong>C'est la table du parent qui liste ses enfants</strong> → <code>∈ fait partie de</code>.<br>
+                  <span style="font-style: italic; color: #047857;">Ex. AGENTS a une colonne <code>College</code> de type Référence multiple → COLLEGES, elle, ne sait rien des agents.</span>
+                </div>
+              </div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-top: 10px;">
+                ⚠️ Avec <code>∈ fait partie de</code>, le sélecteur du dessous <strong>change de table</strong> : il liste les colonnes du parent, pas celles de la table source. C'est normal — c'est là que vit la colonne de références.
+              </p>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🔎 Quand la liste reste vide</div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 8px;">
+                Le champ ne se contente plus d'afficher « Sélectionner… » : il <strong>dit pourquoi</strong>, en bordure orange, et l'infobulle donne la phrase entière.
+              </p>
+              <div style="display: grid; gap: 8px; font-size: 0.88em;">
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong>« le filtre … exclut les N lignes »</strong> — la comparaison ne trouve rien. Vérifie que tu compares des choses comparables : un nom d'agent ne vaudra jamais un nom de collège.
+                </div>
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong>« → TABLE.colonne »</strong> avec <code>∈ fait partie de</code> — la colonne de références est <strong>vide</strong> pour ce parent. Il n'y a rien à filtrer : remplis-la dans Grist.
+                </div>
+                <div style="padding: 8px 12px; background: #f8fafc; border-radius: 4px; color: #475569;">
+                  <strong>« c'est une liste de références, pas un libellé »</strong> — tu as pris la table du parent comme source. Prends la table <em>référencée</em>, et mets la colonne de références dans le filtre.
+                </div>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
+              <div style="font-weight: 700; color: #0891b2; margin-bottom: 8px; font-size: 0.95em;">🔍 Listes longues</div>
+              <p style="color: #475569; line-height: 1.6; font-size: 0.9em;">
+                Au-delà de <strong>8 options</strong>, la liste devient cherchable : un champ de saisie remplace le menu, les résultats se filtrent au fil de la frappe, <kbd>Échap</kbd> referme. Au-delà de 200 résultats l'affichage est tronqué — affine la recherche. Rien à régler, c'est automatique.
+              </p>
             </div>
 
             <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #cffafe;">
@@ -574,6 +623,85 @@
 
             <div style="margin-top: 12px; padding: 10px 14px; background: #ecfeff; border-radius: 6px; font-size: 0.85em; color: #0e7490;">
               📥 <strong>Données prêtes à l'emploi :</strong> les CSV d'exemple (Departements, Villes, Produits) sont disponibles dans le dossier <code style="background:#cffafe;padding:2px 5px;border-radius:3px;">/exemples/</code> du dépôt GitHub du widget.
+            </div>
+          </div>
+
+          <div style="background: #ecfdf5; border-radius: 10px; padding: 20px; border: 1px solid #a7f3d0; margin-bottom: 20px;">
+            <h3 style="font-size: 1.1em; color: #065f46; margin-bottom: 15px;">🧩 Exemple complet — Les collèges d'un agent</h3>
+            <p style="color: #047857; line-height: 1.6; font-size: 0.9em; margin-bottom: 12px;">
+              Le cas que les quatre premiers opérateurs ne savent pas traiter : <strong>le lien est dans la table du parent</strong>.
+            </p>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #a7f3d0;">
+              <div style="font-weight: 700; color: #047857; margin-bottom: 8px; font-size: 0.95em;">📊 Les tables</div>
+              <div style="font-size: 0.88em; color: #475569; line-height: 1.7;">
+                <strong>COLLEGES</strong> — <code>Nom</code>, <code>Commune</code>… <em>aucune colonne ne désigne un agent.</em><br>
+                <strong>AGENTS</strong> — <code>Prenom</code>, <code>Nom</code>, et <code>College</code> de type <strong>Référence multiple → COLLEGES</strong>.
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #a7f3d0;">
+              <div style="font-weight: 700; color: #047857; margin-bottom: 8px; font-size: 0.95em;">🛠️ Champ 1 — l'agent (parent)</div>
+              <div style="font-size: 0.88em; color: #475569; line-height: 1.7;">
+                Liste déroulante · Source <strong>Depuis Grist</strong> · Table <code>AGENTS</code> · Colonne libellé <code>Prenom_Nom</code>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; margin-bottom: 12px; border: 1px solid #a7f3d0;">
+              <div style="font-weight: 700; color: #047857; margin-bottom: 8px; font-size: 0.95em;">🛠️ Champ 2 — le collège (enfant)</div>
+              <div style="font-size: 0.88em; color: #475569; line-height: 1.7;">
+                Table source <code style="background:#d1fae5;padding:2px 5px;border-radius:3px;">COLLEGES</code> — <em>la table référencée, pas AGENTS</em><br>
+                Colonne libellé <code>Nom</code><br>
+                Filtre 1 → Champ parent <code>Prenom_Nom</code><br>
+                Filtre 1 → Opérateur <code style="background:#d1fae5;padding:2px 5px;border-radius:3px;">∈ fait partie de (liste du parent)</code><br>
+                Filtre 1 → Colonne liste <code style="background:#d1fae5;padding:2px 5px;border-radius:3px;">College</code> — <em>elle n'apparaît qu'après avoir choisi l'opérateur</em>
+              </div>
+            </div>
+
+            <div style="background: white; border-radius: 8px; padding: 14px; border: 1px solid #a7f3d0;">
+              <div style="font-weight: 600; color: #047857; margin-bottom: 6px; font-size: 0.88em;">▶️ Résultat</div>
+              <div style="font-size: 0.88em; color: #475569; line-height: 1.7;">
+                Agent = <em>Placid MUGABE</em> → la liste n'offre que <em>Elsa Triolet</em> et <em>Boris Vian</em>, ses deux collèges.
+              </div>
+            </div>
+
+            <div style="margin-top: 12px; padding: 10px 14px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.85em; color: #92400e; line-height: 1.6;">
+              <strong>L'erreur classique :</strong> prendre AGENTS comme table source et <code>College</code> comme colonne libellé. La liste affiche alors <code>L,16,10</code> — les identifiants internes de la liste de références. Le widget le signale désormais.
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">🌐 Lien interne, lien public</h3>
+            <div style="display: grid; gap: 10px; font-size: 0.9em;">
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.6;">
+                <strong style="color:#1e293b;">Lien interne</strong> — pour des personnes qui <strong>ont un compte Grist</strong> sur ce document. À coller comme widget personnalisé dans une page. Rien d'autre à configurer.
+              </div>
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.6;">
+                <strong style="color:#1e293b;">Lien public</strong> — pour des personnes <strong>sans compte Grist</strong>. Il n'apparaît que si l'une des deux voies du modal <em>Proxy</em> est configurée ; sinon le bloc dit ce qui manque.
+              </div>
+            </div>
+            <div style="margin-top: 12px; display: grid; gap: 10px; font-size: 0.88em;">
+              <div style="padding: 10px 14px; background: #ecfdf5; border-radius: 6px; border-left: 3px solid #10b981; color: #065f46; line-height: 1.6;">
+                <strong>① Clé de partage Grist — à préférer.</strong> Le bouton « Créer la page de réception » crée la page de formulaire Grist sur ta table de réponses ; tu la publies, tu copies son lien en <code>/forms/…</code>, tu le colles. Aucun serveur, aucune clé d'API. Grist ne met dans ce formulaire que les 9 premières colonnes, hors formules et pièces jointes.
+              </div>
+              <div style="padding: 10px 14px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #f59e0b; color: #92400e; line-height: 1.6;">
+                <strong>② Proxy — quand ① est fermée.</strong> C'est le cas sur <code>grist.grandlyon.fr</code>, dont le portail d'authentification intercepte les adresses de partage. Un petit service détient alors une clé d'API et relaie les réponses.
+              </div>
+            </div>
+          </div>
+
+          <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">🔒 Qui voit quoi</h3>
+            <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
+              Le widget distingue les <strong>propriétaires</strong> du document des autres. Pour le vérifier, utilise « Voir en tant que » dans Grist.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.88em;">
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
+                <strong style="color:#047857;">Propriétaire</strong><br>tout : Édition, Templates, Nouveau, Sauvegarder, Vider, Partager, Proxy
+              </div>
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
+                <strong style="color:#b45309;">Éditeur ou lecteur</strong><br>Saisie, Guide, PDF — il remplit le formulaire, il ne le construit pas
+              </div>
             </div>
           </div>
 
@@ -830,7 +958,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=42"></script>
+<script src="widget.js?v=43"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>
