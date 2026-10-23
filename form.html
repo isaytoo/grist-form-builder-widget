@@ -1464,6 +1464,20 @@ async function submitForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const detail = (data && (data.error || (data.details && data.details.userError))) || '';
+        // Grist répond « Blocked by table create access rules » sans dire laquelle. En
+        // pratique une clé de partage n'autorise l'écriture que dans la table du formulaire
+        // publié dont elle provient : poster ailleurs est refusé, quels que soient les droits.
+        if (/access rules?/i.test(detail)) {
+          const cible = (function () {
+            try { return decodeURIComponent(publicPostUrl).split('/tables/')[1].split('/')[0]; }
+            catch (e) { return 'la table visée'; }
+          })();
+          throw new Error('Grist refuse la création dans « ' + cible + ' ». Une clé de partage '
+            + 'n\'autorise l\'écriture que dans la table du formulaire publié dont elle provient, '
+            + 'et seulement dans ses colonnes. Vérifiez que la table de réponses du formulaire est '
+            + 'bien celle sur laquelle le formulaire Grist a été publié, et qu\'elle possède les '
+            + 'colonnes envoyées. (' + detail + ')');
+        }
         throw new Error(detail || 'Erreur ' + res.status + (res.status === 404 ? ' — clé de partage inconnue ou table absente' : ''));
       }
     } else {
