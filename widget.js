@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.54';
+const WIDGET_VERSION = 'V.55';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -3732,6 +3732,20 @@ function rendreCherchable(sel) {
     pan.appendChild(d);
   }
 
+
+  // En mise en page absolue, chaque champ porte son propre z-index : le panneau reste
+  // prisonnier du contexte d'empilement de son champ et passe SOUS les champs posés après
+  // lui, malgré son z-index élevé. On hausse donc le champ entier le temps de l'ouverture.
+  var zAvant = null, hausse = null;
+  function hausser() {
+    hausse = box.closest ? box.closest('[style*="position: absolute"]') : null;
+    if (!hausse) { var p = box.parentNode; while (p && p.style && p.style.position !== 'absolute') p = p.parentNode;
+      hausse = (p && p.style) ? p : null; }
+    if (hausse) { zAvant = hausse.style.zIndex; hausse.style.zIndex = '1000'; }
+  }
+  function rabaisser() {
+    if (hausse) { hausse.style.zIndex = zAvant || ''; hausse = null; zAvant = null; }
+  }
   function ouvrir(q) {
     var t = String(q || '').trim().toLowerCase();
     var tous = Array.prototype.slice.call(sel.options, 1);
@@ -3744,6 +3758,7 @@ function rendreCherchable(sel) {
       ligne(o.text, 'fb-rech-item' + (o.value === sel.value ? ' sel' : ''), function () {
         sel.value = o.value;
         sync();
+        rabaisser();
         pan.hidden = true;
         sel.dispatchEvent(new Event('change'));
       });
@@ -3751,15 +3766,16 @@ function rendreCherchable(sel) {
     if (trouves.length > RECHERCHE_MAX) {
       ligne('… et ' + (trouves.length - RECHERCHE_MAX) + ' autre(s) — affinez la recherche', 'fb-rech-vide');
     }
+    hausser();
     pan.hidden = false;
   }
 
   inp.addEventListener('focus', function () { ouvrir(''); });
   inp.addEventListener('input', function () { ouvrir(inp.value); });
   // Le clic sur une ligne passe par mousedown : au moment du blur, la valeur est déjà posée.
-  inp.addEventListener('blur', function () { setTimeout(function () { pan.hidden = true; sync(); }, 120); });
+  inp.addEventListener('blur', function () { setTimeout(function () { rabaisser(); pan.hidden = true; sync(); }, 120); });
   inp.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { pan.hidden = true; inp.blur(); }
+    if (e.key === 'Escape') { rabaisser(); pan.hidden = true; inp.blur(); }
   });
   sel.addEventListener('change', sync);
   sync();
