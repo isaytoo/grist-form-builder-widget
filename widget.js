@@ -51,7 +51,7 @@ let responseTableId = null; // Table séparée pour les réponses (si différent
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.55';
+const WIDGET_VERSION = 'V.56';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -275,7 +275,30 @@ async function ecrireDroitConstruire(ouvert) {
 }
 
 // Appliquer les restrictions selon le rôle
-function applyRoleRestrictions() {
+/**
+ * Restreint l'interface selon le rôle.
+ *
+ * Deux niveaux, et non un seul. Partager et Proxy touchent à la chaîne d'écriture publique —
+ * adresse du relais, identifiant du document, clé de partage, hébergeur du formulaire. Ils
+ * restent RÉSERVÉS AUX PROPRIÉTAIRES, même quand la construction est ouverte aux éditeurs :
+ * construire un formulaire et décider où partent ses réponses sont deux responsabilités
+ * différentes.
+ *
+ * `peutConstruire` vaut vrai pour un éditeur autorisé par l'interrupteur de V.46.
+ */
+function masquerPartageEtProxy() {
+  const partage = document.getElementById('btn-share-form');
+  if (partage) partage.style.display = 'none';
+  const proxy = document.getElementById('btn-proxy-config');
+  if (proxy) proxy.style.display = 'none';
+}
+
+function applyRoleRestrictions(peutConstruire) {
+  if (!isOwner && peutConstruire) {
+    // Éditeur autorisé à construire : il garde l'édition, mais pas la diffusion.
+    masquerPartageEtProxy();
+    return;
+  }
   if (!isOwner) {
     // Masquer les éléments d'édition pour les non-propriétaires
     btnModeEdit.style.display = 'none';
@@ -292,12 +315,7 @@ function applyRoleRestrictions() {
     const btnNouveau = document.getElementById('btn-new-form');
     if (btnNouveau) btnNouveau.style.display = 'none';
 
-    document.getElementById('btn-share-form').style.display = 'none';
-    // Le modal Proxy porte l'adresse du relais, l'identifiant du document et la clé de
-    // partage : autant d'éléments d'une chaîne d'écriture publique. Seul un propriétaire
-    // a à les voir ou à les changer.
-    const btnProxy = document.getElementById('btn-proxy-config');
-    if (btnProxy) btnProxy.style.display = 'none';
+    masquerPartageEtProxy();
     // Guide et PDF restent accessibles : l'un est de la documentation, l'autre exporte un
     // formulaire que l'éditeur a le droit de remplir. Les masquer ne protégeait rien et
     // privait d'outils utiles — c'était du code jamais exécuté jusqu'à V.41.
@@ -442,7 +460,7 @@ grist.onOptions(async function(options) {
   // Si mode formulaire public, forcer le mode saisie et masquer l'édition
   if (isFormMode) {
     isOwner = false;
-    applyRoleRestrictions();
+    applyRoleRestrictions(false);
   } else {
     // isOwner n'était JAMAIS mis à vrai : applyRoleRestrictions() ne s'exécutait qu'en mode
     // formulaire public, et en usage normal tout le monde voyait l'édition, le partage et la
@@ -453,7 +471,9 @@ grist.onOptions(async function(options) {
       // que la personne EST éditrice : un lecteur verrait sinon une interface d'édition dont
       // chaque enregistrement échouerait.
       editeursAutorises = await lireDroitConstruire() && await sondeEditeur();
-      if (!editeursAutorises) applyRoleRestrictions();
+      // Appelée dans les DEUX cas : autorisé, elle ne masque que Partager et Proxy ;
+      // non autorisé, elle ferme toute l'édition.
+      applyRoleRestrictions(editeursAutorises);
     }
   }
 });

@@ -700,7 +700,7 @@
                 <strong style="color:#047857;">Propriétaire</strong><br>Tout : Édition, Templates, Nouveau, Sauvegarder, Vider, Partager, Proxy.
               </div>
               <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
-                <strong style="color:#b45309;">Éditeur</strong><br>Saisie, Guide, PDF. Il remplit, il ne construit pas — <em>sauf si le propriétaire l'y autorise</em>.
+                <strong style="color:#b45309;">Éditeur</strong><br>Saisie, Guide, PDF. Il remplit, il ne construit pas — <em>sauf si le propriétaire l'y autorise</em>. Même autorisé, il n'a <strong>jamais</strong> Partager ni Proxy.
               </div>
               <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
                 <strong style="color:#b45309;">Lecteur</strong><br>Saisie, Guide, PDF. Jamais la construction, quel que soit le réglage.
@@ -716,7 +716,8 @@
                 ☐ Autoriser les <strong>éditeurs</strong> du document à construire des formulaires
               </div>
               <p style="color: #4338ca; line-height: 1.6; font-size: 0.88em;">
-                Coché, tout éditeur retrouve Édition, Templates, Nouveau et Sauvegarder. Décoché, seuls les propriétaires construisent. <strong>Les lecteurs n'y accèdent jamais</strong>, dans les deux cas — ils ne peuvent de toute façon pas enregistrer.
+                Coché, tout éditeur retrouve Édition, Templates, Nouveau et Sauvegarder. Décoché, seuls les propriétaires construisent. <strong>Les lecteurs n'y accèdent jamais</strong>, dans les deux cas — ils ne peuvent de toute façon pas enregistrer.<br><br>
+                <strong>Partager et Proxy restent réservés aux propriétaires</strong>, même interrupteur coché : construire un formulaire et décider où partent ses réponses sont deux responsabilités différentes. Le modal Proxy porte l'adresse du relais, l'identifiant du document et la clé de partage.
               </p>
               <div style="margin-top: 10px; padding: 9px 13px; background: #ecfdf5; border-left: 3px solid #10b981; border-radius: 4px; font-size: 0.85em; color: #065f46; line-height: 1.6;">
                 <strong>Ce réglage n'est pas contournable.</strong> Il est rangé dans une table <code>BM_FormPerms</code> protégée par une règle d'accès Grist réservant l'écriture aux propriétaires. Un éditeur ne peut donc ni s'autoriser lui-même, ni autoriser quelqu'un d'autre. La règle apparaît dans <em>Permissions avancées</em>, avec le mémo « Form Builder Pro ».
@@ -1007,7 +1008,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=55"></script>
+<script src="widget.js?v=56"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>
