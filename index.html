@@ -72,6 +72,7 @@
     .workspace-toolbar { position: sticky; top: 0; left: 0; right: 0; background: white; padding: 8px 15px; display: flex; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 20; justify-content: center; flex-shrink: 0; border-bottom: 1px solid #e2e8f0; width: 100%; }
     .toolbar-btn { padding: 5px 10px; border: 1px solid #e2e8f0; background: white; color: #334155; border-radius: 4px; font-size: 0.8em; cursor: pointer; transition: all 0.15s; }
     .toolbar-btn:hover { background: #f1f5f9; }
+    .toolbar-btn:disabled { opacity: 0.45; cursor: not-allowed; }
     .toolbar-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
     .toolbar-separator { width: 1px; background: #e2e8f0; margin: 0 4px; }
     .page-a4 { width: 210mm; min-height: 297mm; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); position: relative; padding: 15mm; background-size: 20px 20px; box-sizing: border-box; overflow: visible; flex-shrink: 0; }
@@ -161,11 +162,32 @@
     .fb-rech-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.18); }
     .fb-rech-panel { position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 2px);
       max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1;
-      border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); }
-    .fb-rech-item { padding: 7px 10px; font-size: 0.9em; cursor: pointer; line-height: 1.3; }
+      border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); overflow-x: hidden; min-width: 220px; }
+    .fb-rech-item { padding: 7px 10px; font-size: 0.9em; cursor: pointer; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
     .fb-rech-item:hover { background: #eff6ff; }
     .fb-rech-item.sel { background: #dbeafe; font-weight: 600; }
     .fb-rech-vide { padding: 7px 10px; font-size: 0.85em; color: #64748b; font-style: italic; }
+
+    /* Typographie réglée champ par champ. Les attributs ne sont posés que si un réglage
+       existe : sans eux, aucune de ces règles ne s'applique et l'apparence par défaut reste. */
+    [data-fb-pl] .form-label, [data-fb-pl] .form-field-label { font-family: var(--fb-pl) !important; }
+    [data-fb-tl] .form-label, [data-fb-tl] .form-field-label { font-size: var(--fb-tl) !important; }
+    [data-fb-gl] .form-label, [data-fb-gl] .form-field-label { font-weight: var(--fb-gl) !important; }
+    [data-fb-cl] .form-label, [data-fb-cl] .form-field-label { color: var(--fb-cl) !important; }
+    [data-fb-pc] :is(.form-field-input, .form-input, .form-select, .form-textarea-input, .form-textarea, .fb-rech-input, .fb-rech-item, .form-radio-item, .form-checkbox-item, .option-item, .calculated-field) { font-family: var(--fb-pc) !important; }
+    [data-fb-tc] :is(.form-field-input, .form-input, .form-select, .form-textarea-input, .form-textarea, .fb-rech-input, .fb-rech-item, .form-radio-item, .form-checkbox-item, .option-item, .calculated-field) { font-size: var(--fb-tc) !important; }
+
+    /* Cases à cocher en menu déroulant : le groupe de cases reste le porteur des valeurs,
+       il est seulement replié sous un bouton qui résume la sélection. */
+    .fb-multi { position: relative; }
+    .fb-multi-btn { display: block; width: 100%; position: relative; text-align: left; cursor: pointer; background: #fff; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 28px !important; }
+    .fb-multi-btn::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #64748b; }
+    .fb-multi-btn.fb-multi-vide { color: #94a3b8; }
+    .fb-multi-drop { display: none; position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 2px); min-width: 220px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); padding: 6px; }
+    .fb-multi.ouvert .fb-multi-drop { display: block; }
+    .fb-multi-rech { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85em; font-family: inherit; }
+    .fb-multi-rech:focus { outline: none; border-color: #3b82f6; }
+    .fb-multi-drop .form-checkbox-group { max-height: 230px; overflow-y: auto; gap: 4px; }
 
     .form-image { position: absolute; background: white; border: 1px solid #e2e8f0; border-radius: 6px; overflow: visible; cursor: move; }
     .form-image img { width: 100%; height: 100%; object-fit: contain; }
@@ -247,6 +269,17 @@
     .template-item:hover { border-color: #3b82f6; background: #eff6ff; }
     .template-name { font-weight: 500; color: #334155; }
     .template-date { font-size: 0.8em; color: #94a3b8; margin-top: 4px; }
+    .file-drop-preview { border: 1px dashed #93c5fd; border-radius: 4px; background: #eff6ff; color: #3b82f6; font-size: 0.8em; padding: 10px; text-align: center; }
+    .file-existing { font-size: 0.8em; color: #64748b; margin-top: 4px; }
+    /* Champ fichier : le contrôle natif a une largeur fixe et tronquait « Aucun fichier choisi »
+       dès que le libellé passait à gauche. L'<input> reste porteur des fichiers mais devient
+       invisible ; un bouton et la liste des noms (qui passe à la ligne) le remplacent. */
+    .fb-fichier { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    .fb-fichier-input { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; padding: 0 !important; border: 0 !important; overflow: hidden; }
+    .fb-fichier-btn { flex: none; padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; color: #334155; font-size: 0.85em; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    .fb-fichier-btn:hover { background: #eff6ff; border-color: #3b82f6; }
+    .fb-fichier-input:focus-visible + .fb-fichier-btn { outline: 2px solid #3b82f6; outline-offset: 1px; }
+    .fb-fichier-noms { flex: 1 1 120px; min-width: 0; font-size: 0.85em; color: #64748b; overflow-wrap: anywhere; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -265,13 +298,14 @@
       <button class="btn btn-secondary" id="btn-templates">📁 Templates</button>
       <button class="btn btn-success" id="btn-share-form" title="Partager le formulaire">🔗 Partager</button>
       <button class="btn btn-warning" id="btn-export-pdf">📄 PDF</button>
+      <button class="btn btn-secondary" id="btn-open-form" title="Ouvrir un formulaire enregistré dans ce document">📂 Ouvrir</button>
       <button class="btn btn-secondary" id="btn-new-form" title="Créer un nouveau formulaire">📝 Nouveau</button>
       <button class="btn btn-secondary" id="btn-clear">🗑️ Vider</button>
       <button class="btn btn-secondary" id="btn-proxy-config" title="Configuration du proxy">🌐 Proxy</button>
       <button class="btn btn-primary" id="btn-save">💾 Sauvegarder</button>
     </div>
   </div>
-  
+
   <div class="main-content editor-view" id="editor-view">
     <div class="sidebar" id="sidebar">
       <button class="panel-toggle" id="sidebar-toggle" title="Fermer/Ouvrir">
@@ -321,6 +355,7 @@
           <div class="elements-category">
             <div class="elements-category-title">Spéciaux</div>
             <div class="element-item" draggable="true" data-element-type="signature"><span class="field-icon">✍️</span><span class="field-name">Signature</span></div>
+            <div class="element-item" draggable="true" data-element-type="file"><span class="field-icon">📎</span><span class="field-name">Pièce jointe</span></div>
             <div class="element-item" draggable="true" data-element-type="section"><span class="field-icon">📦</span><span class="field-name">Section</span></div>
             <div class="element-item" draggable="true" data-element-type="image"><span class="field-icon">🖼️</span><span class="field-name">Image</span></div>
             <div class="element-item" draggable="true" data-element-type="title"><span class="field-icon">🏷️</span><span class="field-name">Titre/Texte</span></div>
@@ -332,7 +367,7 @@
         </div>
         </div>
     </div>
-    
+
     <div class="workspace" id="workspace">
       <div class="workspace-toolbar">
         <button class="toolbar-btn" id="btn-grid" title="Grille">⊞ Grille</button>
@@ -348,6 +383,12 @@
         <span id="page-indicator" style="font-size: 0.8em; padding: 0 8px; min-width: 60px; text-align: center; display: inline-block;">1 / 1</span>
         <button class="toolbar-btn" id="btn-next-page" title="Page suivante">▶</button>
         <button class="toolbar-btn" id="btn-add-page" title="Ajouter une page">+ Page</button>
+        <button class="toolbar-btn" id="btn-delete-page" title="Supprimer la page affichée">− Page</button>
+        <div class="toolbar-separator"></div>
+        <label for="page-height-cm" style="font-size: 0.8em; color: #64748b; align-self: center;" title="Hauteur de la page affichée">↕ Hauteur</label>
+        <input type="number" id="page-height-cm" min="5" max="300" step="0.1" value="29.7" title="Hauteur de la page affichée, en centimètres (A4 = 29,7)" style="width: 68px; padding: 4px 6px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.8em; font-family: inherit; color: #334155; background: white;">
+        <span style="font-size: 0.8em; color: #64748b; align-self: center;">cm</span>
+        <button class="toolbar-btn" id="btn-page-height-a4" title="Revenir à la hauteur A4 (29,7 cm)">A4</button>
       </div>
       <div class="ruler-corner" id="ruler-corner"></div>
       <div class="ruler ruler-h" id="ruler-h"><div class="ruler-marks" id="ruler-h-marks"></div></div>
@@ -361,7 +402,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="properties-panel" id="properties-panel">
       <button class="panel-toggle" id="properties-toggle" title="Fermer/Ouvrir">
         <svg viewBox="0 0 24 24"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg>
@@ -372,7 +413,7 @@
       </div>
     </div>
   </div>
-  
+
   <div class="form-view" id="form-view">
     <div style="padding: 40px 20px 50px 20px; background: #e2e8f0; min-height: 100%;">
       <div class="form-canvas-view" id="form-canvas-view">
@@ -384,19 +425,19 @@
       </div>
     </div>
   </div>
-  
+
   <div class="form-view" id="guide-view">
     <div style="padding: 40px; background: #f1f5f9; min-height: 100%; overflow-y: auto;">
       <div style="max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px;">
         <h1 style="font-size: 1.8em; color: #1e293b; margin-bottom: 10px; display: flex; align-items: center; gap: 12px;">📖 Guide d'utilisation</h1>
         <p style="color: #64748b; margin-bottom: 30px; font-size: 1em;">Apprenez à créer et partager des formulaires professionnels avec Form Builder Pro.</p>
-        
+
         <div style="display: grid; gap: 25px;">
           <div style="background: #eff6ff; border-radius: 10px; padding: 20px; border-left: 4px solid #3b82f6;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">🎯 Présentation</h3>
             <p style="color: #475569; line-height: 1.7;">Form Builder Pro permet de créer des formulaires professionnels sur page A4 avec drag & drop, puis de les partager avec vos utilisateurs. Les données sont enregistrées directement dans vos tables Grist.</p>
           </div>
-          
+
           <div style="background: #f0fdf4; border-radius: 10px; padding: 20px; border-left: 4px solid #10b981;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">📝 Créer un formulaire</h3>
             <ol style="color: #475569; line-height: 2; padding-left: 20px; margin: 0;">
@@ -407,7 +448,7 @@
               <li>Cliquez sur <strong>💾 Sauvegarder</strong> pour enregistrer</li>
             </ol>
           </div>
-          
+
           <div style="background: #fef3c7; border-radius: 10px; padding: 20px; border-left: 4px solid #f59e0b;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">🔗 Partager le formulaire</h3>
             <ol style="color: #475569; line-height: 2; padding-left: 20px; margin: 0;">
@@ -419,13 +460,14 @@
             </ol>
             <p style="color: #92400e; margin-top: 12px; font-size: 0.9em;"><strong>💡 Astuce :</strong> Les utilisateurs ne verront que le mode saisie, sans accès à l'édition.</p>
           </div>
-          
+
           <div style="background: #faf5ff; border-radius: 10px; padding: 20px; border-left: 4px solid #8b5cf6;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">👥 Plusieurs formulaires</h3>
             <p style="color: #475569; line-height: 1.7;">Chaque formulaire est lié à une table. L'URL de partage contient le paramètre <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;">formId=<em>identifiant</em></code>.</p>
             <p style="color: #475569; margin-top: 10px;">Exemple : <code style="background:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:0.85em;">...?mode=form&formId=form_suivi_des_demandes</code></p>
+            <p style="color: #475569; line-height: 1.7; margin-top: 10px;"><strong>📂 Ouvrir</strong> liste tous les formulaires sauvegardés dans le document : cliquez sur l'un d'eux pour le reprendre, le modifier ou le compléter, puis <strong>💾 Sauvegarder</strong>. L'identifiant vient du <strong>titre</strong> : changer le titre avant de sauvegarder crée une copie sous un nouveau nom, l'original reste dans la liste (🗑️ pour le retirer). Si le titre est déjà celui d'un autre formulaire, une confirmation est demandée avant de le remplacer.</p>
           </div>
-          
+
           <div style="background: #ecfeff; border-radius: 10px; padding: 20px; border-left: 4px solid #06b6d4;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 12px;">🔗 Sélecteurs en cascade (options dynamiques)</h3>
             <p style="color: #475569; line-height: 1.6; margin-bottom: 14px;">
@@ -693,51 +735,15 @@
           <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">🔒 Qui voit quoi</h3>
             <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
-              Le widget lit le rôle de chacun dans le document. Pour vérifier ce que voit un collègue, utilise <strong>« Voir en tant que »</strong> dans Grist : c'est le seul test fiable.
+              Le widget distingue les <strong>propriétaires</strong> du document des autres. Pour le vérifier, utilise « Voir en tant que » dans Grist.
             </p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; font-size: 0.88em;">
-              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #a7f3d0; color: #475569; line-height: 1.7;">
-                <strong style="color:#047857;">Propriétaire</strong><br>Tout : Édition, Templates, Nouveau, Sauvegarder, Vider, Partager, Proxy.
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.88em;">
+              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
+                <strong style="color:#047857;">Propriétaire</strong><br>tout : Édition, Templates, Ouvrir, Nouveau, Sauvegarder, Vider, Partager, Proxy
               </div>
               <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
-                <strong style="color:#b45309;">Éditeur</strong><br>Saisie, Guide, PDF. Il remplit, il ne construit pas — <em>sauf si le propriétaire l'y autorise</em>. Même autorisé, il n'a <strong>jamais</strong> Partager ni Proxy.
+                <strong style="color:#b45309;">Éditeur ou lecteur</strong><br>Saisie, Guide, PDF — il remplit le formulaire, il ne le construit pas
               </div>
-              <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; line-height: 1.7;">
-                <strong style="color:#b45309;">Lecteur</strong><br>Saisie, Guide, PDF. Jamais la construction, quel que soit le réglage.
-              </div>
-            </div>
-
-            <div style="margin-top: 14px; background: #eef2ff; border-radius: 8px; padding: 14px; border-left: 4px solid #6366f1;">
-              <div style="font-weight: 700; color: #3730a3; margin-bottom: 6px; font-size: 0.95em;">🔑 Ouvrir la construction aux éditeurs</div>
-              <p style="color: #4338ca; line-height: 1.6; font-size: 0.88em; margin-bottom: 8px;">
-                Un propriétaire peut confier la construction de formulaires à tous les éditeurs du document. L'interrupteur est en haut du modal <strong>Proxy</strong> :
-              </p>
-              <div style="background: white; border-radius: 6px; padding: 10px 14px; font-size: 0.88em; color: #475569; line-height: 1.6; margin-bottom: 8px;">
-                ☐ Autoriser les <strong>éditeurs</strong> du document à construire des formulaires
-              </div>
-              <p style="color: #4338ca; line-height: 1.6; font-size: 0.88em;">
-                Coché, tout éditeur retrouve Édition, Templates, Nouveau et Sauvegarder. Décoché, seuls les propriétaires construisent. <strong>Les lecteurs n'y accèdent jamais</strong>, dans les deux cas — ils ne peuvent de toute façon pas enregistrer.<br><br>
-                <strong>Partager et Proxy restent réservés aux propriétaires</strong>, même interrupteur coché : construire un formulaire et décider où partent ses réponses sont deux responsabilités différentes. Le modal Proxy porte l'adresse du relais, l'identifiant du document et la clé de partage.
-              </p>
-              <div style="margin-top: 10px; padding: 9px 13px; background: #ecfdf5; border-left: 3px solid #10b981; border-radius: 4px; font-size: 0.85em; color: #065f46; line-height: 1.6;">
-                <strong>Ce réglage n'est pas contournable.</strong> Il est rangé dans une table <code>BM_FormPerms</code> protégée par une règle d'accès Grist réservant l'écriture aux propriétaires. Un éditeur ne peut donc ni s'autoriser lui-même, ni autoriser quelqu'un d'autre. La règle apparaît dans <em>Permissions avancées</em>, avec le mémo « Form Builder Pro ».
-              </div>
-              <div style="margin-top: 8px; padding: 9px 13px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 0.85em; color: #92400e; line-height: 1.6;">
-                <strong>À savoir :</strong> le changement prend effet au <strong>prochain chargement</strong> du widget. Après avoir coché ou décoché, demande à la personne de recharger sa page.
-              </div>
-            </div>
-          </div>
-
-          <div style="background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-            <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">📏 Limite du lien public</h3>
-            <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
-              Le lien public emporte les données des tables sources dans son adresse, pour que les listes déroulantes fonctionnent hors de Grist. Les serveurs refusent les adresses au-delà d'environ <strong>8 000 caractères</strong> — au-delà, le lien s'ouvre sur une erreur <code>414</code>.
-            </p>
-            <p style="color: #475569; line-height: 1.6; font-size: 0.9em; margin-bottom: 10px;">
-              Le widget n'emporte que les colonnes dont le formulaire se sert, ce qui suffit dans la plupart des cas. S'il dépasse quand même, <strong>il refuse d'afficher le lien</strong> et te dit sa taille et le nombre de lignes embarquées, plutôt que de te livrer une adresse morte.
-            </p>
-            <div style="padding: 10px 14px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; color: #475569; font-size: 0.88em; line-height: 1.7;">
-              <strong>Que faire alors :</strong> réduire le nombre d'options (filtrer la table source dans Grist), ou passer par le <strong>lien interne</strong>, qui lit les données en direct et n'a aucune limite de taille.
             </div>
           </div>
 
@@ -745,11 +751,16 @@
             <h3 style="font-size: 1.1em; color: #1e293b; margin-bottom: 15px;">⚙️ Fonctionnalités</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>📄</span> Multi-pages A4</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>↕</span> Hauteur de page réglable</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔤</span> Police et taille par champ</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>☑️</span> Cases à cocher en menu déroulant</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔀</span> Champs conditionnels</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔗</span> Sélecteurs en cascade</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🧮</span> Champs calculés</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🔍</span> Lookup / Autocomplétion</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>✍️</span> Signature</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>📎</span> Pièces jointes</div>
+              <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>🕒</span> Date, date + heure, heure</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>✅</span> Validation avancée</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>📁</span> Templates</div>
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>📜</span> Historique des versions</div>
@@ -757,15 +768,15 @@
               <div style="display: flex; align-items: center; gap: 8px; color: #475569;"><span>📱</span> QR Code</div>
             </div>
           </div>
-          
+
         </div>
       </div>
     </div>
   </div>
-  
+
   <div class="toast" id="toast"></div>
   <div class="loading-overlay" id="loading"><div class="loading-spinner"></div></div>
-  
+
   <div class="modal-overlay hidden" id="modal-confirm" style="z-index: 2000;">
     <div class="modal confirm-modal">
       <div class="confirm-modal-icon" id="confirm-icon">⚠️</div>
@@ -777,7 +788,7 @@
       </div>
     </div>
   </div>
-  
+
   <div class="modal-overlay hidden" id="modal-share">
     <div class="modal" style="max-width: 500px;">
       <div class="modal-title">🔗 Partager le formulaire</div>
@@ -786,7 +797,7 @@
         <p style="font-size: 1em; color: #1e293b; font-weight: 600; margin-bottom: 5px;">Votre formulaire est prêt à être partagé !</p>
         <p style="font-size: 0.85em; color: #64748b; margin-bottom: 20px;">Suivez les étapes ci-dessous pour le mettre à disposition de vos utilisateurs.</p>
       </div>
-      
+
       <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
         <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">📋 Lien interne (depuis Grist)</div>
         <div style="display: flex; gap: 8px;">
@@ -794,7 +805,7 @@
           <button class="btn btn-primary" id="btn-copy-url" style="padding: 10px 15px;">📋 Copier</button>
         </div>
       </div>
-      
+
       <div id="share-public-section" style="background: #ecfdf5; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #10b981;">
         <div style="font-weight: 600; color: #065f46; margin-bottom: 10px; font-size: 0.9em;">🌐 Lien public (sans compte Grist)</div>
         <div style="font-size: 0.8em; color: #047857; margin-bottom: 8px;">Accessible par n'importe qui — les réponses sont envoyées via le proxy.</div>
@@ -804,7 +815,7 @@
         </div>
         <div id="share-public-host" style="font-size:0.78em; line-height:1.5; margin-top:10px;"></div>
       </div>
-      
+
       <div style="background: #eff6ff; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
         <div style="font-weight: 600; color: #1e293b; margin-bottom: 10px; font-size: 0.9em;">🔧 Étape 2 : Ajoutez le widget dans Grist</div>
         <ol style="font-size: 0.85em; color: #475569; padding-left: 18px; margin: 0; line-height: 1.8;">
@@ -815,19 +826,19 @@
           <li>Dans le panneau de droite, accordez <strong>l'accès complet</strong></li>
         </ol>
       </div>
-      
+
       <div style="background: #fef3c7; border-radius: 8px; padding: 12px 15px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
         <div style="font-size: 0.85em; color: #92400e;">
           <strong>💡 Astuce :</strong> Les utilisateurs ne verront que le formulaire de saisie, sans accès à l'édition.
         </div>
       </div>
-      
+
       <div class="modal-actions">
         <button class="btn btn-secondary" id="btn-close-share">Fermer</button>
       </div>
     </div>
   </div>
-  
+
   <div class="modal-overlay hidden" id="modal-proxy">
     <div class="modal" style="max-width: 560px;">
       <div style="background: #eef2ff; border-radius: 8px; padding: 15px; margin-bottom: 18px; border-left: 4px solid #6366f1;">
@@ -974,6 +985,15 @@
     </div>
   </div>
 
+  <div class="modal-overlay hidden" id="modal-open">
+    <div class="modal">
+      <div class="modal-title">📂 Ouvrir un formulaire</div>
+      <p style="font-size: 0.85em; color: #64748b; margin-bottom: 15px;">Formulaires enregistrés dans ce document par le bouton <strong>💾 Sauvegarder</strong>. Cliquez sur l'un d'eux pour le rouvrir et le modifier.</p>
+      <div class="templates-list" id="open-list"></div>
+      <div class="modal-actions"><button class="btn btn-secondary" id="btn-close-open">Fermer</button></div>
+    </div>
+  </div>
+
   <div class="modal-overlay hidden" id="modal-templates">
     <div class="modal">
       <div class="modal-title">📁 Templates</div>
@@ -1008,7 +1028,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="widget.js?v=56"></script>
+<script src="widget.js?v=60"></script>
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
   <span>Isaytoo - 2026</span>
 </footer>

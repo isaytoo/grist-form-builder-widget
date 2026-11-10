@@ -18,34 +18,30 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f1f5f9; color: #334155; min-height: 100vh; padding: 20px; padding-bottom: 100px; }
-    
+
     .form-container { max-width: 800px; margin: 0 auto; }
-    /* Mise en page au pixel près : la page doit pouvoir afficher 794 px de large. */
-    .form-container.fb-page { max-width: 880px; }
-    .form-container.fb-page .form-body { padding-left: 24px; padding-right: 24px; }
-    @media (max-width: 853px) { .form-container.fb-page { max-width: 800px; } }
     .form-header { background: white; border-radius: 12px 12px 0 0; padding: 25px 30px; border-bottom: 3px solid #3b82f6; }
     .form-title { font-size: 1.5em; font-weight: 700; color: #1e293b; margin-bottom: 5px; }
     .form-subtitle { font-size: 0.9em; color: #64748b; }
-    
+
     .form-body { background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-    
+
     .form-page { display: none; }
     .form-page.active { display: block; }
-    
+
     .form-field-group { margin-bottom: 20px; }
     .form-field-group.hidden { display: none; }
-    
+
     .form-label { display: block; font-size: 0.9em; font-weight: 500; color: #475569; margin-bottom: 8px; }
     .form-label.required::after { content: ' *'; color: #ef4444; }
-    
-    .form-input, .form-select, .form-textarea { 
-      width: 100%; 
-      padding: 12px 14px; 
-      border: 1px solid #e2e8f0; 
-      border-radius: 8px; 
-      font-size: 1em; 
-      font-family: inherit; 
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 1em;
+      font-family: inherit;
       transition: border-color 0.2s, box-shadow 0.2s;
       background: white;
     }
@@ -57,23 +53,23 @@
     .fb-rech-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.18); }
     .fb-rech-panel { position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 2px);
       max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #cbd5e1;
-      border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); }
-    .fb-rech-item { padding: 7px 10px; font-size: 0.9em; cursor: pointer; line-height: 1.3; }
+      border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); overflow-x: hidden; min-width: 220px; }
+    .fb-rech-item { padding: 7px 10px; font-size: 0.9em; cursor: pointer; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
     .fb-rech-item:hover { background: #eff6ff; }
     .fb-rech-item.sel { background: #dbeafe; font-weight: 600; }
     .fb-rech-vide { padding: 7px 10px; font-size: 0.85em; color: #64748b; font-style: italic; }
-    .form-input:focus, .form-select:focus, .form-textarea:focus { 
-      outline: none; 
-      border-color: #3b82f6; 
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
     }
     .form-textarea { min-height: 120px; resize: vertical; }
-    
+
     .form-radio-group, .form-checkbox-group { display: flex; flex-direction: column; gap: 10px; }
-    .form-radio-item, .form-checkbox-item { 
-      display: flex; 
-      align-items: center; 
-      gap: 10px; 
+    .form-radio-item, .form-checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       font-size: 0.95em;
       padding: 10px 12px;
       background: #f8fafc;
@@ -83,42 +79,42 @@
     }
     .form-radio-item:hover, .form-checkbox-item:hover { background: #eff6ff; }
     .form-radio-item input, .form-checkbox-item input { width: 18px; height: 18px; cursor: pointer; }
-    
+
     .form-error { color: #ef4444; font-size: 0.85em; margin-top: 6px; display: none; }
     .form-error.show { display: block; }
-    
-    .form-section { 
-      background: #f8fafc; 
-      border-radius: 8px; 
-      padding: 20px; 
+
+    .form-section {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 20px;
       margin-bottom: 25px;
       border-left: 4px solid #3b82f6;
     }
     .form-section-title { font-size: 1.1em; font-weight: 600; color: #1e293b; margin-bottom: 15px; }
-    
-    .signature-container { 
-      border: 2px dashed #e2e8f0; 
-      border-radius: 8px; 
-      background: white; 
+
+    .signature-container {
+      border: 2px dashed #e2e8f0;
+      border-radius: 8px;
+      background: white;
       position: relative;
       overflow: hidden;
     }
     .signature-canvas { width: 100%; height: 150px; cursor: crosshair; display: block; }
-    .signature-clear { 
-      position: absolute; 
-      top: 10px; 
-      right: 10px; 
-      padding: 6px 12px; 
-      font-size: 0.8em; 
-      background: white; 
-      border: 1px solid #e2e8f0; 
-      border-radius: 6px; 
+    .signature-clear {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      font-size: 0.8em;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
       cursor: pointer;
       transition: background 0.15s;
     }
     .signature-clear:hover { background: #f1f5f9; }
-    
-    .form-actions { 
+
+    .form-actions {
       position: fixed;
       bottom: 0;
       left: 0;
@@ -131,14 +127,14 @@
       gap: 15px;
       z-index: 100;
     }
-    
-    .btn { 
-      padding: 12px 30px; 
-      border: none; 
-      border-radius: 8px; 
-      font-size: 1em; 
-      font-weight: 600; 
-      cursor: pointer; 
+
+    .btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
       transition: all 0.2s;
       display: flex;
       align-items: center;
@@ -150,7 +146,7 @@
     .btn-secondary:hover { background: #cbd5e1; }
     .btn-success { background: #10b981; color: white; }
     .btn-success:hover { background: #059669; }
-    
+
     .page-navigation {
       display: flex;
       justify-content: space-between;
@@ -160,11 +156,11 @@
       border-top: 1px solid #e2e8f0;
     }
     .page-indicator { font-size: 0.9em; color: #64748b; }
-    
-    .loading { 
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
+
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
       min-height: 300px;
       color: #64748b;
     }
@@ -177,7 +173,7 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    
+
     .success-message {
       text-align: center;
       padding: 60px 30px;
@@ -185,7 +181,7 @@
     .success-icon { font-size: 4em; margin-bottom: 20px; }
     .success-title { font-size: 1.5em; font-weight: 600; color: #10b981; margin-bottom: 10px; }
     .success-text { color: #64748b; margin-bottom: 25px; }
-    
+
     .toast {
       position: fixed;
       bottom: 100px;
@@ -203,13 +199,74 @@
     .toast.show { opacity: 1; }
     .toast.error { background: #ef4444; }
     .toast.success { background: #10b981; }
-    
+
+    /* Typographie réglée champ par champ. Les attributs ne sont posés que si un réglage
+       existe : sans eux, aucune de ces règles ne s'applique et l'apparence par défaut reste. */
+    [data-fb-pl] .form-label, [data-fb-pl] .form-field-label { font-family: var(--fb-pl) !important; }
+    [data-fb-tl] .form-label, [data-fb-tl] .form-field-label { font-size: var(--fb-tl) !important; }
+    [data-fb-gl] .form-label, [data-fb-gl] .form-field-label { font-weight: var(--fb-gl) !important; }
+    [data-fb-cl] .form-label, [data-fb-cl] .form-field-label { color: var(--fb-cl) !important; }
+    [data-fb-pc] :is(.form-field-input, .form-input, .form-select, .form-textarea-input, .form-textarea, .fb-rech-input, .fb-rech-item, .form-radio-item, .form-checkbox-item, .option-item, .calculated-field) { font-family: var(--fb-pc) !important; }
+    [data-fb-tc] :is(.form-field-input, .form-input, .form-select, .form-textarea-input, .form-textarea, .fb-rech-input, .fb-rech-item, .form-radio-item, .form-checkbox-item, .option-item, .calculated-field) { font-size: var(--fb-tc) !important; }
+
+    /* Cases à cocher en menu déroulant : le groupe de cases reste le porteur des valeurs,
+       il est seulement replié sous un bouton qui résume la sélection. */
+    .fb-multi { position: relative; }
+    .fb-multi-btn { display: block; width: 100%; position: relative; text-align: left; cursor: pointer; background: #fff; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 28px !important; }
+    .fb-multi-btn::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #64748b; }
+    .fb-multi-btn.fb-multi-vide { color: #94a3b8; }
+    .fb-multi-drop { display: none; position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 2px); min-width: 220px; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 8px 20px rgba(15,23,42,.14); padding: 6px; }
+    .fb-multi.ouvert .fb-multi-drop { display: block; }
+    .fb-multi-rech { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85em; font-family: inherit; }
+    .fb-multi-rech:focus { outline: none; border-color: #3b82f6; }
+    .fb-multi-drop .form-checkbox-group { max-height: 230px; overflow-y: auto; gap: 4px; }
+
     .no-form {
       text-align: center;
       padding: 60px 30px;
       color: #64748b;
     }
     .no-form-icon { font-size: 3em; margin-bottom: 15px; opacity: 0.5; }
+    .file-indispo { padding: 12px 14px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; color: #92400e; font-size: 0.9em; }
+    /* Mise en page fidèle à l'éditeur : une page de 210 mm où chaque élément est placé en
+       absolu, aux coordonnées dessinées dans Form Builder Pro. */
+    body.fb-mise-en-page .form-container { max-width: calc(210mm + 2px); }
+    body.fb-mise-en-page .form-header { display: none; }
+    body.fb-mise-en-page .form-body { padding: 0; overflow: visible; border-radius: 12px; }
+    .fb-canvas { position: relative; width: 210mm; min-height: 200px; }
+    .fb-abs { position: absolute; box-sizing: border-box; }
+    .fb-champ { padding: 8px; margin: 0; background: white; }
+    .fb-champ .form-label { margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fb-champ .form-input, .fb-champ .form-select, .fb-champ .form-textarea, .fb-champ .fb-rech-input { padding: 8px 10px; font-size: 0.9em; border-radius: 6px; }
+    .fb-champ .form-textarea { min-height: 60px; }
+    .fb-champ .form-radio-group, .fb-champ .form-checkbox-group { gap: 4px; }
+    .fb-champ .form-radio-item, .fb-champ .form-checkbox-item { padding: 4px 8px; font-size: 0.9em; }
+    .fb-champ .signature-canvas { height: 120px; }
+    .fb-section { padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; }
+    .fb-section-titre { font-size: 0.9em; font-weight: 600; color: #334155; }
+    .fb-titre { font-size: var(--taille, 14pt); font-weight: 600; color: #1e293b; }
+    .fb-image img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .fb-qr { padding: 8px; background: white; }
+    /* Écran trop étroit pour une page A4 (téléphone) : on empile dans l'ordre de lecture. */
+    @media (max-width: 840px) {
+      body.fb-mise-en-page { padding: 10px; padding-bottom: 100px; }
+      .fb-canvas { width: auto; height: auto !important; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+      .fb-abs { position: static !important; width: auto !important; max-width: 100%; }
+      .fb-section { height: auto !important; padding: 10px 14px; }
+      .fb-section:empty { display: none; } /* section sans titre : un cadre vide n'a plus de sens empilé */
+      .fb-image { height: auto !important; }
+      .fb-image img { width: auto; height: auto; max-width: 100%; max-height: 140px; }
+      .fb-titre { font-size: min(var(--taille, 14pt), 20pt); }
+    }
+    /* Champ fichier : le contrôle natif a une largeur fixe et tronquait « Aucun fichier choisi »
+       dès que le libellé passait à gauche. L'<input> reste porteur des fichiers mais devient
+       invisible ; un bouton et la liste des noms (qui passe à la ligne) le remplacent. */
+    .fb-fichier { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    .fb-fichier-input { position: absolute !important; width: 1px !important; height: 1px !important; opacity: 0 !important; padding: 0 !important; border: 0 !important; overflow: hidden; }
+    .fb-fichier-btn { flex: none; padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; color: #334155; font-size: 0.85em; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    .fb-fichier-btn:hover { background: #eff6ff; border-color: #3b82f6; }
+    .fb-fichier-input:focus-visible + .fb-fichier-btn { outline: 2px solid #3b82f6; outline-offset: 1px; }
+    .fb-fichier-noms { flex: 1 1 120px; min-width: 0; font-size: 0.85em; color: #64748b; overflow-wrap: anywhere; line-height: 1.35; }
   </style>
 </head>
 <body>
@@ -217,21 +274,21 @@
     <div id="loading" class="loading">
       <div class="loading-spinner"></div>
     </div>
-    
+
     <div id="no-form" class="no-form" style="display: none;">
       <div class="no-form-icon">📋</div>
       <p>Aucun formulaire configuré.<br>Veuillez contacter l'administrateur.</p>
     </div>
-    
+
     <div id="form-content" style="display: none;">
       <div class="form-header">
         <h1 class="form-title" id="form-title">Formulaire</h1>
         <p class="form-subtitle" id="form-subtitle"></p>
       </div>
-      
+
       <div class="form-body">
         <div id="form-fields"></div>
-        
+
         <div class="page-navigation" id="page-nav" style="display: none;">
           <button class="btn btn-secondary" id="btn-prev-page">← Précédent</button>
           <span class="page-indicator" id="page-indicator">Page 1 / 1</span>
@@ -239,7 +296,7 @@
         </div>
       </div>
     </div>
-    
+
     <div id="success-view" class="success-message" style="display: none;">
       <div class="success-icon">✅</div>
       <h2 class="success-title">Formulaire envoyé !</h2>
@@ -247,12 +304,12 @@
       <button class="btn btn-primary" id="btn-new-form">Nouveau formulaire</button>
     </div>
   </div>
-  
+
   <div class="form-actions" id="form-actions" style="display: none;">
     <button class="btn btn-secondary" id="btn-reset">↺ Réinitialiser</button>
     <button class="btn btn-success" id="btn-submit">✓ Envoyer</button>
   </div>
-  
+
   <div class="toast" id="toast"></div>
 
 <footer style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 12px; font-size: 0.7em; color: #94a3b8; display: flex; justify-content: space-between; z-index: 1000;">
@@ -260,6 +317,7 @@
 </footer>
 
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /**
  * Échappe une valeur avant insertion dans du HTML.
@@ -283,69 +341,17 @@ function escHtml(v) {
 let formConfig = null;
 let currentPage = 1;
 let totalPages = 1;
+// Déclarées ici : en mode public, initFormDisplay() s’exécute avant la fin du script.
+let miseEnPage = false;
+// Seuils de la liste cherchable. Déclarés en tête : en mode public le formulaire est rendu
+// avant la fin du script, et ces variables valaient encore undefined — toutes les listes,
+// même à deux choix, devenaient alors cherchables.
+var RECHERCHE_SEUIL = 8;   // au-delà de ce nombre d'options, la liste devient cherchable
+var RECHERCHE_MAX = 200;   // au-delà, l'affichage est tronqué : la recherche sert à affiner
+let observateurTaille = null;
 
 // Éléments DOM
 const loading = document.getElementById('loading');
-// ─── Mise en page : reproduire le canevas de l'éditeur ───────────────────────────────────
-//
-// L'éditeur est un outil de mise en page : chaque élément porte des coordonnées x/y et une
-// largeur, sur une page A4. Le formulaire publié, lui, se contentait d'empiler les éléments
-// dans leur ordre de création — deux champs côte à côte se retrouvaient l'un sous l'autre, et
-// un titre placé en haut atterrissait en bas.
-//
-// On pose donc une couche de positionnement PAR-DESSUS le rendu existant, plutôt que de
-// réécrire un second moteur de rendu qui finirait par diverger du premier.
-//
-// Sous la largeur d'une page A4, on retombe sur l'empilement : une page positionnée au pixel
-// près est illisible sur téléphone. L'ordre suivi est alors celui de la LECTURE — de haut en
-// bas, puis de gauche à droite — et non l'ordre de création.
-const PAGE_LARGEUR = 794;   // 210 mm à 3,78 px/mm, comme l'éditeur
-const PAGE_HAUTEUR = 1123;  // 297 mm
-
-/** Ordre de lecture : par ligne, puis de gauche à droite. Deux éléments sont sur la même
- *  ligne si leurs sommets sont à moins de 24 px — l'alignement à la main n'est jamais exact. */
-function ordreLecture(a, b) {
-  const ay = typeof a.y === 'number' ? a.y : 0, by = typeof b.y === 'number' ? b.y : 0;
-  if (Math.abs(ay - by) > 24) return ay - by;
-  return (typeof a.x === 'number' ? a.x : 0) - (typeof b.x === 'number' ? b.x : 0);
-}
-
-function peutPositionner(champs) {
-  if (!champs.some(f => typeof f.x === 'number' && typeof f.y === 'number')) return false;
-  // On se fie à la largeur de la FENÊTRE : le conteneur est élargi juste après, on ne peut
-  // donc pas décider à partir de sa largeur courante — elle vaut encore celle de l'empilement.
-  // 60 px de marge pour les rembourrages de la carte et du corps de page.
-  return window.innerWidth >= PAGE_LARGEUR + 60;
-}
-
-function hauteurCanevas(champs) {
-  let bas = PAGE_HAUTEUR;
-  champs.forEach(f => {
-    const h = (typeof f.y === 'number' ? f.y : 0) + (f.height || 90);
-    if (h > bas) bas = h;
-  });
-  return bas + 60;
-}
-
-/** Les sections sont des cadres posés DERRIÈRE les champs qu'elles regroupent. */
-function positionner(noeud, field) {
-  if (!noeud || typeof field.x !== 'number' || typeof field.y !== 'number') return;
-  noeud.style.position = 'absolute';
-  noeud.style.left = field.x + 'px';
-  noeud.style.top = field.y + 'px';
-  noeud.style.margin = '0';
-  noeud.style.boxSizing = 'border-box';
-  if (field.width) noeud.style.width = field.width + 'px';
-  if (field.height && ['section', 'image', 'divider'].includes(field.fieldType)) {
-    noeud.style.height = field.height + 'px';
-  }
-  noeud.style.zIndex = field.fieldType === 'section' ? '0' : '1';
-  if (field.fieldType === 'section') {
-    if (field.transparent) noeud.style.background = 'transparent';
-    else if (field.bgColor) noeud.style.background = field.bgColor;
-  }
-}
-
 const noForm = document.getElementById('no-form');
 const formContent = document.getElementById('form-content');
 const formFields = document.getElementById('form-fields');
@@ -392,16 +398,8 @@ if (isPublicMode) {
     loading.style.display = 'none';
     initFormDisplay();
   } catch (e) {
-    // Ce bloc englobe le décodage du lien ET le premier rendu. Annoncer « lien invalide »
-    // masquait donc les erreurs de rendu : une faute de code passait pour un lien corrompu.
-    // On distingue les deux, et on montre la cause.
-    console.error('[form] échec du mode public :', e);
-    const decodage = !formConfig || !formConfig.fields;
     loading.style.display = 'none';
-    noForm.innerHTML = '<div class="no-form-icon">⚠️</div><p><strong>'
-      + (decodage ? 'Lien de formulaire invalide' : 'Affichage du formulaire impossible')
-      + '</strong></p><p style="margin-top:10px;font-size:0.9em;max-width:460px;margin-left:auto;margin-right:auto;">'
-      + escHtml((e && e.message) || String(e)) + '</p>';
+    noForm.innerHTML = '<div class="no-form-icon">⚠️</div><p><strong>Lien de formulaire invalide</strong></p>';
     noForm.style.display = 'block';
   }
 } else {
@@ -500,79 +498,209 @@ if (isPublicMode) {
 
 function initFormDisplay() {
   totalPages = formConfig.totalPages || 1;
-  
+
   formTitle.textContent = formConfig.title || 'Formulaire';
   formContent.style.display = 'block';
   formActions.style.display = 'flex';
-  
+
   if (totalPages > 1) {
     pageNav.style.display = 'flex';
   }
-  
+
+  // Une configuration issue de l'éditeur porte des coordonnées : on les respecte. Un ancien
+  // lien public, qui n'en transportait pas, garde l'affichage empilé d'avant.
+  miseEnPage = formConfig.fields.some(f => typeof f.x === 'number');
+  document.body.classList.toggle('fb-mise-en-page', miseEnPage);
+  formFields.classList.toggle('fb-canvas', miseEnPage);
+
   renderForm();
 }
 
+/**
+ * Hauteur de la page : les éléments étant en absolu, elle ne se déduit pas toute seule.
+ * On prend le bas de l'élément visible le plus bas. Sur petit écran, l'affichage est empilé
+ * et la hauteur redevient naturelle.
+ */
+function ajusterHauteur() {
+  if (!miseEnPage) return;
+  if (window.matchMedia('(max-width: 840px)').matches) { formFields.style.height = ''; return; }
+  let bas = 0;
+  Array.prototype.forEach.call(formFields.children, el => {
+    if (el.offsetParent === null) return; // champ masqué par une condition
+    bas = Math.max(bas, el.offsetTop + el.offsetHeight);
+  });
+  // Hauteur réglée dans l'éditeur pour cette page (en mm) : on la respecte, sans jamais
+  // couper un élément qui dépasserait. Sans réglage, la page épouse son contenu.
+  const mm = Number((formConfig.pageHeights || {})[currentPage]);
+  const reglee = mm > 0 ? mm * 3.7795 : 0;
+  formFields.style.height = Math.max(bas + 40, reglee) + 'px';
+}
+
+/** Recalcule la hauteur quand un élément change de taille (cascade, condition, image…). */
+function surveillerTailles() {
+  if (!miseEnPage || typeof ResizeObserver === 'undefined') return;
+  if (observateurTaille) observateurTaille.disconnect();
+  let prevu = false;
+  observateurTaille = new ResizeObserver(() => {
+    if (prevu) return;
+    prevu = true;
+    requestAnimationFrame(() => { prevu = false; ajusterHauteur(); });
+  });
+  Array.prototype.forEach.call(formFields.children, el => observateurTaille.observe(el));
+}
+window.addEventListener('resize', ajusterHauteur);
+
+/**
+ * Place un élément aux coordonnées de l'éditeur.
+ *
+ * L'ordre dans le DOM suit l'ordre de lecture (haut → bas, gauche → droite) : c'est lui
+ * qu'utilisent la tabulation et l'affichage empilé. L'empilement visuel, lui, reprend l'ordre
+ * de l'éditeur (« Premier plan » / « Arrière-plan ») via le z-index.
+ */
+function renderPositionne(field) {
+  const z = formConfig.fields.indexOf(field);
+  const place = (el, opts = {}) => {
+    el.classList.add('fb-abs');
+    el.style.left = (field.x || 0) + 'px';
+    el.style.top = (field.y || 0) + 'px';
+    if (field.width && !opts.sansLargeur) el.style.width = field.width + 'px';
+    if (opts.hauteur) el.style.height = opts.hauteur + 'px';
+    el.style.zIndex = z;
+    formFields.appendChild(el);
+    return el;
+  };
+  const fond = (el) => {
+    if (field.transparent) el.style.backgroundColor = 'transparent';
+    else if (field.bgColor) el.style.backgroundColor = field.bgColor;
+  };
+
+  switch (field.fieldType) {
+    case 'section': {
+      const d = document.createElement('div');
+      d.className = 'fb-section';
+      fond(d);
+      if (field.transparent) d.style.border = '1px dashed #cbd5e1';
+      if (field.label) {
+        const t = document.createElement('div');
+        t.className = 'fb-section-titre';
+        t.textContent = field.label;
+        if (field.textColor) t.style.color = field.textColor;
+        d.appendChild(t);
+      }
+      place(d, { hauteur: field.height || 150 });
+      return;
+    }
+    case 'image': {
+      if (!field.imageData) return; // le lien public n'embarque pas les images (taille d'URL)
+      const d = document.createElement('div');
+      d.className = 'fb-image';
+      fond(d);
+      const img = document.createElement('img');
+      img.src = field.imageData;
+      img.alt = field.label || '';
+      d.appendChild(img);
+      place(d, { hauteur: field.height || 100 });
+      return;
+    }
+    case 'title': {
+      const d = document.createElement('div');
+      d.className = 'fb-titre';
+      // L'éditeur exprime la taille en points : c'était lue en « em », d'où un titre géant.
+      d.style.setProperty('--taille', (field.fontSize || 14) + 'pt');
+      if (field.fontWeight) d.style.fontWeight = field.fontWeight;
+      if (field.textColor) d.style.color = field.textColor;
+      if (field.fontFamily) d.style.fontFamily = field.fontFamily;
+      if (field.fontStyle) d.style.fontStyle = field.fontStyle;
+      if (field.textDecoration) d.style.textDecoration = field.textDecoration;
+      if (field.textAlign) d.style.textAlign = field.textAlign;
+      if (field.lineHeight) d.style.lineHeight = field.lineHeight;
+      if (!field.transparent && field.bgColor) {
+        d.style.backgroundColor = field.bgColor;
+        d.style.padding = '8px 12px';
+        d.style.borderRadius = '6px';
+      }
+      d.textContent = field.label || '';
+      place(d);
+      return;
+    }
+    case 'divider': {
+      const d = document.createElement('div');
+      d.style.padding = '5px 0';
+      const style = field.dividerStyle === 'dashed' ? 'dashed' : (field.dividerStyle === 'dotted' ? 'dotted' : 'solid');
+      const l = document.createElement('div');
+      l.style.borderTop = `${field.dividerHeight || 2}px ${style} ${field.dividerColor || '#cbd5e1'}`;
+      d.appendChild(l);
+      place(d);
+      return;
+    }
+    case 'qrcode': {
+      const d = document.createElement('div');
+      d.className = 'fb-qr';
+      fond(d);
+      place(d, { sansLargeur: true });
+      if (typeof QRCode !== 'undefined') {
+        new QRCode(d, {
+          text: field.qrContent || window.location.href,
+          width: field.qrSize || 100, height: field.qrSize || 100,
+          colorDark: field.qrColor || '#000000', colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+      return;
+    }
+    default: {
+      const group = renderField(field);
+      group.classList.add('fb-champ');
+      fond(group);
+      place(group);
+    }
+  }
+}
 
 function renderForm() {
   formFields.innerHTML = '';
 
-  // Trié dans l'ordre de lecture, et non dans l'ordre de création : c'est vrai aussi en
-  // empilement, où l'ordre d'apparition doit suivre ce qu'on voit dans l'éditeur.
-  const pageFields = formConfig.fields
-    .filter(f => (f.page || 1) === currentPage)
-    .slice()
-    .sort(ordreLecture);
+  // Filtrer les champs de la page courante
+  const pageFields = formConfig.fields.filter(f => (f.page || 1) === currentPage);
 
-  const canevas = peutPositionner(pageFields);
-  formFields.style.position = canevas ? 'relative' : '';
-  formFields.style.height = canevas ? hauteurCanevas(pageFields) + 'px' : '';
-  // La carte fait 800 px au plus : trop étroit pour une page A4 de 794 px une fois les
-  // rembourrages déduits. On l'élargit le temps d'afficher le canevas.
-  const conteneur = document.querySelector('.form-container');
-  if (conteneur) conteneur.classList.toggle('fb-page', canevas);
+  if (miseEnPage) {
+    pageFields.slice()
+      .sort((a, b) => ((a.y || 0) - (b.y || 0)) || ((a.x || 0) - (b.x || 0)))
+      .forEach(renderPositionne);
+  } else {
+    pageFields.forEach(field => {
+      if (field.fieldType === 'section') {
+        renderSection(field);
+      } else if (field.fieldType === 'title') {
+        renderTitle(field);
+      } else if (field.fieldType === 'image') {
+        renderImage(field);
+      } else if (field.fieldType === 'qrcode' || field.fieldType === 'divider') {
+        // Sans coordonnées, ni QR code ni filet n'ont de place utile.
+      } else {
+        renderField(field);
+      }
+    });
+  }
 
-  pageFields.forEach(field => {
-    const avant = formFields.childElementCount;
-    if (field.fieldType === 'section') {
-      renderSection(field);
-    } else if (field.fieldType === 'title') {
-      renderTitle(field);
-    } else if (field.fieldType === 'image') {
-      renderImage(field);
-    } else if (field.fieldType === 'qrcode') {
-      // Skip QR codes in form view
-    } else {
-      renderField(field);
-    }
-    if (canevas) {
-      // Un rendu peut poser plusieurs nœuds : on les positionne tous.
-      Array.prototype.slice.call(formFields.children, avant).forEach(n => positionner(n, field));
-    }
-  });
-  
   // Initialiser les signatures
   initSignatures();
-  
+
   // Initialiser les conditions
   initConditions();
 
   // Initialiser les sources d'options dynamiques (cascade)
   initDynamicSources();
   activerRecherche();
+  majTousMulti();
 
   // Initialiser les calculs
   initCalculations();
-  
-  updatePageIndicator();
-}
 
-// Passer d'un canevas à un empilement selon la largeur disponible : on redessine, sans
-// perdre les valeurs déjà saisies puisqu'elles vivent dans le document.
-let _redessin = null;
-window.addEventListener('resize', () => {
-  clearTimeout(_redessin);
-  _redessin = setTimeout(() => { if (formConfig && formConfig.fields) renderForm(); }, 200);
-});
+  updatePageIndicator();
+  ajusterHauteur();
+  surveillerTailles();
+}
 
 function renderSection(field) {
   const section = document.createElement('div');
@@ -583,51 +711,172 @@ function renderSection(field) {
 
 function renderTitle(field) {
   const title = document.createElement('div');
-  // Mêmes règles que l'éditeur, à la ligne près : fontSize est exprimé en POINTS, comme
-  // l'annonce le panneau « Taille (pt) ». Il était ici interprété en `em`, avec un défaut de
-  // 1,2 — un titre réglé à 14 s'affichait donc en 14 em, soit une dizaine de centimètres.
-  title.style.fontSize = (field.fontSize || 14) + 'pt';
-  title.style.fontWeight = field.fontWeight || '600';
-  title.style.color = field.textColor || '#1e293b';
-  if (field.fontFamily) title.style.fontFamily = field.fontFamily;
-  if (field.fontStyle) title.style.fontStyle = field.fontStyle;
-  if (field.textDecoration) title.style.textDecoration = field.textDecoration;
-  if (field.textAlign) title.style.textAlign = field.textAlign;
-  if (field.lineHeight) title.style.lineHeight = field.lineHeight;
-  if (field.transparent) title.style.backgroundColor = 'transparent';
-  else if (field.bgColor) {
-    title.style.backgroundColor = field.bgColor;
-    title.style.padding = '8px 12px';
-    title.style.borderRadius = '6px';
-  }
-  title.style.marginBottom = '12px';
+  title.style.cssText = `font-size: ${Math.min(field.fontSize || 14, 20)}pt; font-weight: 600; color: ${field.textColor || '#1e293b'}; margin-bottom: 15px;`;
   title.textContent = field.label;
   formFields.appendChild(title);
 }
 
 function renderImage(field) {
-  // Un cadre est posé même sans image : il porte les dimensions voulues, et le canevas reste
-  // fidèle. Sans lui, l'emplacement disparaissait et ce qui suivait remontait d'autant.
-  const cadre = document.createElement('div');
-  cadre.style.marginBottom = '12px';
-  const src = /^https?:\/\//i.test(String(field.imageUrl || '').trim())
-    ? String(field.imageUrl).trim() : (field.imageData || '');
-  if (src) {
+  if (field.imageData) {
     const img = document.createElement('img');
-    img.src = src;
-    img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; border-radius: 8px; display: block;';
-    cadre.appendChild(img);
+    img.src = field.imageData;
+    img.style.cssText = 'max-width: 100%; height: auto; margin-bottom: 20px; border-radius: 8px;';
+    formFields.appendChild(img);
   }
-  formFields.appendChild(cadre);
+}
+
+// ─── Cases à cocher en menu déroulant ────────────────────────────────────────
+//
+// Une longue liste de cases occupe toute la page. Option « Affichage en menu déroulant » :
+// les cases sont repliées sous un bouton qui résume la sélection et s'ouvrent au clic.
+//
+// Le groupe de cases (#input-<id>) RESTE le porteur des valeurs : la soumission, les
+// conditions, les cascades et le chargement d'un enregistrement lisent et réécrivent ses
+// cases comme avant. On l'enveloppe seulement — même principe que la liste cherchable.
+// Les écouteurs sont délégués au document : ils survivent aux cascades, qui réécrivent le
+// contenu du groupe.
+
+/** Enveloppe le HTML d'un groupe de cases dans le bouton + panneau déroulant. */
+function enveloppeMulti(field, groupeHtml) {
+  return `<div class="fb-multi">
+      <button type="button" class="form-input fb-multi-btn fb-multi-vide" data-placeholder="${escHtml(field.placeholder || 'Sélectionner...')}">${escHtml(field.placeholder || 'Sélectionner...')}</button>
+      <div class="fb-multi-drop">
+        <input type="text" class="fb-multi-rech" placeholder="Rechercher..." autocomplete="off">
+        ${groupeHtml}
+      </div>
+    </div>`;
+}
+
+/** Met à jour le résumé affiché sur le bouton d'un menu de cases. */
+function majMulti(boite) {
+  const btn = boite.querySelector('.fb-multi-btn');
+  const groupe = boite.querySelector('.form-checkbox-group');
+  const rech = boite.querySelector('.fb-multi-rech');
+  if (!btn || !groupe) return;
+  const cases = Array.prototype.slice.call(groupe.querySelectorAll('input[type="checkbox"]'));
+  const coches = cases.filter(c => c.checked).map(c => {
+    const l = c.closest('label');
+    return ((l && l.textContent) || c.value || '').trim();
+  });
+  let texte;
+  let alerte = false;
+  if (!cases.length) {
+    // Aucune case : le groupe porte le diagnostic (« Aucun résultat… ») — on le montre.
+    texte = groupe.textContent.trim() || 'Aucune option';
+    alerte = true;
+  } else if (!coches.length) {
+    texte = btn.dataset.placeholder || 'Sélectionner...';
+  } else {
+    texte = coches.length === 1 ? coches[0] : coches.length + ' choix : ' + coches.join(', ');
+  }
+  btn.textContent = texte;
+  btn.title = (coches.length || alerte) ? texte : '';
+  btn.classList.toggle('fb-multi-vide', !coches.length);
+  btn.style.borderColor = alerte ? '#f59e0b' : '';
+  // La recherche n'a d'intérêt que sur une liste longue.
+  if (rech) rech.style.display = cases.length > RECHERCHE_SEUIL ? '' : 'none';
+}
+
+/** Idem, à partir du groupe de cases (appelée par les cascades après réécriture). */
+function majMultiDe(groupe) {
+  const boite = groupe && groupe.closest ? groupe.closest('.fb-multi') : null;
+  if (boite) majMulti(boite);
+}
+
+function majTousMulti() {
+  Array.prototype.forEach.call(document.querySelectorAll('.fb-multi'), majMulti);
+}
+
+/** Hisse le champ hôte au premier plan tant que son menu est ouvert (voir rendreCherchable). */
+function premierPlanMulti(boite, oui) {
+  const hote = boite.closest('.fb-abs, .form-field-view');
+  if (!hote) return;
+  if (oui) {
+    if (hote.dataset.zOrigineMulti === undefined) hote.dataset.zOrigineMulti = hote.style.zIndex || '';
+    hote.style.zIndex = '10000';
+  } else if (hote.dataset.zOrigineMulti !== undefined) {
+    hote.style.zIndex = hote.dataset.zOrigineMulti;
+    delete hote.dataset.zOrigineMulti;
+  }
+}
+
+function filtrerMulti(boite, q) {
+  const t = String(q || '').trim().toLowerCase();
+  Array.prototype.forEach.call(boite.querySelectorAll('.form-checkbox-item'), l => {
+    l.style.display = (!t || l.textContent.toLowerCase().indexOf(t) !== -1) ? '' : 'none';
+  });
+}
+
+function fermerMulti() {
+  Array.prototype.forEach.call(document.querySelectorAll('.fb-multi.ouvert'), b => {
+    b.classList.remove('ouvert');
+    premierPlanMulti(b, false);
+    const r = b.querySelector('.fb-multi-rech');
+    if (r) { r.value = ''; filtrerMulti(b, ''); }
+  });
+}
+
+document.addEventListener('click', function (e) {
+  const cible = e.target;
+  if (!cible || !cible.closest) return;
+  const btn = cible.closest('.fb-multi-btn');
+  const boite = cible.closest('.fb-multi');
+  if (btn && boite) {
+    const dejaOuvert = boite.classList.contains('ouvert');
+    fermerMulti();
+    if (!dejaOuvert) {
+      majMulti(boite);
+      boite.classList.add('ouvert');
+      premierPlanMulti(boite, true);
+      const r = boite.querySelector('.fb-multi-rech');
+      if (r && r.style.display !== 'none') r.focus();
+    }
+    return;
+  }
+  if (!boite) fermerMulti(); // clic ailleurs : on referme
+});
+document.addEventListener('change', function (e) {
+  const c = e.target;
+  if (!c || c.type !== 'checkbox' || !c.closest) return;
+  const boite = c.closest('.fb-multi');
+  if (boite) majMulti(boite);
+});
+document.addEventListener('input', function (e) {
+  const r = e.target;
+  if (!r || !r.classList || !r.classList.contains('fb-multi-rech')) return;
+  filtrerMulti(r.closest('.fb-multi'), r.value);
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') fermerMulti();
+});
+
+/**
+ * Applique à un champ rendu la typographie réglée dans le panneau Propriétés.
+ *
+ * On pose des variables CSS sur le conteneur du champ, et des attributs qui activent les
+ * règles correspondantes de la feuille de style. Tout ce qui est créé ensuite à l'intérieur
+ * — options rechargées par une cascade, liste cherchable — en hérite sans autre appel.
+ */
+function appliquerPolices(el, f) {
+  if (!el || !f) return;
+  const poser = (attr, prop, v) => {
+    if (v) { el.setAttribute(attr, ''); el.style.setProperty(prop, String(v)); }
+  };
+  poser('data-fb-pl', '--fb-pl', f.labelFontFamily);
+  poser('data-fb-tl', '--fb-tl', f.labelFontSize ? f.labelFontSize + 'pt' : '');
+  poser('data-fb-gl', '--fb-gl', f.labelBold ? '700' : '');
+  poser('data-fb-cl', '--fb-cl', f.labelColor);
+  poser('data-fb-pc', '--fb-pc', f.inputFontFamily);
+  poser('data-fb-tc', '--fb-tc', f.inputFontSize ? f.inputFontSize + 'pt' : '');
 }
 
 function renderField(field) {
   const group = document.createElement('div');
   group.className = 'form-field-group';
   group.dataset.fieldId = field.id;
-  
+
   let inputHtml = '';
-  
+
   switch (field.fieldType) {
     case 'textarea':
       inputHtml = `<textarea id="input-${field.id}" class="form-textarea" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}></textarea>`;
@@ -667,7 +916,16 @@ function renderField(field) {
       `;
       break;
     case 'date':
-      inputHtml = `<input type="date" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
+      inputHtml = `<input type="${typeInputDate(field)}" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
+      break;
+    case 'file':
+      inputHtml = isPublicMode
+        ? `<div class="file-indispo">📎 L'envoi de fichiers n'est pas disponible dans ce formulaire. Transmettez votre document par un autre moyen.</div>`
+        : `<div class="fb-fichier">
+          <input type="file" id="input-${field.id}" class="form-input fb-fichier-input" ${field.fileMultiple !== false ? 'multiple' : ''} ${field.fileAccept ? `accept="${escHtml(field.fileAccept)}"` : ''}>
+          <label for="input-${field.id}" class="fb-fichier-btn">📎 ${field.fileMultiple !== false ? 'Choisir des fichiers' : 'Choisir un fichier'}</label>
+          <span class="fb-fichier-noms" id="noms-${field.id}">Aucun fichier</span>
+        </div>`;
       break;
     case 'number':
       inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
@@ -688,13 +946,20 @@ function renderField(field) {
     default:
       inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
   }
-  
+
+  if (field.fieldType === 'checkbox' && field.checkboxDropdown) inputHtml = enveloppeMulti(field, inputHtml);
+
   // Layout selon position du label
-  if (field.labelPosition === 'left') {
+  if (field.hideLabel) {
+    group.innerHTML = `
+      ${inputHtml}
+      <div class="form-error" id="error-${field.id}"></div>
+    `;
+  } else if (field.labelPosition === 'left') {
     group.innerHTML = `
       <div style="display: flex; align-items: flex-start; gap: 15px;">
-        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 120px; padding-top: 12px;">${escHtml(field.label)}</label>
-        <div style="flex: 1;">
+        <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 80px; max-width: 40%; padding-top: 8px;">${escHtml(field.label)}</label>
+        <div style="flex: 1; min-width: 0;">
           ${inputHtml}
           <div class="form-error" id="error-${field.id}"></div>
         </div>
@@ -707,8 +972,10 @@ function renderField(field) {
       <div class="form-error" id="error-${field.id}"></div>
     `;
   }
-  
+
+  appliquerPolices(group, field);
   formFields.appendChild(group);
+  return group;
 }
 
 function initSignatures() {
@@ -716,16 +983,16 @@ function initSignatures() {
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
-    
+
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
-    
+
     canvas.addEventListener('mousedown', (e) => {
       isDrawing = true;
       [lastX, lastY] = [e.offsetX, e.offsetY];
     });
-    
+
     canvas.addEventListener('mousemove', (e) => {
       if (!isDrawing) return;
       ctx.beginPath();
@@ -737,10 +1004,10 @@ function initSignatures() {
       ctx.stroke();
       [lastX, lastY] = [e.offsetX, e.offsetY];
     });
-    
+
     canvas.addEventListener('mouseup', () => isDrawing = false);
     canvas.addEventListener('mouseout', () => isDrawing = false);
-    
+
     // Touch support
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -749,7 +1016,7 @@ function initSignatures() {
       isDrawing = true;
       [lastX, lastY] = [touch.clientX - rect.left, touch.clientY - rect.top];
     });
-    
+
     canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
       if (!isDrawing) return;
@@ -764,10 +1031,10 @@ function initSignatures() {
       ctx.stroke();
       [lastX, lastY] = [touch.clientX - rect.left, touch.clientY - rect.top];
     });
-    
+
     canvas.addEventListener('touchend', () => isDrawing = false);
   });
-  
+
   document.querySelectorAll('.signature-clear').forEach(btn => {
     btn.addEventListener('click', () => {
       const canvasId = btn.dataset.canvas;
@@ -782,22 +1049,22 @@ function initSignatures() {
 
 function initConditions() {
   if (!formConfig || !formConfig.fields) return;
-  
+
   formConfig.fields.forEach(field => {
     if (!field.condition || !field.condition.fieldId) return;
-    
+
     const group = document.querySelector(`.form-field-group[data-field-id="${field.id}"]`);
     if (!group) return;
-    
+
     const sourceField = formConfig.fields.find(f => f.id === field.condition.fieldId);
     if (!sourceField) return;
-    
+
     const sourceInput = document.getElementById(`input-${field.condition.fieldId}`);
     if (!sourceInput) return;
-    
+
     function checkCondition() {
       let sourceValue = '';
-      
+
       if (sourceField.fieldType === 'radio') {
         const checked = sourceInput.querySelector('input:checked');
         sourceValue = checked ? checked.value : '';
@@ -807,10 +1074,10 @@ function initConditions() {
       } else {
         sourceValue = sourceInput.value || '';
       }
-      
+
       let visible = false;
       const condValue = field.condition.value || '';
-      
+
       switch (field.condition.operator) {
         case 'equals':
           visible = sourceValue === condValue;
@@ -828,10 +1095,10 @@ function initConditions() {
           visible = sourceValue === '';
           break;
       }
-      
+
       group.classList.toggle('hidden', !visible);
     }
-    
+
     if (sourceField.fieldType === 'radio' || sourceField.fieldType === 'checkbox') {
       sourceInput.querySelectorAll('input').forEach(input => {
         input.addEventListener('change', checkCondition);
@@ -840,7 +1107,7 @@ function initConditions() {
       sourceInput.addEventListener('input', checkCondition);
       sourceInput.addEventListener('change', checkCondition);
     }
-    
+
     checkCondition();
   });
 }
@@ -1074,21 +1341,17 @@ async function reloadDynamicField(field) {
     const c = document.getElementById(`input-${field.id}`);
     if (!c) return;
     const sel = Array.isArray(currentValue) ? currentValue : [];
-    if (hint) { c.innerHTML = emptyHintHtml(hint); return; }
+    if (hint) { c.innerHTML = emptyHintHtml(hint); majMultiDe(c); return; }
     c.innerHTML = opts.map(o => `
       <label class="form-checkbox-item">
         <input type="checkbox" value="${escHtml(o.value)}" ${sel.includes(o.value) ? 'checked' : ''}>
         <span>${escHtml(o.label)}</span>
       </label>
     `).join('');
+    majMultiDe(c);
   }
 }
 
-// Au-delà de ce nombre d'options, une liste déroulante devient cherchable.
-var RECHERCHE_SEUIL = 8;
-// Au-delà, on tronque l'affichage : un panneau de mille lignes ne sert personne, et la
-// recherche est justement là pour affiner.
-var RECHERCHE_MAX = 200;
 
 /**
  * Transforme une liste déroulante longue en liste cherchable.
@@ -1136,6 +1399,23 @@ function rendreCherchable(sel) {
     inp.style.borderColor = sel.style.borderColor || '';
   }
 
+
+  // Liste ouverte au premier plan. Dans la mise en page, chaque champ placé porte son propre
+  // z-index (l'ordre de l'éditeur) : le panneau restait enfermé dans celui de son champ et
+  // passait SOUS les champs suivants. On hisse le champ hôte le temps de l'ouverture.
+  var hote = box.closest('.fb-abs, .form-field-view');
+  function premierPlan(oui) {
+    if (!hote) return;
+    if (oui) {
+      if (hote.dataset.zOrigine === undefined) hote.dataset.zOrigine = hote.style.zIndex || '';
+      hote.style.zIndex = '10000';
+    } else if (hote.dataset.zOrigine !== undefined) {
+      hote.style.zIndex = hote.dataset.zOrigine;
+      delete hote.dataset.zOrigine;
+    }
+  }
+  function fermer() { pan.hidden = true; premierPlan(false); }
+
   function ligne(texte, cls, onPick) {
     var d = document.createElement('div');
     d.className = cls;
@@ -1144,20 +1424,6 @@ function rendreCherchable(sel) {
     pan.appendChild(d);
   }
 
-
-  // En mise en page absolue, chaque champ porte son propre z-index : le panneau reste
-  // prisonnier du contexte d'empilement de son champ et passe SOUS les champs posés après
-  // lui, malgré son z-index élevé. On hausse donc le champ entier le temps de l'ouverture.
-  var zAvant = null, hausse = null;
-  function hausser() {
-    hausse = box.closest ? box.closest('[style*="position: absolute"]') : null;
-    if (!hausse) { var p = box.parentNode; while (p && p.style && p.style.position !== 'absolute') p = p.parentNode;
-      hausse = (p && p.style) ? p : null; }
-    if (hausse) { zAvant = hausse.style.zIndex; hausse.style.zIndex = '1000'; }
-  }
-  function rabaisser() {
-    if (hausse) { hausse.style.zIndex = zAvant || ''; hausse = null; zAvant = null; }
-  }
   function ouvrir(q) {
     var t = String(q || '').trim().toLowerCase();
     var tous = Array.prototype.slice.call(sel.options, 1);
@@ -1170,24 +1436,23 @@ function rendreCherchable(sel) {
       ligne(o.text, 'fb-rech-item' + (o.value === sel.value ? ' sel' : ''), function () {
         sel.value = o.value;
         sync();
-        rabaisser();
-        pan.hidden = true;
+        fermer();
         sel.dispatchEvent(new Event('change'));
       });
     });
     if (trouves.length > RECHERCHE_MAX) {
       ligne('… et ' + (trouves.length - RECHERCHE_MAX) + ' autre(s) — affinez la recherche', 'fb-rech-vide');
     }
-    hausser();
     pan.hidden = false;
+    premierPlan(true);
   }
 
   inp.addEventListener('focus', function () { ouvrir(''); });
   inp.addEventListener('input', function () { ouvrir(inp.value); });
   // Le clic sur une ligne passe par mousedown : au moment du blur, la valeur est déjà posée.
-  inp.addEventListener('blur', function () { setTimeout(function () { rabaisser(); pan.hidden = true; sync(); }, 120); });
+  inp.addEventListener('blur', function () { setTimeout(function () { fermer(); sync(); }, 120); });
   inp.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { rabaisser(); pan.hidden = true; inp.blur(); }
+    if (e.key === 'Escape') { fermer(); inp.blur(); }
   });
   sel.addEventListener('change', sync);
   sync();
@@ -1248,29 +1513,29 @@ function initCalculations() {
 
   const calculatedFields = formConfig.fields.filter(f => f.fieldType === 'calculated');
   if (calculatedFields.length === 0) return;
-  
+
   function recalculateAll() {
     calculatedFields.forEach(field => {
       const resultEl = document.getElementById(`input-${field.id}`);
       if (!resultEl) return;
-      
+
       let valueA = 0;
       let valueB = 0;
-      
+
       if (field.calcFieldA) {
         const inputA = document.getElementById(`input-${field.calcFieldA}`);
         if (inputA) valueA = parseFloat(inputA.value) || 0;
       }
-      
+
       if (field.calcFieldB === '_constant') {
         valueB = field.calcConstant || 0;
       } else if (field.calcFieldB) {
         const inputB = document.getElementById(`input-${field.calcFieldB}`);
         if (inputB) valueB = parseFloat(inputB.value) || 0;
       }
-      
+
       let result = 0;
-      
+
       switch (field.calcType || 'sum') {
         case 'sum': result = valueA + valueB; break;
         case 'subtract': result = valueA - valueB; break;
@@ -1284,12 +1549,12 @@ function initCalculations() {
           } catch (e) { result = 0; }
           break;
       }
-      
+
       const decimals = field.calcDecimals !== undefined ? field.calcDecimals : 2;
       resultEl.textContent = result.toFixed(decimals);
     });
   }
-  
+
   formConfig.fields.forEach(field => {
     if (field.fieldType === 'number') {
       const input = document.getElementById(`input-${field.id}`);
@@ -1299,7 +1564,7 @@ function initCalculations() {
       }
     }
   });
-  
+
   recalculateAll();
 }
 
@@ -1315,30 +1580,271 @@ function showToast(message, type = 'info') {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+
+// ─── Pièces jointes ───────────────────────────────────────────────────────────
+
+/** Message d'erreur pour un champ fichier, ou '' s'il est valide. */
+function fileFieldError(field, files, existing) {
+  if (field.required && !files.length && !(existing && existing.length)) return 'Ce champ est obligatoire';
+  if (field.fileMultiple === false && files.length > 1) return 'Un seul fichier autorisé';
+  const max = Number((field.fileMaxMb === undefined || field.fileMaxMb === null) ? 10 : field.fileMaxMb);
+  if (max > 0) {
+    const trop = files.find(f => f.size > max * 1024 * 1024);
+    if (trop) return `« ${trop.name} » dépasse ${max} Mo`;
+  }
+  return '';
+}
+
+/**
+ * Téléverse des fichiers dans le document et rend leurs identifiants.
+ *
+ * L'API des widgets n'expose pas de téléversement : on passe par le jeton d'accès
+ * (requiredAccess 'full' requis) et l'API REST du document. Grist répond par un tableau
+ * d'identifiants, à écrire dans une colonne Pièces jointes sous la forme ['L', …ids].
+ */
+
+// ─── Relais par l'extension « Grist Widget Bridge » ──────────────────────────
+//
+// Le widget est servi depuis un autre site que Grist : ses requêtes partent sans le cookie du
+// portail d'authentification, qui les redirige vers la connexion. L'extension injecte dans la
+// page Grist elle-même un relais (grist-host-bridge.js) : le fichier lui est confié par
+// postMessage, et c'est la page Grist — même site, cookie compris — qui l'envoie.
+//
+// Protocole v1 de l'extension : HANDSHAKE → HANDSHAKE_ACK, puis UPLOAD { base64, name, type }
+// → { result: [ids] } ou { error }. Un fichier par message.
+
+let pontGrist = null; // Promise<string|null> : origine de la page Grist si le relais répond
+
+function pontDisponible() {
+  if (pontGrist) return pontGrist;
+  pontGrist = new Promise(resolve => {
+    if (window.parent === window) { resolve(null); return; }
+    const fin = setTimeout(() => { window.removeEventListener('message', ecoute); resolve(null); }, 800);
+    function ecoute(e) {
+      if (e.source !== window.parent) return;
+      const m = e.data;
+      if (!m || !m._gristBridge || m.type !== 'HANDSHAKE_ACK') return;
+      clearTimeout(fin);
+      window.removeEventListener('message', ecoute);
+      resolve(e.origin); // les fichiers ne partiront que vers cette origine
+    }
+    window.addEventListener('message', ecoute);
+    // Le handshake ne contient rien de sensible : '*' permet de découvrir l'origine du parent.
+    window.parent.postMessage({ _gristBridge: true, type: 'HANDSHAKE', version: '1' }, '*');
+  });
+  return pontGrist;
+}
+
+function lireBase64(fichier) {
+  return new Promise((ok, ko) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] || '');
+    r.onerror = () => ko(r.error || new Error('lecture du fichier impossible'));
+    r.readAsDataURL(fichier);
+  });
+}
+
+async function envoyerParPont(fichier, origine, docId) {
+  const base64 = await lireBase64(fichier);
+  const requestId = 'fbp_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return new Promise((ok, ko) => {
+    const fin = setTimeout(() => {
+      window.removeEventListener('message', ecoute);
+      ko(new Error(`l'extension Grist Widget Bridge n'a pas répondu pour « ${fichier.name} ». Rien n'a été enregistré.`));
+    }, 120000);
+    function ecoute(e) {
+      if (e.source !== window.parent || e.origin !== origine) return;
+      const m = e.data;
+      if (!m || !m._gristBridge || m.requestId !== requestId) return;
+      clearTimeout(fin);
+      window.removeEventListener('message', ecoute);
+      if (m.error) ko(new Error(`envoi de « ${fichier.name} » refusé par Grist (via l'extension) : ${m.error}. Rien n'a été enregistré.`));
+      else ok(Array.isArray(m.result) ? m.result : [m.result]);
+    }
+    window.addEventListener('message', ecoute);
+    window.parent.postMessage({
+      _gristBridge: true, type: 'UPLOAD', version: '1', requestId,
+      payload: { base64, name: fichier.name, type: fichier.type || 'application/octet-stream', docId }
+    }, origine);
+  });
+}
+
+async function uploadAttachments(files) {
+  const { token, baseUrl } = await grist.docApi.getAccessToken({ readOnly: false });
+
+  // 1) Par l'extension, quand elle est installée et que ce widget y est déclaré.
+  const origineGrist = await pontDisponible();
+  if (origineGrist) {
+    const docId = (String(baseUrl).match(/\/api\/docs\/([^/?#]+)/) || [])[1] || '';
+    const ids = [];
+    for (const f of files) ids.push(...await envoyerParPont(f, origineGrist, docId));
+    return ids;
+  }
+
+  // 2) Sinon, envoi direct à l'API (fonctionne quand aucun portail ne s'interpose).
+  const fd = new FormData();
+  files.forEach(f => fd.append('upload', f, f.name));
+  const hote = (function () { try { return new URL(baseUrl).host; } catch (e) { return 'le serveur Grist'; } })();
+  // Grist accepte cette requête d'une autre origine (jeton dans l'URL, sans cookie) : s'il
+  // y a blocage, il vient d'un intermédiaire.
+  let res;
+  try {
+    res = await fetch(`${baseUrl}/attachments?auth=${encodeURIComponent(token)}`, { method: 'POST', body: fd });
+  } catch (e) {
+    // Le navigateur ne dit pas pourquoi (réseau, redirection, CORS) et interdit de le savoir.
+    // Grist acceptant cette requête, la cause est un intermédiaire placé devant lui.
+    throw new Error(`${hote} a intercepté l'envoi du fichier avant qu'il n'atteigne Grist `
+      + '(portail d\'authentification, proxy ou pare-feu). Les adresses /api/docs/…/attachments '
+      + 'doivent être laissées passer : Grist vérifie lui-même le jeton. '
+      + 'Contournement : installer l\'extension Grist Widget Bridge et y déclarer cette page comme widget. '
+      + 'Rien n\'a été enregistré.');
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !Array.isArray(data)) {
+    const raison = res.status === 413 ? 'fichier trop volumineux pour le serveur'
+      : (res.status === 401 || res.status === 403) ? 'droits insuffisants sur le document'
+      : ((data && data.error) || 'HTTP ' + res.status);
+    throw new Error('envoi du fichier refusé : ' + raison + '. Rien n\'a été enregistré.');
+  }
+  return data;
+}
+
+// ─── Date, date + heure, heure seule ─────────────────────────────────────────
+
+/** Mode d'un champ Date : 'date' (défaut), 'datetime' ou 'time'. */
+function modeDate(field) {
+  return (field && field.dateMode) || 'date';
+}
+
+/** Type de l'<input> HTML correspondant au mode. */
+function typeInputDate(field) {
+  const m = modeDate(field);
+  return m === 'datetime' ? 'datetime-local' : (m === 'time' ? 'time' : 'date');
+}
+
+/**
+ * Valeur à écrire dans Grist pour une saisie date + heure (« 2026-11-05T10:30 »).
+ *
+ * Une colonne DateTime stocke des secondes depuis 1970 : on convertit en instant absolu, à
+ * partir de l'heure locale du navigateur — Grist l'affichera ensuite dans le fuseau de la
+ * colonne. Une colonne Date ne garde que le jour. Ailleurs (Texte, type inconnu), on écrit un
+ * texte lisible « 05/11/2026 10:30 ». Date seule et heure seule passent inchangées.
+ */
+function valeurDateHeure(raw, mode, colType) {
+  if (!raw) return null;
+  if (mode !== 'datetime') return raw;
+  const t = String(colType || '');
+  if (t.startsWith('DateTime')) {
+    const ms = new Date(raw).getTime();
+    return isNaN(ms) ? raw : Math.floor(ms / 1000);
+  }
+  if (t === 'Date') return raw.slice(0, 10);
+  const [jour, heure] = String(raw).split('T');
+  const [a, m, j] = jour.split('-');
+  return `${j}/${m}/${a}${heure ? ' ' + heure.slice(0, 5) : ''}`;
+}
+
+/**
+ * Valeur Grist → valeur d'<input> (date, datetime-local ou time).
+ *
+ * fetchTable rend des secondes depuis 1970, onRecord peut rendre des objets Date, et une
+ * colonne Texte rend ce qu'on y a écrit. Une colonne Date vaut minuit UTC : on la lit en UTC,
+ * sinon elle reculerait d'un jour à l'ouest de Greenwich. Une DateTime se lit en heure locale.
+ */
+function versChampDate(value, mode) {
+  if (value === null || value === undefined || value === '') return '';
+  const p = n => String(n).padStart(2, '0');
+  if (mode === 'time') {
+    const m = String(value).match(/(\d{1,2}):(\d{2})/);
+    return m ? `${p(m[1])}:${m[2]}` : '';
+  }
+  let d;
+  if (value instanceof Date) d = value;
+  else if (typeof value === 'number') d = new Date(value * 1000);
+  else {
+    const s = String(value).trim();
+    if (mode === 'date' && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    if (mode === 'datetime' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
+    const fr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}:\d{2}))?/);
+    if (fr) return mode === 'date' ? `${fr[3]}-${fr[2]}-${fr[1]}` : `${fr[3]}-${fr[2]}-${fr[1]}T${fr[4] || '00:00'}`;
+    d = new Date(s);
+  }
+  if (isNaN(d)) return '';
+  if (mode === 'date') return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Colonne de destination d'un champ : columnId, sinon dérivée du libellé (comme labelToColumnId). */
+function colIdOf(field) {
+  return field.columnId || ((field.label || 'col').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 40) || 'col');
+}
+
+/** Types des colonnes d'une table, lus dans les métadonnées (mode Grist uniquement). */
+async function typesColonnes(tableId) {
+  const tables = await grist.docApi.fetchTable('_grist_Tables');
+  const cols = await grist.docApi.fetchTable('_grist_Tables_column');
+  const ref = tables.id[tables.tableId.indexOf(tableId)];
+  const types = {};
+  cols.id.forEach((_, i) => { if (cols.parentId[i] === ref) types[cols.colId[i]] = cols.type[i]; });
+  return types;
+}
+
+
+// Affiche les noms des fichiers choisis à côté du bouton (voir .fb-fichier).
+document.addEventListener('change', function (e) {
+  const i = e.target;
+  if (!i || !i.classList || !i.classList.contains('fb-fichier-input')) return;
+  const n = document.getElementById('noms-' + i.id.replace(/^input-/, ''));
+  if (!n) return;
+  const f = Array.from(i.files || []);
+  n.textContent = f.length ? f.map(x => x.name).join(', ') : 'Aucun fichier';
+  n.title = n.textContent;
+});
+
 async function submitForm() {
   const destTable = formConfig?.responseTableId || formConfig?.tableId;
   if (!formConfig || !destTable) {
     showToast('Configuration invalide', 'error');
     return;
   }
-  
+
   const record = {};
   let hasError = false;
-  
+  const pendingFiles = [];   // fichiers à téléverser après validation
+  const dateTimeCols = [];   // colonnes saisies en date + heure
+
   formConfig.fields.forEach(field => {
     if (field.fieldType === 'section' || field.fieldType === 'title' || field.fieldType === 'image' || field.fieldType === 'qrcode') return;
-    
+
     const group = document.querySelector(`.form-field-group[data-field-id="${field.id}"]`);
     if (group && group.classList.contains('hidden')) return;
-    
+
     const errorEl = document.getElementById(`error-${field.id}`);
     if (errorEl) {
       errorEl.textContent = '';
       errorEl.classList.remove('show');
     }
-    
+
+    if (field.fieldType === 'file') {
+      // Ni la clé de partage ni le proxy ne transportent de fichier : en mode public le
+      // champ est seulement informatif, et ne bloque pas l'envoi même s'il est obligatoire.
+      if (isPublicMode) return;
+      const input = document.getElementById(`input-${field.id}`);
+      const files = input && input.files ? Array.from(input.files) : [];
+      const err = fileFieldError(field, files, []);
+      if (err) {
+        if (errorEl) { errorEl.textContent = err; errorEl.classList.add('show'); }
+        hasError = true;
+        return;
+      }
+      if (files.length) pendingFiles.push({ colId: colIdOf(field), files });
+      return;
+    }
+    if (field.fieldType === 'date' && modeDate(field) === 'datetime') dateTimeCols.push(colIdOf(field));
+
     let value = null;
-    
+
     if (field.fieldType === 'radio') {
       const container = document.getElementById(`input-${field.id}`);
       const checked = container?.querySelector('input:checked');
@@ -1368,7 +1874,7 @@ async function submitForm() {
         value = input ? input.value : null;
       }
     }
-    
+
     // Validation
     if (field.required && (value === null || value === '' || (Array.isArray(value) && value.length === 0))) {
       if (errorEl) {
@@ -1378,7 +1884,7 @@ async function submitForm() {
       hasError = true;
       return;
     }
-    
+
     if (value !== null && value !== '') {
       if (field.fieldType === 'number') {
         value = parseFloat(value);
@@ -1399,7 +1905,7 @@ async function submitForm() {
           return;
         }
       }
-      
+
       // Longueurs mini / maxi : réglables dans le panneau de droite et
       // appliquées par l'onglet Saisie du constructeur, mais jamais vérifiées
       // ici — le formulaire public les laissait passer.
@@ -1434,28 +1940,37 @@ async function submitForm() {
         }
       }
     }
-    
+
     if (Array.isArray(value)) {
       value = value.join(', ');
     }
-    
+
     // Utiliser columnId ou dériver du label (même logique que labelToColumnId côté widget)
-    const colId = field.columnId || ((field.label || 'col').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 40) || 'col');
+    const colId = colIdOf(field);
     if (colId) record[colId] = value;
   });
-  
+
   if (hasError) {
     showToast('Veuillez corriger les erreurs', 'error');
     return;
   }
-  
+
   // Ajouter l'horodatage seulement si la colonne existe dans la config
   const hasSoumisLe = formConfig.fields.some(f => f.columnId === 'Soumis_le');
   if (hasSoumisLe || formConfig.hasTimestamp) {
     record['Soumis_le'] = Math.floor(Date.now() / 1000);
   }
-  
+
   try {
+    // Types des colonnes visées : transmis par le lien en mode public, lus dans le document sinon.
+    let types = (formConfig.colTypes) || {};
+    if (!isPublicMode && (pendingFiles.length || dateTimeCols.length)) {
+      try { types = await typesColonnes(destTable); } catch (e) { /* types inconnus : texte lisible */ }
+    }
+    dateTimeCols.forEach(col => {
+      if (record[col] !== undefined) record[col] = valeurDateHeure(record[col], 'datetime', types[col]);
+    });
+
     if (isPublicMode) {
       let res;
       if (publicPostUrl) {
@@ -1480,33 +1995,27 @@ async function submitForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const detail = (data && (data.error || (data.details && data.details.userError))) || '';
-        // Grist répond « Blocked by table create access rules » sans dire laquelle. En
-        // pratique une clé de partage n'autorise l'écriture que dans la table du formulaire
-        // publié dont elle provient : poster ailleurs est refusé, quels que soient les droits.
-        if (/access rules?/i.test(detail)) {
-          const cible = (function () {
-            try { return decodeURIComponent(publicPostUrl).split('/tables/')[1].split('/')[0]; }
-            catch (e) { return 'la table visée'; }
-          })();
-          throw new Error('Grist refuse la création dans « ' + cible + ' ». Une clé de partage '
-            + 'n\'autorise l\'écriture que dans la table du formulaire publié dont elle provient, '
-            + 'et seulement dans ses colonnes. Vérifiez que la table de réponses du formulaire est '
-            + 'bien celle sur laquelle le formulaire Grist a été publié, et qu\'elle possède les '
-            + 'colonnes envoyées. (' + detail + ')');
-        }
         throw new Error(detail || 'Erreur ' + res.status + (res.status === 404 ? ' — clé de partage inconnue ou table absente' : ''));
       }
     } else {
       // Mode Grist : écrire directement via l'API interne
+      if (pendingFiles.length) {
+        // Vérifié AVANT téléversement, pour ne pas laisser de fichiers orphelins.
+        const mauvaise = pendingFiles.find(p => types[p.colId] !== 'Attachments');
+        if (mauvaise) throw new Error(`la colonne "${mauvaise.colId}" n'est pas de type Pièces jointes`);
+        for (const p of pendingFiles) {
+          record[p.colId] = ['L', ...(await uploadAttachments(p.files))];
+        }
+      }
       await grist.docApi.applyUserActions([
         ['AddRecord', destTable, null, record]
       ]);
     }
-    
+
     formContent.style.display = 'none';
     formActions.style.display = 'none';
     successView.style.display = 'block';
-    
+
   } catch (error) {
     console.error('Erreur soumission:', error);
     // Un échec réseau sur l'appel du proxy est presque toujours une origine
@@ -1517,7 +2026,12 @@ async function submitForm() {
           ? 'Envoi impossible : ' + (function(){ try { return new URL(publicPostUrl).origin; } catch (e) { return 'le serveur Grist'; } })()
             + ' n\'a pas répondu. Si cette instance est derrière un portail d\'authentification, les adresses /api/s/ sont interceptées : il faut passer par le proxy.'
           : 'Envoi impossible : le proxy n\'a pas répondu (vérifiez son URL et que ' + window.location.origin + ' figure dans ALLOWED_ORIGINS).')
-      : 'Erreur lors de l\'envoi : ' + error.message, 'error');
+      : (/KeyError/.test(error.message || '')
+          // Champ ajouté au formulaire après la création de la table de réponses.
+          ? 'Rien n\'a été enregistré : la table ' + destTable + ' n\'a pas de colonne '
+            + ((error.message.match(/KeyError\s+'?([^']+)'?/) || [])[1] || '(inconnue)')
+            + '. Le concepteur du formulaire doit compléter la table de réponses (bouton « ↻ Compléter » de Form Builder Pro).'
+          : 'Erreur lors de l\'envoi : ' + error.message), 'error');
   }
 }
 

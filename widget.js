@@ -39,6 +39,11 @@ let templates = [];
 let versionHistory = [];
 let currentPage = 1;
 let totalPages = 1;
+// Hauteur personnalisée des pages, en millimètres, par numéro de page : { "2": 400 }.
+// Une page absente de cet objet garde la hauteur A4 (297 mm). La largeur reste 210 mm.
+let pageHeights = {};
+const HAUTEUR_A4_MM = 297;
+const PX_PAR_MM = 3.7795;
 let isOwner = false;
 let snapToGrid = true;
 let showGrid = true;
@@ -46,12 +51,13 @@ let zoomLevel = 100;
 let fieldIdCounter = 0;
 let selectedRecordId = null; // ID de l'enregistrement sélectionné pour mise à jour
 let selectedRecordData = null; // Données de l'enregistrement sélectionné
-let responseTableId = null; // Table séparée pour les réponses (si différente de tableId)
+let responseTableId = null;
+let existingAttachments = {}; // pièces déjà présentes sur la ligne chargée, par id de champ // Table séparée pour les réponses (si différente de tableId)
 
 // Éléments DOM
 // Référence de version de l'application, affichée dans l'en-tête.
 // À faire évoluer en même temps que le ?v= de index.html.
-const WIDGET_VERSION = 'V.56';
+const WIDGET_VERSION = 'V.60';
 
 const tableSelect = document.getElementById('table-select');
 const responseTableSelect = document.getElementById('response-table-select');
@@ -275,30 +281,7 @@ async function ecrireDroitConstruire(ouvert) {
 }
 
 // Appliquer les restrictions selon le rôle
-/**
- * Restreint l'interface selon le rôle.
- *
- * Deux niveaux, et non un seul. Partager et Proxy touchent à la chaîne d'écriture publique —
- * adresse du relais, identifiant du document, clé de partage, hébergeur du formulaire. Ils
- * restent RÉSERVÉS AUX PROPRIÉTAIRES, même quand la construction est ouverte aux éditeurs :
- * construire un formulaire et décider où partent ses réponses sont deux responsabilités
- * différentes.
- *
- * `peutConstruire` vaut vrai pour un éditeur autorisé par l'interrupteur de V.46.
- */
-function masquerPartageEtProxy() {
-  const partage = document.getElementById('btn-share-form');
-  if (partage) partage.style.display = 'none';
-  const proxy = document.getElementById('btn-proxy-config');
-  if (proxy) proxy.style.display = 'none';
-}
-
-function applyRoleRestrictions(peutConstruire) {
-  if (!isOwner && peutConstruire) {
-    // Éditeur autorisé à construire : il garde l'édition, mais pas la diffusion.
-    masquerPartageEtProxy();
-    return;
-  }
+function applyRoleRestrictions() {
   if (!isOwner) {
     // Masquer les éléments d'édition pour les non-propriétaires
     btnModeEdit.style.display = 'none';
@@ -307,19 +290,27 @@ function applyRoleRestrictions(peutConstruire) {
     btnSave.style.display = 'none';
     btnClear.style.display = 'none';
     btnTemplates.style.display = 'none';
-    
+
     // « Nouveau » vide le formulaire — champs, titre, table. C'est une action d'édition, la
     // seule qui restait ouverte alors que tout le reste est fermé. Sauvegarder étant masqué,
     // un éditeur ne pouvait pas persister la perte, mais il blanchissait son écran sans
     // comprendre pourquoi.
     const btnNouveau = document.getElementById('btn-new-form');
     if (btnNouveau) btnNouveau.style.display = 'none';
+    // « Ouvrir » remplace le formulaire affiché par un autre : même raison.
+    const btnOuvrir = document.getElementById('btn-open-form');
+    if (btnOuvrir) btnOuvrir.style.display = 'none';
 
-    masquerPartageEtProxy();
+    document.getElementById('btn-share-form').style.display = 'none';
+    // Le modal Proxy porte l'adresse du relais, l'identifiant du document et la clé de
+    // partage : autant d'éléments d'une chaîne d'écriture publique. Seul un propriétaire
+    // a à les voir ou à les changer.
+    const btnProxy = document.getElementById('btn-proxy-config');
+    if (btnProxy) btnProxy.style.display = 'none';
     // Guide et PDF restent accessibles : l'un est de la documentation, l'autre exporte un
     // formulaire que l'éditeur a le droit de remplir. Les masquer ne protégeait rien et
     // privait d'outils utiles — c'était du code jamais exécuté jusqu'à V.41.
-    
+
     // Forcer le mode Saisie
     switchMode('fill');
   }
@@ -338,15 +329,15 @@ const targetFormId = urlParams.get('formId'); // ID unique du formulaire
 grist.onOptions(async function(options) {
   if (isInitialized) return;
   isInitialized = true;
-  
+
   // Annuler le timeout car on est bien dans Grist
   if (gristTimeout) {
     clearTimeout(gristTimeout);
     gristTimeout = null;
   }
-  
+
   formConfig = options || {};
-  
+
   try {
     await loadTables();
   } catch (e) {
@@ -358,7 +349,7 @@ grist.onOptions(async function(options) {
       return;
     }
   }
-  
+
   // Toujours essayer de charger depuis la table BM_FormConfig (source de vérité)
   try {
     const tables = await grist.docApi.listTables();
@@ -376,8 +367,18 @@ grist.onOptions(async function(options) {
           if (trouve) formConfig = trouve;
         } else {
           // Sinon, charger la config la plus récente ou celle des options
+          // Les options de la vue portent le formId du formulaire sauvegardé dans CE widget :
+          // c'est lui qu'on rouvre. Chercher par table seule rouvrait le formulaire le plus
+          // récent de cette table — pas forcément le bon quand deux formulaires la partagent.
           const optionsTableId = formConfig.tableId;
-          if (optionsTableId) {
+          const parCle = formConfig.formId ? (data.ConfigKey || []).indexOf(formConfig.formId) : -1;
+          let parCleCfg = null;
+          if (parCle >= 0) {
+            try { parCleCfg = JSON.parse(data.ConfigData[parCle]); } catch (e) { parCleCfg = null; }
+          }
+          if (parCleCfg) {
+            formConfig = parCleCfg;
+          } else if (optionsTableId) {
             const trouve = chercherConfigParTable(data, optionsTableId);
             if (trouve) formConfig = trouve;
           } else {
@@ -390,29 +391,31 @@ grist.onOptions(async function(options) {
   } catch (e) {
     console.log('Pas de config trouvée dans la table BM_FormConfig');
   }
-  
+
   // Fallback sur les options du widget si pas de config dans la table
   if ((!formConfig.fields || formConfig.fields.length === 0) && options && options.fields) {
     formConfig = options;
   }
-  
+
   templates = formConfig.templates || [];
   totalPages = formConfig.totalPages || 1;
+  pageHeights = Object.assign({}, formConfig.pageHeights || {});
   versionHistory = formConfig.versionHistory || [];
   currentPage = 1;
-  
+
   updatePageIndicator();
-  
+
   if (formConfig.title) {
     formTitleInput.value = formConfig.title;
   }
-  
+
   // Restaurer le responseTableId depuis la config
   if (formConfig.responseTableId) {
     responseTableId = formConfig.responseTableId;
     if (responseTableSelect) responseTableSelect.value = formConfig.responseTableId;
   }
-  
+  majBoutonReponses();
+
   // Restaurer les paramètres de partage public
   if (formConfig.proxyPlatform) {
     switchProxyPlatform(formConfig.proxyPlatform);
@@ -439,7 +442,7 @@ grist.onOptions(async function(options) {
     const el = document.getElementById('cfg-doc-id');
     if (el) el.value = formConfig.docId;
   }
-  
+
   // La table source est restaurée même si le formulaire n'a pas encore de
   // champs : sinon l'onglet « Champs » restait sur « Sélectionnez une table »
   // alors que la liste déroulante affichait bien une table.
@@ -454,13 +457,13 @@ grist.onOptions(async function(options) {
     fieldIdCounter = Math.max(...formFields.map(f => parseInt(f.id.replace('field_', '')) || 0)) + 1;
     renderFormFields();
   }
-  
+
   hideLoading();
-  
+
   // Si mode formulaire public, forcer le mode saisie et masquer l'édition
   if (isFormMode) {
     isOwner = false;
-    applyRoleRestrictions(false);
+    applyRoleRestrictions();
   } else {
     // isOwner n'était JAMAIS mis à vrai : applyRoleRestrictions() ne s'exécutait qu'en mode
     // formulaire public, et en usage normal tout le monde voyait l'édition, le partage et la
@@ -471,9 +474,7 @@ grist.onOptions(async function(options) {
       // que la personne EST éditrice : un lecteur verrait sinon une interface d'édition dont
       // chaque enregistrement échouerait.
       editeursAutorises = await lireDroitConstruire() && await sondeEditeur();
-      // Appelée dans les DEUX cas : autorisé, elle ne masque que Partager et Proxy ;
-      // non autorisé, elle ferme toute l'édition.
-      applyRoleRestrictions(editeursAutorises);
+      if (!editeursAutorises) applyRoleRestrictions();
     }
   }
 });
@@ -481,15 +482,15 @@ grist.onOptions(async function(options) {
 // Écouter la sélection d'un enregistrement dans Grist
 grist.onRecord(function(record) {
   if (!record || !formConfig || !formConfig.tableId) return;
-  
+
   selectedRecordId = record.id;
   selectedRecordData = record;
-  
+
   // Pré-remplir le formulaire en mode Saisie
   if (formView.classList.contains('active')) {
     fillFormWithRecord(record);
   }
-  
+
   // Mettre à jour l'indicateur de mode
   updateRecordModeIndicator();
 });
@@ -497,17 +498,17 @@ grist.onRecord(function(record) {
 // Pré-remplir le formulaire avec les données d'un enregistrement
 function fillFormWithRecord(record) {
   if (!formConfig || !formConfig.fields) return;
-  
+
   // D'abord réinitialiser tous les champs
   resetFormInputs();
-  
+
   formConfig.fields.forEach(field => {
     if (!field.columnId) return;
-    
+
     const value = record[field.columnId];
     // Ne remplir que si la valeur existe et n'est pas vide
     if (value === undefined || value === null || value === '') return;
-    
+
     if (field.fieldType === 'radio') {
       const container = document.getElementById(`input-${field.id}`);
       if (container) {
@@ -522,27 +523,40 @@ function fillFormWithRecord(record) {
           cb.checked = values.includes(cb.value);
         });
       }
+    } else if (field.fieldType === 'file') {
+      // Un champ fichier ne se pré-remplit pas (le navigateur l'interdit) : on mémorise les
+      // pièces déjà jointes et on les annonce. Les nouveaux fichiers s'y ajouteront.
+      const ids = refIdsOf(value);
+      existingAttachments[field.id] = ids;
+      const info = document.getElementById(`existing-${field.id}`);
+      if (info) info.textContent = ids.length
+        ? `${ids.length} fichier(s) déjà joint(s) — les nouveaux s'y ajouteront.` : '';
+    } else if (field.fieldType === 'date') {
+      // fetchTable rend des secondes depuis 1970 : les affecter telles quelles laissait le champ vide.
+      const input = document.getElementById(`input-${field.id}`);
+      if (input) input.value = versChampDate(value, modeDate(field));
     } else {
       const input = document.getElementById(`input-${field.id}`);
       if (input) input.value = value;
     }
   });
+  majTousMulti();
 }
 
 // Afficher le sélecteur d'enregistrement existant
 async function renderRecordSelector() {
   const formViewEl = document.getElementById('form-view');
   if (!formViewEl || !formConfig || !formConfig.tableId) return;
-  
+
   // Supprimer l'ancien sélecteur s'il existe
   const oldSelector = document.getElementById('record-selector-container');
   if (oldSelector) oldSelector.remove();
-  
+
   // Créer le conteneur du sélecteur (fixe en haut)
   const container = document.createElement('div');
   container.id = 'record-selector-container';
   container.style.cssText = 'position: sticky; top: 0; z-index: 100; padding: 10px 15px; margin: 0 auto 10px; max-width: 700px; background: #f8fafc; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
-  
+
   container.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <label style="font-size: 0.85em; color: #64748b; white-space: nowrap;">📋 Modifier :</label>
@@ -555,19 +569,19 @@ async function renderRecordSelector() {
       <button id="btn-load-record" style="padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em;">Charger</button>
     </div>
   `;
-  
+
   formViewEl.insertBefore(container, formViewEl.firstChild);
-  
+
   // Charger les enregistrements existants
   let tableData = null;
   try {
     tableData = await grist.docApi.fetchTable(formConfig.tableId);
     const selector = document.getElementById('record-selector');
     const colSelector = document.getElementById('record-display-col');
-    
+
     if (tableData && tableData.id) {
       // Remplir le sélecteur de colonnes
-      const columns = Object.keys(tableData).filter(col => 
+      const columns = Object.keys(tableData).filter(col =>
         col !== 'id' && !col.startsWith('grist') && col !== 'manualSort'
       );
       columns.forEach(col => {
@@ -576,7 +590,7 @@ async function renderRecordSelector() {
         opt.textContent = col;
         colSelector.appendChild(opt);
       });
-      
+
       // Fonction pour remplir le sélecteur d'enregistrements
       function fillRecordSelector(displayCol) {
         selector.innerHTML = '<option value="">-- Nouvel enregistrement --</option>';
@@ -591,25 +605,25 @@ async function renderRecordSelector() {
           selector.value = selectedRecordId;
         }
       }
-      
+
       // Remplir avec la première colonne par défaut
-      const defaultCol = columns.find(col => 
+      const defaultCol = columns.find(col =>
         tableData[col] && tableData[col].some(v => typeof v === 'string' && v)
       ) || 'id';
       colSelector.value = defaultCol;
       fillRecordSelector(defaultCol);
-      
+
       // Événement changement de colonne
       colSelector.addEventListener('change', (e) => {
         fillRecordSelector(e.target.value);
       });
     }
-    
+
     // Si un enregistrement est déjà sélectionné, le pré-sélectionner
     if (selectedRecordId) {
       selector.value = selectedRecordId;
     }
-    
+
     // Événement de chargement
     document.getElementById('btn-load-record')?.addEventListener('click', async () => {
       const recordId = parseInt(selector.value);
@@ -620,7 +634,7 @@ async function renderRecordSelector() {
         updateRecordModeIndicator();
         return;
       }
-      
+
       // Charger l'enregistrement
       try {
         const data = await grist.docApi.fetchTable(formConfig.tableId);
@@ -641,7 +655,7 @@ async function renderRecordSelector() {
         showToast('Erreur lors du chargement', 'error');
       }
     });
-    
+
   } catch (e) {
     console.log('Impossible de charger les enregistrements:', e);
   }
@@ -651,7 +665,7 @@ async function renderRecordSelector() {
 function updateRecordModeIndicator() {
   let indicator = document.getElementById('record-mode-indicator');
   const selectorContainer = document.getElementById('record-selector-container');
-  
+
   if (!indicator) {
     indicator = document.createElement('div');
     indicator.id = 'record-mode-indicator';
@@ -661,13 +675,13 @@ function updateRecordModeIndicator() {
       selectorContainer.parentNode.insertBefore(indicator, selectorContainer.nextSibling);
     }
   }
-  
+
   if (selectedRecordId) {
     indicator.style.background = '#fef3c7';
     indicator.style.color = '#92400e';
     indicator.style.border = '1px solid #fcd34d';
     indicator.innerHTML = `<strong>📝 Mode mise à jour</strong> - Ligne #${selectedRecordId} sélectionnée <button id="btn-new-record" style="margin-left: 10px; padding: 4px 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">+ Nouveau</button>`;
-    
+
     document.getElementById('btn-new-record')?.addEventListener('click', () => {
       selectedRecordId = null;
       selectedRecordData = null;
@@ -701,7 +715,7 @@ async function loadTables() {
   try {
     const tables = await grist.docApi.listTables();
     availableTables = tables;
-    
+
     tableSelect.innerHTML = '<option value="">-- Sélectionner une table --</option>';
     tables.forEach(table => {
       const option = document.createElement('option');
@@ -709,11 +723,11 @@ async function loadTables() {
       option.textContent = table;
       tableSelect.appendChild(option);
     });
-    
+
     if (formConfig && formConfig.tableId) {
       tableSelect.value = formConfig.tableId;
     }
-    
+
     // Remplir le sélecteur de table de réponses
     if (responseTableSelect) {
       responseTableSelect.innerHTML = '<option value="">-- Même table source --</option>';
@@ -737,7 +751,7 @@ async function loadTables() {
 // Charger les données pour un champ Lookup
 async function loadLookupData(field) {
   if (!field.lookupTable) return;
-  
+
   try {
     const data = await grist.docApi.fetchTable(field.lookupTable);
     field.lookupData = data;
@@ -757,22 +771,26 @@ async function loadTableColumns(tableId) {
     fieldsList.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em; padding: 10px;">Sélectionnez une table</p>';
     return;
   }
-  
+
   try {
     currentTable = tableId;
     const columns = await grist.docApi.fetchTable(tableId);
-    
-    const columnNames = Object.keys(columns).filter(col => 
-      col !== 'id' && 
-      !col.startsWith('grist') && 
+
+    const columnNames = Object.keys(columns).filter(col =>
+      col !== 'id' &&
+      !col.startsWith('grist') &&
       col !== 'manualSort'
     );
+    // Une colonne Pièces jointes vaut ['L', 3, 7] dans fetchTable, indiscernable d'une liste
+    // de références : le vrai type vient des métadonnées.
+    delete fillColumnTypesCache[tableId];
+    const types = await fillGetColumnTypes(tableId);
     tableColumns = columnNames.map(name => ({
       id: name,
       name: name,
-      type: guessFieldType(columns[name])
+      type: types[name] === 'Attachments' ? 'file' : guessFieldType(columns[name])
     }));
-    
+
     renderFieldsList();
   } catch (error) {
     console.error('Erreur chargement colonnes:', error);
@@ -798,7 +816,7 @@ function getFieldIcon(type) {
   const icons = {
     'text': '📝', 'textarea': '📄', 'number': '🔢', 'date': '📅',
     'email': '📧', 'phone': '📞', 'select': '📋', 'radio': '🔘',
-    'checkbox': '☑️', 'signature': '✍️', 'section': '📦'
+    'checkbox': '☑️', 'signature': '✍️', 'section': '📦', 'file': '📎'
   };
   return icons[type] || '📝';
 }
@@ -806,12 +824,12 @@ function getFieldIcon(type) {
 // Afficher la liste des champs
 function renderFieldsList() {
   fieldsList.innerHTML = '';
-  
+
   if (tableColumns.length === 0) {
     fieldsList.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em; padding: 10px;">Aucun champ disponible</p>';
     return;
   }
-  
+
   tableColumns.forEach(col => {
     const fieldItem = document.createElement('div');
     fieldItem.className = 'field-item';
@@ -820,16 +838,16 @@ function renderFieldsList() {
     fieldItem.dataset.fieldName = col.name;
     fieldItem.dataset.fieldType = col.type;
     fieldItem.dataset.isColumn = 'true';
-    
+
     fieldItem.innerHTML = `
       <span class="field-icon">${getFieldIcon(col.type)}</span>
       <span class="field-name">${col.name}</span>
       <span class="field-type">${col.type}</span>
     `;
-    
+
     fieldItem.addEventListener('dragstart', handleDragStart);
     fieldItem.addEventListener('dragend', handleDragEnd);
-    
+
     fieldsList.appendChild(fieldItem);
   });
 }
@@ -838,7 +856,7 @@ function renderFieldsList() {
 function handleDragStart(e) {
   const isColumn = e.target.dataset.isColumn === 'true';
   const elementType = e.target.dataset.elementType;
-  
+
   if (isColumn) {
     draggedData = {
       type: 'column',
@@ -852,7 +870,7 @@ function handleDragStart(e) {
       elementType: elementType
     };
   }
-  
+
   e.target.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'copy';
 }
@@ -882,24 +900,24 @@ formCanvas.addEventListener('dragleave', () => {
 formCanvas.addEventListener('drop', (e) => {
   e.preventDefault();
   formCanvas.classList.remove('drag-over');
-  
+
   if (!draggedData) return;
-  
+
   const rect = formCanvas.getBoundingClientRect();
   let x = e.clientX - rect.left - 100;
   let y = e.clientY - rect.top - 20;
-  
+
   // Snap to grid
   if (snapToGrid) {
     x = Math.round(x / 20) * 20;
     y = Math.round(y / 20) * 20;
   }
-  
+
   x = Math.max(0, x);
   y = Math.max(0, y);
-  
+
   let newField;
-  
+
   if (draggedData.type === 'column') {
     // Vérifier si la colonne existe déjà
     const existing = formFields.find(f => f.columnId === draggedData.columnId);
@@ -907,7 +925,7 @@ formCanvas.addEventListener('drop', (e) => {
       showToast('Ce champ est déjà sur le formulaire', 'error');
       return;
     }
-    
+
     newField = {
       id: 'field_' + (fieldIdCounter++),
       columnId: draggedData.columnId,
@@ -946,7 +964,7 @@ formCanvas.addEventListener('drop', (e) => {
       dataSource: { mode: 'static', tableId: '', labelColumn: '', valueColumn: '', filters: [] }
     };
   }
-  
+
   formFields.push(newField);
   saveVersion('Ajout de champ');
   renderFormFields();
@@ -960,7 +978,7 @@ function getDefaultLabel(type) {
     'date': 'Date', 'email': 'Email', 'phone': 'Téléphone',
     'image': 'Image', 'title': 'Titre', 'qrcode': 'QR Code', 'lookup': 'Recherche', 'calculated': 'Calcul',
     'select': 'Sélection', 'radio': 'Choix', 'checkbox': 'Options',
-    'signature': 'Signature', 'section': 'Section', 'divider': 'Filet'
+    'signature': 'Signature', 'section': 'Section', 'divider': 'Filet', 'file': 'Pièce jointe'
   };
   return labels[type] || 'Champ';
 }
@@ -969,12 +987,12 @@ function getDefaultLabel(type) {
 function renderFormFields() {
   const existingFields = formCanvas.querySelectorAll('.form-field, .form-section, .form-image, .form-title-element, .form-qrcode, .form-divider');
   existingFields.forEach(f => f.remove());
-  
+
   // Filtrer les champs de la page courante
   const pageFields = formFields.filter(f => (f.page || 1) === currentPage);
-  
+
   emptyMessage.style.display = pageFields.length === 0 ? 'block' : 'none';
-  
+
   pageFields.forEach(field => {
     if (field.fieldType === 'section') {
       const sectionEl = createSectionElement(field);
@@ -1007,7 +1025,7 @@ function createImageElement(field) {
   imageEl.style.top = field.y + 'px';
   imageEl.style.width = field.width + 'px';
   imageEl.style.height = (field.height || 100) + 'px';
-  
+
   // Appliquer la couleur de fond
   if (field.transparent) {
     imageEl.style.backgroundColor = 'transparent';
@@ -1015,11 +1033,11 @@ function createImageElement(field) {
   } else if (field.bgColor) {
     imageEl.style.backgroundColor = field.bgColor;
   }
-  
+
   if (field.imageData) {
     imageEl.innerHTML = `
       <button class="form-image-delete" title="Supprimer">×</button>
-      <img src="${escHtml(sourceImage(field))}" alt="${escHtml(field.label)}" draggable="false">
+      <img src="${field.imageData}" alt="${escHtml(field.label)}" draggable="false">
       <div class="form-field-resize"></div>
     `;
   } else {
@@ -1029,7 +1047,7 @@ function createImageElement(field) {
       <div class="form-field-resize"></div>
     `;
   }
-  
+
   imageEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-image-delete')) return;
     if (e.target.classList.contains('form-field-resize')) return;
@@ -1037,18 +1055,18 @@ function createImageElement(field) {
     selectField(field.id);
     startDragField(e, imageEl, field);
   });
-  
+
   imageEl.querySelector('.form-image-delete').addEventListener('click', () => {
     deleteField(field.id);
   });
-  
+
   // Redimensionnement
   const resizeHandle = imageEl.querySelector('.form-field-resize');
   resizeHandle.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     startResizeImage(e, imageEl, field);
   });
-  
+
   return imageEl;
 }
 
@@ -1058,30 +1076,30 @@ function startResizeImage(e, imageEl, field) {
   const startY = e.clientY;
   const startWidth = field.width;
   const startHeight = field.height || 100;
-  
+
   function onMouseMove(e) {
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    
+
     let newWidth = startWidth + dx;
     let newHeight = startHeight + dy;
-    
+
     if (snapToGrid) {
       newWidth = Math.round(newWidth / 20) * 20;
       newHeight = Math.round(newHeight / 20) * 20;
     }
-    
+
     field.width = Math.max(50, newWidth);
     field.height = Math.max(50, newHeight);
     imageEl.style.width = field.width + 'px';
     imageEl.style.height = field.height + 'px';
   }
-  
+
   function onMouseUp() {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
   }
-  
+
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
 }
@@ -1109,15 +1127,15 @@ function createTitleElement(field) {
     titleEl.style.padding = '8px 12px';
     titleEl.style.borderRadius = '6px';
   }
-  
+
   titleEl.innerHTML = `
     <button class="form-title-element-delete" title="Supprimer">×</button>
     <span contenteditable="true" spellcheck="false">${escHtml(field.label)}</span>
     <div class="resize-handle" title="Redimensionner"></div>
   `;
-  
+
   const textSpan = titleEl.querySelector('span');
-  
+
   titleEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-title-element-delete')) return;
     if (e.target.classList.contains('resize-handle')) return;
@@ -1127,7 +1145,7 @@ function createTitleElement(field) {
       startDragField(e, titleEl, field);
     }
   });
-  
+
   // Double-click to edit text
   titleEl.addEventListener('dblclick', (e) => {
     if (e.target === textSpan || e.target.closest('span[contenteditable]')) {
@@ -1140,7 +1158,7 @@ function createTitleElement(field) {
       sel.addRange(range);
     }
   });
-  
+
   // Save text on blur
   textSpan.addEventListener('blur', () => {
     field.label = textSpan.textContent || 'Texte';
@@ -1150,7 +1168,7 @@ function createTitleElement(field) {
       if (labelInput) labelInput.value = field.label;
     }
   });
-  
+
   // Prevent Enter from creating new lines, save instead
   textSpan.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -1162,18 +1180,18 @@ function createTitleElement(field) {
       textSpan.blur();
     }
   });
-  
+
   titleEl.querySelector('.form-title-element-delete').addEventListener('click', () => {
     deleteField(field.id);
   });
-  
+
   // Resize handle
   titleEl.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
     e.stopPropagation();
     selectField(field.id);
     startResizeField(e, titleEl, field);
   });
-  
+
   return titleEl;
 }
 
@@ -1185,37 +1203,37 @@ function createDividerElement(field) {
   dividerEl.style.left = field.x + 'px';
   dividerEl.style.top = field.y + 'px';
   dividerEl.style.width = field.width + 'px';
-  
+
   const lineStyle = `
     height: ${field.dividerHeight || 2}px;
     background: ${field.dividerColor || '#cbd5e1'};
     ${field.dividerStyle === 'dashed' ? 'border-top: ' + (field.dividerHeight || 2) + 'px dashed ' + (field.dividerColor || '#cbd5e1') + '; background: transparent;' : ''}
     ${field.dividerStyle === 'dotted' ? 'border-top: ' + (field.dividerHeight || 2) + 'px dotted ' + (field.dividerColor || '#cbd5e1') + '; background: transparent;' : ''}
   `;
-  
+
   dividerEl.innerHTML = `
     <button class="form-divider-delete" title="Supprimer">×</button>
     <div class="form-divider-line" style="${lineStyle}"></div>
     <div class="resize-handle" title="Redimensionner"></div>
   `;
-  
+
   dividerEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-divider-delete')) return;
     if (e.target.classList.contains('resize-handle')) return;
     selectField(field.id);
     startDragField(e, dividerEl, field);
   });
-  
+
   dividerEl.querySelector('.form-divider-delete').addEventListener('click', () => {
     deleteField(field.id);
   });
-  
+
   dividerEl.querySelector('.resize-handle').addEventListener('mousedown', (e) => {
     e.stopPropagation();
     selectField(field.id);
     startResizeField(e, dividerEl, field);
   });
-  
+
   return dividerEl;
 }
 
@@ -1226,7 +1244,7 @@ function createQRCodeElement(field) {
   qrcodeEl.dataset.fieldId = field.id;
   qrcodeEl.style.left = field.x + 'px';
   qrcodeEl.style.top = field.y + 'px';
-  
+
   // Appliquer la couleur de fond
   if (field.transparent) {
     qrcodeEl.style.backgroundColor = 'transparent';
@@ -1234,15 +1252,15 @@ function createQRCodeElement(field) {
   } else if (field.bgColor) {
     qrcodeEl.style.backgroundColor = field.bgColor;
   }
-  
+
   const size = field.qrSize || 100;
   const qrContent = field.qrContent || 'https://gristup.fr';
-  
+
   qrcodeEl.innerHTML = `
     <button class="form-qrcode-delete" title="Supprimer">×</button>
     <div class="qrcode-container" id="qr-${field.id}"></div>
   `;
-  
+
   // Générer le QR Code après l'ajout au DOM
   setTimeout(() => {
     const container = document.getElementById('qr-' + field.id);
@@ -1258,18 +1276,179 @@ function createQRCodeElement(field) {
       });
     }
   }, 50);
-  
+
   qrcodeEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-qrcode-delete')) return;
     selectField(field.id);
     startDragField(e, qrcodeEl, field);
   });
-  
+
   qrcodeEl.querySelector('.form-qrcode-delete').addEventListener('click', () => {
     deleteField(field.id);
   });
-  
+
   return qrcodeEl;
+}
+
+// ─── Cases à cocher en menu déroulant ────────────────────────────────────────
+//
+// Une longue liste de cases occupe toute la page. Option « Affichage en menu déroulant » :
+// les cases sont repliées sous un bouton qui résume la sélection et s'ouvrent au clic.
+//
+// Le groupe de cases (#input-<id>) RESTE le porteur des valeurs : la soumission, les
+// conditions, les cascades et le chargement d'un enregistrement lisent et réécrivent ses
+// cases comme avant. On l'enveloppe seulement — même principe que la liste cherchable.
+// Les écouteurs sont délégués au document : ils survivent aux cascades, qui réécrivent le
+// contenu du groupe.
+
+/** Enveloppe le HTML d'un groupe de cases dans le bouton + panneau déroulant. */
+function enveloppeMulti(field, groupeHtml) {
+  return `<div class="fb-multi">
+      <button type="button" class="form-input fb-multi-btn fb-multi-vide" data-placeholder="${escHtml(field.placeholder || 'Sélectionner...')}">${escHtml(field.placeholder || 'Sélectionner...')}</button>
+      <div class="fb-multi-drop">
+        <input type="text" class="fb-multi-rech" placeholder="Rechercher..." autocomplete="off">
+        ${groupeHtml}
+      </div>
+    </div>`;
+}
+
+/** Met à jour le résumé affiché sur le bouton d'un menu de cases. */
+function majMulti(boite) {
+  const btn = boite.querySelector('.fb-multi-btn');
+  const groupe = boite.querySelector('.form-checkbox-group');
+  const rech = boite.querySelector('.fb-multi-rech');
+  if (!btn || !groupe) return;
+  const cases = Array.prototype.slice.call(groupe.querySelectorAll('input[type="checkbox"]'));
+  const coches = cases.filter(c => c.checked).map(c => {
+    const l = c.closest('label');
+    return ((l && l.textContent) || c.value || '').trim();
+  });
+  let texte;
+  let alerte = false;
+  if (!cases.length) {
+    // Aucune case : le groupe porte le diagnostic (« Aucun résultat… ») — on le montre.
+    texte = groupe.textContent.trim() || 'Aucune option';
+    alerte = true;
+  } else if (!coches.length) {
+    texte = btn.dataset.placeholder || 'Sélectionner...';
+  } else {
+    texte = coches.length === 1 ? coches[0] : coches.length + ' choix : ' + coches.join(', ');
+  }
+  btn.textContent = texte;
+  btn.title = (coches.length || alerte) ? texte : '';
+  btn.classList.toggle('fb-multi-vide', !coches.length);
+  btn.style.borderColor = alerte ? '#f59e0b' : '';
+  // La recherche n'a d'intérêt que sur une liste longue.
+  if (rech) rech.style.display = cases.length > RECHERCHE_SEUIL ? '' : 'none';
+}
+
+/** Idem, à partir du groupe de cases (appelée par les cascades après réécriture). */
+function majMultiDe(groupe) {
+  const boite = groupe && groupe.closest ? groupe.closest('.fb-multi') : null;
+  if (boite) majMulti(boite);
+}
+
+function majTousMulti() {
+  Array.prototype.forEach.call(document.querySelectorAll('.fb-multi'), majMulti);
+}
+
+/** Hisse le champ hôte au premier plan tant que son menu est ouvert (voir rendreCherchable). */
+function premierPlanMulti(boite, oui) {
+  const hote = boite.closest('.fb-abs, .form-field-view');
+  if (!hote) return;
+  if (oui) {
+    if (hote.dataset.zOrigineMulti === undefined) hote.dataset.zOrigineMulti = hote.style.zIndex || '';
+    hote.style.zIndex = '10000';
+  } else if (hote.dataset.zOrigineMulti !== undefined) {
+    hote.style.zIndex = hote.dataset.zOrigineMulti;
+    delete hote.dataset.zOrigineMulti;
+  }
+}
+
+function filtrerMulti(boite, q) {
+  const t = String(q || '').trim().toLowerCase();
+  Array.prototype.forEach.call(boite.querySelectorAll('.form-checkbox-item'), l => {
+    l.style.display = (!t || l.textContent.toLowerCase().indexOf(t) !== -1) ? '' : 'none';
+  });
+}
+
+function fermerMulti() {
+  Array.prototype.forEach.call(document.querySelectorAll('.fb-multi.ouvert'), b => {
+    b.classList.remove('ouvert');
+    premierPlanMulti(b, false);
+    const r = b.querySelector('.fb-multi-rech');
+    if (r) { r.value = ''; filtrerMulti(b, ''); }
+  });
+}
+
+document.addEventListener('click', function (e) {
+  const cible = e.target;
+  if (!cible || !cible.closest) return;
+  const btn = cible.closest('.fb-multi-btn');
+  const boite = cible.closest('.fb-multi');
+  if (btn && boite) {
+    const dejaOuvert = boite.classList.contains('ouvert');
+    fermerMulti();
+    if (!dejaOuvert) {
+      majMulti(boite);
+      boite.classList.add('ouvert');
+      premierPlanMulti(boite, true);
+      const r = boite.querySelector('.fb-multi-rech');
+      if (r && r.style.display !== 'none') r.focus();
+    }
+    return;
+  }
+  if (!boite) fermerMulti(); // clic ailleurs : on referme
+});
+document.addEventListener('change', function (e) {
+  const c = e.target;
+  if (!c || c.type !== 'checkbox' || !c.closest) return;
+  const boite = c.closest('.fb-multi');
+  if (boite) majMulti(boite);
+});
+document.addEventListener('input', function (e) {
+  const r = e.target;
+  if (!r || !r.classList || !r.classList.contains('fb-multi-rech')) return;
+  filtrerMulti(r.closest('.fb-multi'), r.value);
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') fermerMulti();
+});
+
+/**
+ * Applique à un champ rendu la typographie réglée dans le panneau Propriétés.
+ *
+ * On pose des variables CSS sur le conteneur du champ, et des attributs qui activent les
+ * règles correspondantes de la feuille de style. Tout ce qui est créé ensuite à l'intérieur
+ * — options rechargées par une cascade, liste cherchable — en hérite sans autre appel.
+ */
+function appliquerPolices(el, f) {
+  if (!el || !f) return;
+  const poser = (attr, prop, v) => {
+    if (v) { el.setAttribute(attr, ''); el.style.setProperty(prop, String(v)); }
+  };
+  poser('data-fb-pl', '--fb-pl', f.labelFontFamily);
+  poser('data-fb-tl', '--fb-tl', f.labelFontSize ? f.labelFontSize + 'pt' : '');
+  poser('data-fb-gl', '--fb-gl', f.labelBold ? '700' : '');
+  poser('data-fb-cl', '--fb-cl', f.labelColor);
+  poser('data-fb-pc', '--fb-pc', f.inputFontFamily);
+  poser('data-fb-tc', '--fb-tc', f.inputFontSize ? f.inputFontSize + 'pt' : '');
+}
+
+// Polices proposées pour le libellé et pour le champ (les mêmes que pour Titre/Texte).
+const POLICES = [
+  ['', 'Par défaut'],
+  ['Arial, sans-serif', 'Arial'],
+  ["'Times New Roman', serif", 'Times New Roman'],
+  ['Georgia, serif', 'Georgia'],
+  ["'Courier New', monospace", 'Courier New'],
+  ['Verdana, sans-serif', 'Verdana'],
+  ["'Trebuchet MS', sans-serif", 'Trebuchet MS'],
+  ['Impact, sans-serif', 'Impact']
+];
+function optionsPolice(choisie) {
+  return POLICES.map(([v, nom]) =>
+    `<option value="${escHtml(v)}" ${(choisie || '') === v ? 'selected' : ''}>${escHtml(nom)}</option>`).join('');
 }
 
 // Créer un élément de champ
@@ -1280,7 +1459,7 @@ function createFormFieldElement(field) {
   fieldEl.style.left = field.x + 'px';
   fieldEl.style.top = field.y + 'px';
   fieldEl.style.width = field.width + 'px';
-  
+
   // Appliquer la couleur de fond
   if (field.transparent) {
     fieldEl.style.backgroundColor = 'transparent';
@@ -1288,9 +1467,9 @@ function createFormFieldElement(field) {
   } else if (field.bgColor) {
     fieldEl.style.backgroundColor = field.bgColor;
   }
-  
+
   let inputHtml = '';
-  
+
   switch (field.fieldType) {
     case 'textarea':
       inputHtml = `<textarea class="form-field-input form-field-textarea" placeholder="${escHtml(field.placeholder || 'Saisir...')}" readonly></textarea>`;
@@ -1316,6 +1495,17 @@ function createFormFieldElement(field) {
     case 'radio':
     case 'checkbox': {
       const isDynamic = field.dataSource && field.dataSource.mode === 'grist';
+      if (field.fieldType === 'checkbox' && field.checkboxDropdown) {
+        // Affichage en menu déroulant : l'aperçu montre un menu replié, pas la liste.
+        const ds = field.dataSource || {};
+        const resume = isDynamic
+          ? (ds.tableId
+              ? `🔗 ${escHtml(ds.tableId)}${ds.labelColumn ? ' · ' + escHtml(ds.labelColumn) : ''}${ds.filters?.length ? ' · ' + ds.filters.length + ' filtre(s)' : ''}`
+              : '🔗 Dynamique (à configurer)')
+          : `☑ ${escHtml(field.placeholder || 'Sélectionner...')} (${field.options.length} choix)`;
+        inputHtml = `<select class="form-field-input ${isDynamic ? 'dynamic-source' : ''}" disabled><option>${resume}</option></select>`;
+        break;
+      }
       if (isDynamic) {
         const ds = field.dataSource;
         const summary = ds.tableId
@@ -1338,13 +1528,16 @@ function createFormFieldElement(field) {
     case 'signature':
       inputHtml = `<div class="signature-pad">✍️ Zone de signature</div>`;
       break;
+    case 'file':
+      inputHtml = `<div class="file-drop-preview">📎 ${field.fileMultiple !== false ? 'Joindre des fichiers' : 'Joindre un fichier'}${field.fileAccept ? ' · ' + escHtml(field.fileAccept) : ''}</div>`;
+      break;
     case 'date':
-      inputHtml = `<input type="date" class="form-field-input" disabled>`;
+      inputHtml = `<input type="${typeInputDate(field)}" class="form-field-input" disabled>`;
       break;
     default:
       inputHtml = `<input type="${field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}" class="form-field-input" placeholder="${escHtml(field.placeholder || 'Saisir...')}" readonly>`;
   }
-  
+
   // Appliquer le style selon la position du label et si le label est masqué
   if (field.hideLabel) {
     // Label masqué - afficher uniquement le champ
@@ -1358,7 +1551,7 @@ function createFormFieldElement(field) {
       <button class="form-field-delete" title="Supprimer">×</button>
       <div style="display: flex; align-items: center; gap: 10px;">
         <div class="form-field-label" style="flex-shrink: 0; margin-bottom: 0; min-width: 80px; max-width: 40%;">${escHtml(field.label)}${field.required ? ' <span style="color: #ef4444;">*</span>' : ''}</div>
-        <div style="flex: 1;">${inputHtml}</div>
+        <div style="flex: 1; min-width: 0;">${inputHtml}</div>
       </div>
       <div class="form-field-resize"></div>
     `;
@@ -1370,7 +1563,9 @@ function createFormFieldElement(field) {
       <div class="form-field-resize"></div>
     `;
   }
-  
+
+  appliquerPolices(fieldEl, field);
+
   // Événements
   fieldEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-field-delete')) return;
@@ -1378,17 +1573,17 @@ function createFormFieldElement(field) {
     selectField(field.id);
     startDragField(e, fieldEl, field);
   });
-  
+
   fieldEl.querySelector('.form-field-delete').addEventListener('click', () => {
     deleteField(field.id);
   });
-  
+
   const resizeHandle = fieldEl.querySelector('.form-field-resize');
   resizeHandle.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     startResizeField(e, fieldEl, field);
   });
-  
+
   return fieldEl;
 }
 
@@ -1407,31 +1602,31 @@ function createSectionElement(field) {
   } else if (field.bgColor) {
     sectionEl.style.backgroundColor = field.bgColor;
   }
-  
+
   sectionEl.innerHTML = `
     <button class="form-section-delete" title="Supprimer">×</button>
     <div class="form-section-title" style="${field.textColor ? 'color:' + field.textColor : ''}">${escHtml(field.label)}</div>
     <div class="form-field-resize"></div>
   `;
-  
+
   sectionEl.addEventListener('mousedown', (e) => {
     if (e.target.classList.contains('form-section-delete')) return;
     if (e.target.classList.contains('form-field-resize')) return;
     selectField(field.id);
     startDragField(e, sectionEl, field);
   });
-  
+
   sectionEl.querySelector('.form-section-delete').addEventListener('click', () => {
     deleteField(field.id);
   });
-  
+
   // Redimensionnement
   const resizeHandle = sectionEl.querySelector('.form-field-resize');
   resizeHandle.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     startResizeImage(e, sectionEl, field);
   });
-  
+
   return sectionEl;
 }
 
@@ -1441,18 +1636,18 @@ function getFieldsInSection(section) {
   const sectionTop = section.y;
   const sectionRight = section.x + section.width;
   const sectionBottom = section.y + (section.height || 150);
-  
+
   return formFields.filter(f => {
     if (f.id === section.id) return false;
     if (f.fieldType === 'section') return false;
-    
+
     // Vérifier si le centre du champ est dans la section
     const fieldCenterX = f.x + (f.width / 2);
     const fieldCenterY = f.y + 40; // Approximation du centre vertical
-    
-    return fieldCenterX >= sectionLeft && 
-           fieldCenterX <= sectionRight && 
-           fieldCenterY >= sectionTop && 
+
+    return fieldCenterX >= sectionLeft &&
+           fieldCenterX <= sectionRight &&
+           fieldCenterY >= sectionTop &&
            fieldCenterY <= sectionBottom;
   });
 }
@@ -1463,7 +1658,7 @@ function startDragField(e, fieldEl, field) {
   const startY = e.clientY;
   const startLeft = field.x;
   const startTop = field.y;
-  
+
   // Si c'est une section, récupérer les éléments à l'intérieur
   let childFields = [];
   let childStartPositions = [];
@@ -1471,28 +1666,28 @@ function startDragField(e, fieldEl, field) {
     childFields = getFieldsInSection(field);
     childStartPositions = childFields.map(f => ({ id: f.id, x: f.x, y: f.y }));
   }
-  
+
   function onMouseMove(e) {
     let dx = e.clientX - startX;
     let dy = e.clientY - startY;
-    
+
     let newX = startLeft + dx;
     let newY = startTop + dy;
-    
+
     if (snapToGrid) {
       newX = Math.round(newX / 20) * 20;
       newY = Math.round(newY / 20) * 20;
     }
-    
+
     const actualDx = newX - startLeft;
     const actualDy = newY - startTop;
-    
+
     field.x = Math.max(0, newX);
     field.y = Math.max(0, newY);
-    
+
     fieldEl.style.left = field.x + 'px';
     fieldEl.style.top = field.y + 'px';
-    
+
     // Déplacer aussi les éléments enfants
     if (field.fieldType === 'section') {
       childStartPositions.forEach(pos => {
@@ -1509,12 +1704,12 @@ function startDragField(e, fieldEl, field) {
       });
     }
   }
-  
+
   function onMouseUp() {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
   }
-  
+
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
 }
@@ -1523,24 +1718,24 @@ function startDragField(e, fieldEl, field) {
 function startResizeField(e, fieldEl, field) {
   const startX = e.clientX;
   const startWidth = field.width;
-  
+
   function onMouseMove(e) {
     const dx = e.clientX - startX;
     let newWidth = startWidth + dx;
-    
+
     if (snapToGrid) {
       newWidth = Math.round(newWidth / 20) * 20;
     }
-    
+
     field.width = Math.max(150, newWidth);
     fieldEl.style.width = field.width + 'px';
   }
-  
+
   function onMouseUp() {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
   }
-  
+
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
 }
@@ -1549,10 +1744,10 @@ function startResizeField(e, fieldEl, field) {
 function selectField(fieldId) {
   const oldSelected = formCanvas.querySelector('.form-field.selected, .form-section.selected, .form-image.selected, .form-title-element.selected, .form-qrcode.selected, .form-divider.selected');
   if (oldSelected) oldSelected.classList.remove('selected');
-  
+
   const fieldEl = formCanvas.querySelector(`[data-field-id="${fieldId}"]`);
   if (fieldEl) fieldEl.classList.add('selected');
-  
+
   selectedField = formFields.find(f => f.id === fieldId);
   renderPropertiesPanel();
 }
@@ -1561,7 +1756,7 @@ function selectField(fieldId) {
 function bringToFront(fieldId) {
   const index = formFields.findIndex(f => f.id === fieldId);
   if (index === -1 || index === formFields.length - 1) return;
-  
+
   const field = formFields.splice(index, 1)[0];
   formFields.push(field);
   renderFormFields();
@@ -1573,7 +1768,7 @@ function bringToFront(fieldId) {
 function sendToBack(fieldId) {
   const index = formFields.findIndex(f => f.id === fieldId);
   if (index === -1 || index === 0) return;
-  
+
   const field = formFields.splice(index, 1)[0];
   formFields.unshift(field);
   renderFormFields();
@@ -1597,7 +1792,7 @@ function renderPropertiesPanel() {
     propertiesContent.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em;">Sélectionnez un champ pour modifier ses propriétés</p>';
     return;
   }
-  
+
   const f = selectedField;
   const isSection = f.fieldType === 'section';
   const isImage = f.fieldType === 'image';
@@ -1606,28 +1801,25 @@ function renderPropertiesPanel() {
   const isDivider = f.fieldType === 'divider';
   const hasOptions = ['select', 'radio', 'checkbox'].includes(f.fieldType);
   const isDecorative = isSection || isImage || isTitle || isQRCode || isDivider;
-  
+
   let html = `
     <div class="property-group">
       <div class="property-label">${isTitle ? 'Texte' : 'Libellé'}</div>
       <input type="text" class="property-input" id="prop-label" value="${escHtml(f.label)}">
     </div>
   `;
-  
+
   // Image upload
   if (isImage) {
     html += `
       <div class="property-group">
         <div class="property-label">Image</div>
         <input type="file" id="prop-image-upload" accept="image/*" style="font-size: 0.85em;">
-        ${f.imageData ? '<p style="color: #10b981; font-size: 0.8em; margin-top: 5px;">✓ Image chargée (fichier)</p>' : ''}
-        <div class="property-label" style="margin-top: 10px;">ou adresse de l'image</div>
-        <input type="text" class="property-input" id="prop-image-url" value="${escHtml(f.imageUrl || '')}" placeholder="https://…/logo.png">
-        <div class="property-hint">Une image <b>déposée en fichier</b> est stockée dans le formulaire : elle ne peut pas voyager dans un lien public, qu'elle ferait exploser (une adresse tient dans environ 7 800 caractères, une image en fait des dizaines de milliers). Une image <b>par adresse</b> ne coûte que sa longueur et s'affiche partout. Hébergez-la à côté du widget — sur les Pages de la forge, par exemple.</div>
+        ${f.imageData ? '<p style="color: #10b981; font-size: 0.8em; margin-top: 5px;">✓ Image chargée</p>' : ''}
       </div>
     `;
   }
-  
+
   // Options de formatage pour titre/texte
   if (isTitle) {
     html += `
@@ -1674,7 +1866,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // Divider (Filet) properties
   if (isDivider) {
     html += `
@@ -1696,7 +1888,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // QR Code properties
   if (isQRCode) {
     html += `
@@ -1722,14 +1914,14 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // Calculated field properties
   const isCalculated = f.fieldType === 'calculated';
   if (isCalculated) {
-    const numberFields = formFields.filter(field => 
+    const numberFields = formFields.filter(field =>
       field.id !== f.id && field.fieldType === 'number'
     );
-    
+
     html += `
       <div class="property-group">
         <div class="property-label">Type de calcul</div>
@@ -1775,7 +1967,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // Lookup properties
   const isLookup = f.fieldType === 'lookup';
   if (isLookup) {
@@ -1785,7 +1977,7 @@ function renderPropertiesPanel() {
       const cols = Object.keys(f.lookupData).filter(c => c !== 'id' && c !== 'manualSort');
       columnOptions += cols.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
     }
-    
+
     html += `
       <div class="property-group">
         <div class="property-label">Table source</div>
@@ -1811,7 +2003,31 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
+
+  // Pièce jointe
+  if (f.fieldType === 'file') {
+    const maxMb = (f.fileMaxMb === undefined || f.fileMaxMb === null) ? 10 : f.fileMaxMb;
+    html += `
+      <div class="property-group">
+        <div class="property-label">Types acceptés</div>
+        <input type="text" class="property-input" id="prop-file-accept" value="${escHtml(f.fileAccept || '')}" placeholder="image/*,.pdf,.docx">
+        <div class="property-hint">Vide = tous les fichiers. Extensions ou types MIME séparés par des virgules.</div>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Taille max par fichier (Mo)</div>
+        <input type="number" class="property-input" id="prop-file-max" value="${maxMb}" min="0" step="1">
+        <div class="property-hint">0 = pas de limite côté formulaire (celle du serveur Grist s'applique toujours).</div>
+      </div>
+      <div class="property-group">
+        <label class="property-checkbox">
+          <input type="checkbox" id="prop-file-multiple" ${f.fileMultiple !== false ? 'checked' : ''}>
+          Plusieurs fichiers
+        </label>
+      </div>
+    `;
+  }
+
   // Couleurs (pour section, titre et champs)
   if (isSection || isTitle) {
     html += `
@@ -1829,7 +2045,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // Couleur de fond pour les champs de saisie (sauf Section et Titre qui l'ont déjà)
   if (!isSection && !isTitle) {
     html += `
@@ -1843,7 +2059,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   if (!isDecorative) {
     // Sélecteur de type de champ
     html += `
@@ -1861,11 +2077,12 @@ function renderPropertiesPanel() {
           <option value="checkbox" ${f.fieldType === 'checkbox' ? 'selected' : ''}>Cases à cocher</option>
           <option value="lookup" ${f.fieldType === 'lookup' ? 'selected' : ''}>Lookup (référence)</option>
           <option value="signature" ${f.fieldType === 'signature' ? 'selected' : ''}>Signature</option>
+          <option value="file" ${f.fieldType === 'file' ? 'selected' : ''}>Pièce jointe</option>
           <option value="calculated" ${f.fieldType === 'calculated' ? 'selected' : ''}>Champ calculé</option>
         </select>
       </div>
     `;
-    
+
     if (f.columnId) {
       html += `
         <div class="property-group">
@@ -1885,14 +2102,32 @@ function renderPropertiesPanel() {
         </div>
       `;
     }
-    
+
     html += `
       <div class="property-group">
         <div class="property-label">Placeholder</div>
         <input type="text" class="property-input" id="prop-placeholder" value="${escHtml(f.placeholder || '')}">
       </div>
     `;
-    
+
+    // Format d'un champ Date : jour seul, jour + heure, ou heure seule.
+    if (f.fieldType === 'date') {
+      const dm = modeDate(f);
+      html += `
+        <div class="property-group">
+          <div class="property-label">Format</div>
+          <select class="property-select" id="prop-date-mode">
+            <option value="date" ${dm === 'date' ? 'selected' : ''}>Date</option>
+            <option value="datetime" ${dm === 'datetime' ? 'selected' : ''}>Date et heure</option>
+            <option value="time" ${dm === 'time' ? 'selected' : ''}>Heure seule</option>
+          </select>
+          <div class="property-hint">${dm === 'datetime'
+            ? 'À lier de préférence à une colonne Grist de type « Date et heure ».'
+            : (dm === 'time' ? 'Enregistrée sous la forme HH:MM : à lier à une colonne Texte.' : 'À lier à une colonne Grist de type Date.')}</div>
+        </div>
+      `;
+    }
+
     // Masquer le label
     html += `
       <div class="property-group">
@@ -1902,7 +2137,7 @@ function renderPropertiesPanel() {
         </label>
       </div>
     `;
-    
+
     // Position du label (seulement si le label n'est pas masqué)
     if (!f.hideLabel) {
       html += `
@@ -1915,7 +2150,41 @@ function renderPropertiesPanel() {
         </div>
       `;
     }
-    
+
+    // Typographie : police et taille du libellé, puis du champ lui-même.
+    html += `
+      <div class="property-group" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
+        <div class="property-label" style="font-weight: 600; color: #1e293b;">Typographie du libellé</div>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Police</div>
+        <select class="property-select" id="prop-label-font">${optionsPolice(f.labelFontFamily)}</select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Taille (pt)</div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="number" class="property-input" id="prop-label-size" value="${f.labelFontSize || ''}" min="6" max="48" step="1" placeholder="Par défaut" style="flex: 1;">
+          <button type="button" class="toolbar-btn ${f.labelBold ? 'active' : ''}" id="prop-label-bold" title="Gras" style="font-weight: bold; width: 34px;">G</button>
+          <input type="color" id="prop-label-color" value="${f.labelColor || '#475569'}" title="Couleur du libellé" style="width: 34px; height: 30px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; padding: 1px;">
+        </div>
+      </div>
+      <div class="property-group">
+        <div class="property-label" style="font-weight: 600; color: #1e293b;">Typographie du champ</div>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Police</div>
+        <select class="property-select" id="prop-input-font">${optionsPolice(f.inputFontFamily)}</select>
+      </div>
+      <div class="property-group">
+        <div class="property-label">Taille (pt)</div>
+        <input type="number" class="property-input" id="prop-input-size" value="${f.inputFontSize || ''}" min="6" max="48" step="1" placeholder="Par défaut">
+        <div class="property-hint">Vide = taille par défaut. S'applique au texte saisi et aux options.</div>
+      </div>
+      <div class="property-group">
+        <button type="button" class="add-option-btn" id="prop-typo-reset" style="margin-top: 0;">↺ Typographie par défaut</button>
+      </div>
+    `;
+
     // Validation rules
     html += `
       <div class="property-group" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
@@ -1928,7 +2197,7 @@ function renderPropertiesPanel() {
         </label>
       </div>
     `;
-    
+
     // Min/Max for number fields
     if (f.fieldType === 'number') {
       html += `
@@ -1942,7 +2211,7 @@ function renderPropertiesPanel() {
         </div>
       `;
     }
-    
+
     // Min/Max length for text fields
     if (['text', 'textarea', 'email', 'phone'].includes(f.fieldType)) {
       html += `
@@ -1956,7 +2225,7 @@ function renderPropertiesPanel() {
         </div>
       `;
     }
-    
+
     // Regex pattern
     if (['text', 'phone'].includes(f.fieldType)) {
       html += `
@@ -1982,7 +2251,7 @@ function renderPropertiesPanel() {
       `;
     }
   }
-  
+
   // Conditions d'affichage (pour tous les champs sauf section)
   if (!isSection) {
     // Tous les champs saisissables peuvent piloter une condition, et tous les
@@ -1991,7 +2260,7 @@ function renderPropertiesPanel() {
     const otherFields = formFields.filter(field =>
       field.id !== f.id && condInputTypes.includes(field.fieldType)
     );
-    
+
     if (otherFields.length > 0) {
       html += `
         <div class="property-group" style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px;">
@@ -2029,7 +2298,7 @@ function renderPropertiesPanel() {
       `;
     }
   }
-  
+
   // Page du champ
   if (totalPages > 1) {
     const pageOptions = Array.from({length: totalPages}, (_, i) => i + 1)
@@ -2042,7 +2311,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // Ordre d'affichage (z-index)
   html += `
     <div class="property-group">
@@ -2053,7 +2322,7 @@ function renderPropertiesPanel() {
       </div>
     </div>
   `;
-  
+
   const widthCm = (f.width / 37.8).toFixed(1);
   html += `
     <div class="property-group">
@@ -2066,7 +2335,7 @@ function renderPropertiesPanel() {
       </div>
     </div>
   `;
-  
+
   if (isSection || isImage) {
     const heightCm = ((f.height || 100) / 37.8).toFixed(1);
     html += `
@@ -2081,7 +2350,7 @@ function renderPropertiesPanel() {
       </div>
     `;
   }
-  
+
   // La case « Champ obligatoire » est rendue une seule fois, dans la section
   // Validation ci-dessus : un second rendu portait le même id, donc
   // getElementById ne voyait que le premier et la case du bas était inerte.
@@ -2092,6 +2361,18 @@ function renderPropertiesPanel() {
     const ds = f.dataSource;
     const cascadeInputTypes = ['text', 'textarea', 'number', 'date', 'email', 'phone', 'select', 'radio', 'checkbox'];
     const otherFieldsForFilter = formFields.filter(of => of.id !== f.id && cascadeInputTypes.includes(of.fieldType));
+
+    if (f.fieldType === 'checkbox') {
+      html += `
+        <div class="property-group">
+          <label class="property-checkbox">
+            <input type="checkbox" id="prop-checkbox-dropdown" ${f.checkboxDropdown ? 'checked' : ''}>
+            Affichage en menu déroulant
+          </label>
+          <div class="property-hint">Gagne de la place : les cases sont repliées sous un menu qui s'ouvre au clic. Plusieurs choix restent possibles.</div>
+        </div>
+      `;
+    }
 
     html += `
       <div class="property-group">
@@ -2210,7 +2491,7 @@ function renderPropertiesPanel() {
       `;
     }
   }
-  
+
   // Le sélecteur « Validation » (Aucune / Email / Téléphone / min / max / regex)
   // a été retiré : f.validation n'était lu ni par submitForm ni par form.html.
   // La validation réellement appliquée est celle de la section Validation
@@ -2224,7 +2505,7 @@ function renderPropertiesPanel() {
   // jamais quand ce bloc était seul à l'écran (image, QR code).
 
   propertiesContent.innerHTML = html;
-  
+
   // Event listeners
   document.getElementById('prop-field-type')?.addEventListener('change', (e) => {
     const newType = e.target.value;
@@ -2237,7 +2518,7 @@ function renderPropertiesPanel() {
     selectField(selectedField.id);
     renderPropertiesPanel(); // Re-render pour afficher les nouvelles options
   });
-  
+
   document.getElementById('prop-label')?.addEventListener('input', (e) => {
     selectedField.label = e.target.value;
     // Mettre à jour le texte directement sans re-render complet
@@ -2255,25 +2536,70 @@ function renderPropertiesPanel() {
       }
     }
   });
-  
+
   document.getElementById('prop-placeholder')?.addEventListener('change', (e) => {
     selectedField.placeholder = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
+  // Typographie du libellé et du champ
+  const tailleSaisie = (v) => {
+    const n = parseFloat(String(v).replace(',', '.'));
+    return isFinite(n) && n > 0 ? Math.min(48, Math.max(6, n)) : undefined; // vide = défaut
+  };
+  const redessiner = () => { renderFormFields(); selectField(selectedField.id); };
+  document.getElementById('prop-label-font')?.addEventListener('change', (e) => {
+    selectedField.labelFontFamily = e.target.value || undefined;
+    redessiner();
+  });
+  document.getElementById('prop-label-size')?.addEventListener('change', (e) => {
+    selectedField.labelFontSize = tailleSaisie(e.target.value);
+    redessiner();
+  });
+  document.getElementById('prop-label-bold')?.addEventListener('click', () => {
+    selectedField.labelBold = !selectedField.labelBold;
+    redessiner();
+  });
+  document.getElementById('prop-label-color')?.addEventListener('change', (e) => {
+    selectedField.labelColor = e.target.value;
+    renderFormFields();
+    // Pas de re-rendu du panneau : il fermerait la palette.
+    const el = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
+    if (el) el.classList.add('selected');
+  });
+  document.getElementById('prop-input-font')?.addEventListener('change', (e) => {
+    selectedField.inputFontFamily = e.target.value || undefined;
+    redessiner();
+  });
+  document.getElementById('prop-input-size')?.addEventListener('change', (e) => {
+    selectedField.inputFontSize = tailleSaisie(e.target.value);
+    redessiner();
+  });
+  document.getElementById('prop-typo-reset')?.addEventListener('click', () => {
+    ['labelFontFamily', 'labelFontSize', 'labelBold', 'labelColor', 'inputFontFamily', 'inputFontSize']
+      .forEach(k => { delete selectedField[k]; });
+    redessiner();
+  });
+
+  document.getElementById('prop-checkbox-dropdown')?.addEventListener('change', (e) => {
+    selectedField.checkboxDropdown = e.target.checked;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+
   document.getElementById('prop-hide-label')?.addEventListener('change', (e) => {
     selectedField.hideLabel = e.target.checked;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-label-position')?.addEventListener('change', (e) => {
     selectedField.labelPosition = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-width')?.addEventListener('input', (e) => {
     selectedField.width = parseInt(e.target.value) || 200;
     // Mettre à jour le champ cm
@@ -2282,7 +2608,7 @@ function renderPropertiesPanel() {
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-width-cm')?.addEventListener('change', (e) => {
     const cm = parseFloat(e.target.value) || 5;
     selectedField.width = Math.round(cm * 37.8);
@@ -2292,7 +2618,7 @@ function renderPropertiesPanel() {
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-height')?.addEventListener('input', (e) => {
     selectedField.height = parseInt(e.target.value) || 150;
     // Mettre à jour le champ cm
@@ -2301,7 +2627,7 @@ function renderPropertiesPanel() {
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-height-cm')?.addEventListener('change', (e) => {
     const cm = parseFloat(e.target.value) || 3;
     selectedField.height = Math.round(cm * 37.8);
@@ -2311,13 +2637,8 @@ function renderPropertiesPanel() {
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Upload image
-  document.getElementById('prop-image-url')?.addEventListener('change', (e) => {
-    if (!selectedField) return;
-    selectedField.imageUrl = (e.target.value || '').trim();
-    renderFormFields();
-  });
   document.getElementById('prop-image-upload')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -2332,42 +2653,42 @@ function renderPropertiesPanel() {
       reader.readAsDataURL(file);
     }
   });
-  
+
   // Taille de police
   document.getElementById('prop-font-size')?.addEventListener('change', (e) => {
     selectedField.fontSize = parseFloat(e.target.value) || 14;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Police
   document.getElementById('prop-font-family')?.addEventListener('change', (e) => {
     selectedField.fontFamily = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Gras
   document.getElementById('prop-bold')?.addEventListener('click', () => {
     selectedField.fontWeight = selectedField.fontWeight === 'bold' ? '' : 'bold';
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Italique
   document.getElementById('prop-italic')?.addEventListener('click', () => {
     selectedField.fontStyle = selectedField.fontStyle === 'italic' ? '' : 'italic';
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Souligné
   document.getElementById('prop-underline')?.addEventListener('click', () => {
     selectedField.textDecoration = selectedField.textDecoration === 'underline' ? '' : 'underline';
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Alignement
   document.getElementById('prop-align-left')?.addEventListener('click', () => {
     selectedField.textAlign = 'left';
@@ -2384,14 +2705,14 @@ function renderPropertiesPanel() {
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Interligne
   document.getElementById('prop-line-height')?.addEventListener('change', (e) => {
     selectedField.lineHeight = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Couleur du texte
   document.getElementById('prop-text-color')?.addEventListener('change', (e) => {
     selectedField.textColor = e.target.value;
@@ -2400,7 +2721,7 @@ function renderPropertiesPanel() {
     const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
     if (fieldEl) fieldEl.classList.add('selected');
   });
-  
+
   // Couleur de fond
   document.getElementById('prop-bg-color')?.addEventListener('change', (e) => {
     selectedField.bgColor = e.target.value;
@@ -2410,47 +2731,47 @@ function renderPropertiesPanel() {
     const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
     if (fieldEl) fieldEl.classList.add('selected');
   });
-  
+
   // Fond transparent
   document.getElementById('prop-transparent')?.addEventListener('change', (e) => {
     selectedField.transparent = e.target.checked;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Divider (Filet) properties
   document.getElementById('prop-divider-style')?.addEventListener('change', (e) => {
     selectedField.dividerStyle = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-divider-height')?.addEventListener('change', (e) => {
     selectedField.dividerHeight = parseInt(e.target.value) || 2;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-divider-color')?.addEventListener('change', (e) => {
     selectedField.dividerColor = e.target.value;
     renderFormFields();
     const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
     if (fieldEl) fieldEl.classList.add('selected');
   });
-  
+
   // QR Code properties
   document.getElementById('prop-qr-content')?.addEventListener('change', (e) => {
     selectedField.qrContent = e.target.value;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-qr-size')?.addEventListener('change', (e) => {
     selectedField.qrSize = parseInt(e.target.value) || 100;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   document.getElementById('prop-qr-color')?.addEventListener('change', (e) => {
     selectedField.qrColor = e.target.value;
     renderFormFields();
@@ -2458,7 +2779,7 @@ function renderPropertiesPanel() {
     const fieldEl = formCanvas.querySelector(`[data-field-id="${selectedField.id}"]`);
     if (fieldEl) fieldEl.classList.add('selected');
   });
-  
+
   document.getElementById('prop-qr-type')?.addEventListener('change', async (e) => {
     selectedField.qrType = e.target.value;
     if (e.target.value === 'record') {
@@ -2480,7 +2801,7 @@ function renderPropertiesPanel() {
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Changer de page
   document.getElementById('prop-page')?.addEventListener('change', (e) => {
     selectedField.page = parseInt(e.target.value);
@@ -2489,52 +2810,52 @@ function renderPropertiesPanel() {
     renderPropertiesPanel();
     showToast('Champ déplacé vers la page ' + e.target.value, 'success');
   });
-  
+
   // Ordre d'affichage
   document.getElementById('btn-bring-front')?.addEventListener('click', () => {
     bringToFront(selectedField.id);
   });
-  
+
   document.getElementById('btn-send-back')?.addEventListener('click', () => {
     sendToBack(selectedField.id);
   });
-  
+
   document.getElementById('prop-required')?.addEventListener('change', (e) => {
     selectedField.required = e.target.checked;
     renderFormFields();
     selectField(selectedField.id);
   });
-  
+
   // Min/Max for numbers
   document.getElementById('prop-min')?.addEventListener('change', (e) => {
     selectedField.minValue = e.target.value !== '' ? parseFloat(e.target.value) : undefined;
   });
-  
+
   document.getElementById('prop-max')?.addEventListener('change', (e) => {
     selectedField.maxValue = e.target.value !== '' ? parseFloat(e.target.value) : undefined;
   });
-  
+
   // Min/Max length for text
   document.getElementById('prop-min-length')?.addEventListener('change', (e) => {
     selectedField.minLength = e.target.value !== '' ? parseInt(e.target.value) : undefined;
   });
-  
+
   document.getElementById('prop-max-length')?.addEventListener('change', (e) => {
     selectedField.maxLength = e.target.value !== '' ? parseInt(e.target.value) : undefined;
   });
-  
+
   // Pattern preset
   document.getElementById('prop-pattern-preset')?.addEventListener('change', (e) => {
     selectedField.patternPreset = e.target.value;
     const customGroup = document.getElementById('custom-pattern-group');
-    
+
     const patterns = {
       'email': '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
       'phone-fr': '^0[1-9]([ .-]?[0-9]{2}){4}$',
       'postal-fr': '^[0-9]{5}$',
       'siret': '^[0-9]{14}$'
     };
-    
+
     if (e.target.value === 'custom') {
       if (customGroup) customGroup.style.display = '';
     } else {
@@ -2542,17 +2863,17 @@ function renderPropertiesPanel() {
       selectedField.pattern = patterns[e.target.value] || '';
     }
   });
-  
+
   // Custom pattern
   document.getElementById('prop-pattern')?.addEventListener('change', (e) => {
     selectedField.pattern = e.target.value;
   });
-  
+
   // Error message
   document.getElementById('prop-error-message')?.addEventListener('change', (e) => {
     selectedField.errorMessage = e.target.value;
   });
-  
+
   // Calculated field properties
   document.getElementById('prop-calc-type')?.addEventListener('change', (e) => {
     selectedField.calcType = e.target.value;
@@ -2563,11 +2884,11 @@ function renderPropertiesPanel() {
       if (formulaGroup) formulaGroup.style.display = 'none';
     }
   });
-  
+
   document.getElementById('prop-calc-field-a')?.addEventListener('change', (e) => {
     selectedField.calcFieldA = e.target.value;
   });
-  
+
   document.getElementById('prop-calc-field-b')?.addEventListener('change', (e) => {
     selectedField.calcFieldB = e.target.value;
     const constantGroup = document.getElementById('calc-constant-group');
@@ -2577,23 +2898,23 @@ function renderPropertiesPanel() {
       if (constantGroup) constantGroup.style.display = 'none';
     }
   });
-  
+
   document.getElementById('prop-calc-constant')?.addEventListener('change', (e) => {
     selectedField.calcConstant = parseFloat(e.target.value) || 0;
   });
-  
+
   document.getElementById('prop-calc-formula')?.addEventListener('change', (e) => {
     selectedField.calcFormula = e.target.value;
   });
-  
+
   document.getElementById('prop-calc-decimals')?.addEventListener('change', (e) => {
     selectedField.calcDecimals = parseInt(e.target.value) || 0;
   });
-  
+
   document.getElementById('prop-calc-suffix')?.addEventListener('change', (e) => {
     selectedField.calcSuffix = e.target.value;
   });
-  
+
   // Lookup properties
   document.getElementById('prop-lookup-table')?.addEventListener('change', async (e) => {
     selectedField.lookupTable = e.target.value;
@@ -2611,15 +2932,41 @@ function renderPropertiesPanel() {
       if (valGroup) valGroup.style.display = 'none';
     }
   });
-  
+
   document.getElementById('prop-lookup-display')?.addEventListener('change', (e) => {
     selectedField.lookupDisplayColumn = e.target.value;
   });
-  
+
+
+  // Pièce jointe
+  document.getElementById('prop-file-accept')?.addEventListener('change', (e) => {
+    selectedField.fileAccept = e.target.value.trim();
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+
+  document.getElementById('prop-file-max')?.addEventListener('change', (e) => {
+    const n = parseFloat(e.target.value);
+    selectedField.fileMaxMb = isNaN(n) || n < 0 ? 0 : n;
+  });
+
+  document.getElementById('prop-file-multiple')?.addEventListener('change', (e) => {
+    selectedField.fileMultiple = e.target.checked;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+
+  // Format de date
+  document.getElementById('prop-date-mode')?.addEventListener('change', (e) => {
+    selectedField.dateMode = e.target.value;
+    renderFormFields();
+    selectField(selectedField.id);
+  });
+
   document.getElementById('prop-lookup-value')?.addEventListener('change', (e) => {
     selectedField.lookupValueColumn = e.target.value;
   });
-  
+
   // Conditional display
   document.getElementById('prop-has-condition')?.addEventListener('change', (e) => {
     const conditionOptions = document.getElementById('condition-options');
@@ -2631,7 +2978,7 @@ function renderPropertiesPanel() {
       if (conditionOptions) conditionOptions.style.display = 'none';
     }
   });
-  
+
   document.getElementById('prop-condition-field')?.addEventListener('change', (e) => {
     if (!e.target.value) {
       selectedField.condition = null;
@@ -2647,7 +2994,7 @@ function renderPropertiesPanel() {
     }
     selectedField.condition.fieldId = e.target.value;
   });
-  
+
   document.getElementById('prop-condition-operator')?.addEventListener('change', (e) => {
     if (selectedField.condition) {
       selectedField.condition.operator = e.target.value;
@@ -2659,13 +3006,13 @@ function renderPropertiesPanel() {
       }
     }
   });
-  
+
   document.getElementById('prop-condition-value')?.addEventListener('change', (e) => {
     if (selectedField.condition) {
       selectedField.condition.value = e.target.value;
     }
   });
-  
+
   document.getElementById('prop-column')?.addEventListener('change', (e) => {
     selectedField.columnId = e.target.value || null;
     // Mettre à jour le libellé avec le nom de la colonne
@@ -2676,40 +3023,44 @@ function renderPropertiesPanel() {
       selectField(selectedField.id);
     }
   });
-  
+
   // Créer une nouvelle colonne dans Grist
   document.getElementById('btn-create-column')?.addEventListener('click', async () => {
     if (!currentTable) {
       showToast('Veuillez sélectionner une table', 'error');
       return;
     }
-    
+
     // L'ancien nettoyage conservait les accents : Grist renommait la colonne à
     // la création et selectedField.columnId pointait alors vers un identifiant
     // inexistant. On normalise comme labelToColumnId, puis on relit la table.
     const columnName = labelToColumnId(selectedField.label);
-    
+
     // Déterminer le type de colonne Grist selon le type de champ
     let gristType = 'Text';
     if (selectedField.fieldType === 'number') gristType = 'Numeric';
-    else if (selectedField.fieldType === 'date') gristType = 'Date';
+    else if (selectedField.fieldType === 'date') {
+      const dm = modeDate(selectedField);
+      gristType = dm === 'datetime' ? 'DateTime' : (dm === 'time' ? 'Text' : 'Date');
+    }
+    else if (selectedField.fieldType === 'file') gristType = 'Attachments';
     else if (selectedField.fieldType === 'email') gristType = 'Text';
     else if (selectedField.fieldType === 'checkbox') gristType = 'ChoiceList';
     else if (selectedField.fieldType === 'select' || selectedField.fieldType === 'radio') gristType = 'Choice';
-    
+
     try {
       showLoading();
       await grist.docApi.applyUserActions([
         ['AddColumn', currentTable, columnName, { type: gristType }]
       ]);
-      
+
       // Recharger les colonnes puis lier le champ à l'identifiant réellement
       // créé par Grist (qui peut différer du nom demandé).
       const avant = tableColumns.map(c => c.id);
       await loadTableColumns(currentTable);
       const nouvelle = tableColumns.map(c => c.id).find(id => avant.indexOf(id) === -1);
       selectedField.columnId = nouvelle || columnName;
-      
+
       hideLoading();
       renderFormFields();
       selectField(selectedField.id);
@@ -2720,7 +3071,7 @@ function renderPropertiesPanel() {
       showToast('Erreur lors de la création de la colonne', 'error');
     }
   });
-  
+
   // Options
   if (hasOptions) {
     document.querySelectorAll('#options-editor .option-row input').forEach(input => {
@@ -2731,7 +3082,7 @@ function renderPropertiesPanel() {
         selectField(selectedField.id);
       });
     });
-    
+
     document.querySelectorAll('#options-editor .option-row button').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const index = parseInt(e.target.dataset.index);
@@ -2741,7 +3092,7 @@ function renderPropertiesPanel() {
         selectField(selectedField.id);
       });
     });
-    
+
     document.getElementById('btn-add-option')?.addEventListener('click', () => {
       selectedField.options.push('Nouvelle option');
       renderPropertiesPanel();
@@ -2908,10 +3259,44 @@ async function saveFormConfig() {
     showToast('Veuillez sélectionner une table', 'error');
     return;
   }
-  
+
   const title = formTitleInput.value || 'Formulaire ' + currentTable;
   const formId = generateFormId(title);
-  
+
+  // La ligne de BM_FormConfig est désignée par le titre. Si ce titre est déjà celui d'un
+  // AUTRE formulaire que celui ouvert ici, sauvegarder le remplacerait sans rien dire —
+  // typiquement deux formulaires laissés sous « Nouveau formulaire ». On demande d'abord.
+  // Rien n'est demandé quand on resauvegarde le formulaire ouvert : c'est une mise à jour.
+  if (!(formConfig && formConfig.formId === formId)) {
+    let existant = null;
+    try {
+      const tables = await grist.docApi.listTables();
+      if (tables.includes('BM_FormConfig')) {
+        const d = await grist.docApi.fetchTable('BM_FormConfig');
+        const i = (d.ConfigKey || []).indexOf(formId);
+        if (i >= 0) {
+          try { existant = JSON.parse(d.ConfigData[i]); } catch (e) { existant = {}; }
+        }
+      }
+    } catch (e) { /* lecture impossible : on ne bloque pas la sauvegarde */ }
+    if (existant) {
+      const nb = Array.isArray(existant.fields) ? existant.fields.length : 0;
+      const ok = await showConfirm({
+        icon: '⚠️',
+        title: 'Un formulaire porte déjà ce titre',
+        message: `« ${existant.title || title} » existe déjà dans ce document (${nb} élément(s), table ${existant.tableId || '?'}). `
+          + 'Sauvegarder le remplacera par le formulaire affiché. Pour garder les deux, annulez et changez le titre.',
+        confirmText: 'Remplacer',
+        cancelText: 'Annuler',
+        danger: true
+      });
+      if (!ok) {
+        showToast('Sauvegarde annulée : changez le titre pour garder les deux formulaires', 'error');
+        return false;
+      }
+    }
+  }
+
   const docIdInput = document.getElementById('cfg-doc-id');
 
   // Plus de « secret de proxy » : aucun des proxys fournis n'en vérifie
@@ -2941,16 +3326,17 @@ async function saveFormConfig() {
     title: title,
     templates: templates,
     totalPages: totalPages,
+    pageHeights: pageHeights,
     versionHistory: versionHistory.slice(0, 10) // Garder les 10 dernières versions
   };
-  
+
   try {
     await grist.setOptions(config);
     formConfig = config;
-    
+
     // Aussi sauvegarder dans une table BM_FormConfig pour partage entre widgets
     await saveConfigToTable(config);
-    
+
     showToast('Configuration sauvegardée', 'success');
   } catch (error) {
     console.error('Erreur sauvegarde:', error);
@@ -2963,7 +3349,7 @@ async function saveConfigToTable(config) {
   try {
     const tables = await grist.docApi.listTables();
     const configTableName = 'BM_FormConfig';
-    
+
     // Créer la table si elle n'existe pas
     if (!tables.includes(configTableName)) {
       await grist.docApi.applyUserActions([
@@ -2973,14 +3359,14 @@ async function saveConfigToTable(config) {
         ]]
       ]);
     }
-    
+
     // Chercher si une config existe déjà (par formId)
     const existingData = await grist.docApi.fetchTable(configTableName);
     const configJson = JSON.stringify(config);
     const configKey = config.formId || 'form_' + (config.tableId || 'default');
-    
+
     const existingIndex = existingData.ConfigKey?.findIndex(k => k === configKey);
-    
+
     if (existingIndex !== undefined && existingIndex >= 0) {
       // Mettre à jour
       const rowId = existingData.id[existingIndex];
@@ -2999,6 +3385,182 @@ async function saveConfigToTable(config) {
   }
 }
 
+/**
+ * Remplace TOUT l'état de l'éditeur par une configuration.
+ *
+ * Sert à « Ouvrir » (configuration lue dans BM_FormConfig) et à « Nouveau » (configuration
+ * vierge). Chaque réglage absent de la configuration est remis à vide : c'est ce qui empêche
+ * un formulaire d'hériter de la table de réponses ou du lien de partage du précédent.
+ */
+async function appliquerConfig(cfg) {
+  formConfig = cfg || {};
+  templates = formConfig.templates || [];
+  versionHistory = formConfig.versionHistory || [];
+  totalPages = formConfig.totalPages || 1;
+  pageHeights = Object.assign({}, formConfig.pageHeights || {});
+  currentPage = 1;
+  selectedField = null;
+  // La ligne sélectionnée appartenait à la table source du formulaire précédent.
+  selectedRecordId = null;
+  selectedRecordData = null;
+  existingAttachments = {};
+
+  formTitleInput.value = formConfig.title || '';
+  responseTableId = formConfig.responseTableId || null;
+  if (responseTableSelect) responseTableSelect.value = responseTableId || '';
+  majBoutonReponses();
+
+  if (formConfig.proxyPlatform) switchProxyPlatform(formConfig.proxyPlatform);
+  const poser = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  const urls = formConfig.proxyUrls || {};
+  ['cloudflare', 'vercel', 'netlify', 'node', 'deno', 'nextcloud'].forEach(p => {
+    // Ancienne configuration : une seule URL, celle de la plateforme active.
+    poser('cfg-proxy-url-' + p, urls[p] || (!formConfig.proxyUrls && p === currentProxyPlatform ? formConfig.proxyUrl : ''));
+  });
+  poser('cfg-public-base', formConfig.publicBaseUrl);
+  poser('cfg-share-link', formConfig.shareLink);
+  poser('cfg-doc-id', formConfig.docId);
+  etatLienPartage();
+
+  tableSelect.value = formConfig.tableId || '';
+  await loadTableColumns(formConfig.tableId || '');
+
+  formFields = Array.isArray(formConfig.fields) ? formConfig.fields : [];
+  fieldIdCounter = formFields.length
+    ? Math.max(...formFields.map(f => parseInt(String(f.id).replace('field_', '')) || 0)) + 1
+    : 0;
+
+  updatePageIndicator();
+  renderFormFields();
+  renderPropertiesPanel();
+  renderHistoryList();
+}
+
+/**
+ * « Ouvrir » : liste les formulaires enregistrés dans BM_FormConfig et rouvre celui choisi.
+ *
+ * Sauvegarder écrivait bien une ligne par formulaire, mais rien ne permettait d'en choisir
+ * une : le widget rouvrait d'office un seul formulaire, et après « Nouveau » il n'existait
+ * plus aucun chemin vers les autres.
+ *
+ * Titres et clés passent par textContent, jamais par innerHTML.
+ */
+async function ouvrirListeFormulaires() {
+  const liste = document.getElementById('open-list');
+  const modal = document.getElementById('modal-open');
+  if (!liste || !modal) return;
+  const vide = (texte) => {
+    liste.innerHTML = '';
+    const p = document.createElement('p');
+    p.style.cssText = 'color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;';
+    p.textContent = texte;
+    liste.appendChild(p);
+  };
+  liste.innerHTML = '';
+
+  let data = null;
+  try {
+    const tables = await grist.docApi.listTables();
+    if (tables.includes('BM_FormConfig')) data = await grist.docApi.fetchTable('BM_FormConfig');
+  } catch (e) {
+    console.error('Erreur lecture BM_FormConfig:', e);
+    vide('Lecture de BM_FormConfig impossible : ' + ((e && e.message) || String(e)));
+    modal.classList.remove('hidden');
+    return;
+  }
+
+  const n = data && data.id ? data.id.length : 0;
+  for (let i = 0; i < n; i++) {
+    let cfg;
+    try { cfg = JSON.parse(data.ConfigData[i]); } catch (e) { continue; }
+    if (!cfg || !Array.isArray(cfg.fields)) continue;
+    const cle = data.ConfigKey[i];
+    const rowId = data.id[i];
+    const titre = cfg.title || cle || '(sans titre)';
+    const actuel = !!(formConfig && formConfig.formId && formConfig.formId === cle);
+
+    const item = document.createElement('div');
+    item.className = 'template-item';
+    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+    if (actuel) { item.style.borderColor = '#3b82f6'; item.style.background = '#eff6ff'; }
+
+    const texte = document.createElement('div');
+    texte.style.cssText = 'flex: 1; min-width: 0;';
+    const nom = document.createElement('div');
+    nom.className = 'template-name';
+    nom.textContent = titre + (actuel ? ' — ouvert actuellement' : '');
+    const info = document.createElement('div');
+    info.className = 'template-date';
+    info.style.overflowWrap = 'anywhere';
+    info.textContent = `Source : ${cfg.tableId || '?'} · Réponses : ${cfg.responseTableId || cfg.tableId || '?'}`
+      + ` · ${cfg.fields.length} élément(s) · ${cfg.totalPages || 1} page(s)`;
+    texte.append(nom, info);
+
+    const suppr = document.createElement('button');
+    suppr.type = 'button';
+    suppr.title = 'Supprimer ce formulaire enregistré';
+    suppr.textContent = '🗑️';
+    suppr.style.cssText = 'background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8em; flex: none;';
+
+    item.append(texte, suppr);
+
+    item.addEventListener('click', async () => {
+      if (formFields.length > 0) {
+        const ok = await showConfirm({
+          icon: '📂',
+          title: 'Ouvrir ce formulaire',
+          message: `Ouvrir « ${titre} » ? Il remplacera le formulaire affiché ; les modifications non sauvegardées seront perdues.`,
+          confirmText: 'Ouvrir',
+          cancelText: 'Annuler'
+        });
+        if (!ok) return;
+      }
+      try {
+        showLoading();
+        // La clé de la ligne fait foi, même si le JSON en portait une autre.
+        cfg.formId = cle;
+        await appliquerConfig(cfg);
+        // Ce widget rouvrira désormais ce formulaire-là à son prochain chargement.
+        try { await grist.setOptions(cfg); } catch (e) { console.warn('setOptions:', e); }
+        modal.classList.add('hidden');
+        switchMode('edit');
+        hideLoading();
+        showToast('Formulaire « ' + titre + ' » ouvert', 'success');
+      } catch (e) {
+        hideLoading();
+        console.error('Erreur ouverture formulaire:', e);
+        showToast('Erreur lors de l\'ouverture : ' + ((e && e.message) || String(e)), 'error');
+      }
+    });
+
+    suppr.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const ok = await showConfirm({
+        icon: '🗑️',
+        title: 'Supprimer le formulaire',
+        message: `Supprimer définitivement « ${titre} » de BM_FormConfig ? Les liens de partage internes qui le désignent cesseront de fonctionner. Les réponses déjà enregistrées ne sont pas touchées.`,
+        confirmText: 'Supprimer',
+        cancelText: 'Annuler',
+        danger: true
+      });
+      if (!ok) return;
+      try {
+        await grist.docApi.applyUserActions([['RemoveRecord', 'BM_FormConfig', rowId]]);
+        showToast('Formulaire « ' + titre + ' » supprimé', 'success');
+        await ouvrirListeFormulaires();
+      } catch (err) {
+        console.error('Erreur suppression formulaire:', err);
+        showToast('Suppression impossible : ' + ((err && err.message) || String(err)), 'error');
+      }
+    });
+
+    liste.appendChild(item);
+  }
+
+  if (!liste.children.length) vide('Aucun formulaire enregistré dans ce document. Construisez-en un puis cliquez sur « Sauvegarder ».');
+  modal.classList.remove('hidden');
+}
+
 // Créer un nouveau formulaire
 async function newForm() {
   const confirmed = await showConfirm({
@@ -3008,18 +3570,23 @@ async function newForm() {
     confirmText: 'Nouveau',
     cancelText: 'Annuler'
   });
-  
+
   if (confirmed) {
-    formFields = [];
-    selectedField = null;
-    totalPages = 1;
-    currentPage = 1;
-    formTitleInput.value = 'Nouveau formulaire';
-    tableSelect.value = '';
-    await loadTableColumns('');
-    updatePageIndicator();
-    renderFormFields();
-    renderPropertiesPanel();
+    // Remise à zéro COMPLÈTE. L'ancien code ne vidait que les champs : la table de réponses,
+    // le lien de partage et l'historique du formulaire précédent restaient en mémoire, et le
+    // nouveau formulaire, une fois sauvegardé, écrivait ses réponses dans la table de l'ancien.
+    // Restent : les templates (pour repartir d'un modèle) et les réglages du proxy, qui
+    // valent pour le document entier.
+    const garde = formConfig || {};
+    await appliquerConfig({
+      title: 'Nouveau formulaire',
+      templates: templates,
+      proxyPlatform: currentProxyPlatform,
+      proxyUrls: garde.proxyUrls,
+      proxyUrl: garde.proxyUrl,
+      docId: garde.docId,
+      publicBaseUrl: garde.publicBaseUrl
+    });
     showToast('Nouveau formulaire créé', 'success');
   }
 }
@@ -3027,7 +3594,7 @@ async function newForm() {
 // Vider le formulaire
 async function clearForm() {
   if (formFields.length === 0) return;
-  
+
   const confirmed = await showConfirm({
     icon: '🗑️',
     title: 'Vider le formulaire',
@@ -3036,7 +3603,7 @@ async function clearForm() {
     cancelText: 'Annuler',
     danger: true
   });
-  
+
   if (confirmed) {
     formFields = [];
     selectedField = null;
@@ -3050,7 +3617,7 @@ async function clearForm() {
 function switchMode(mode) {
   const guideView = document.getElementById('guide-view');
   const btnModeGuide = document.getElementById('btn-mode-guide');
-  
+
   // Réinitialiser tous les états
   editorView.classList.add('hidden');
   formView.classList.remove('active');
@@ -3058,7 +3625,7 @@ function switchMode(mode) {
   btnModeEdit.classList.remove('active');
   btnModeFill.classList.remove('active');
   btnModeGuide?.classList.remove('active');
-  
+
   if (mode === 'edit') {
     editorView.classList.remove('hidden');
     btnModeEdit.classList.add('active');
@@ -3077,24 +3644,24 @@ function renderFormViewPageNav() {
   // Supprimer l'ancienne navigation si elle existe
   const existingNav = document.getElementById('form-view-page-nav');
   if (existingNav) existingNav.remove();
-  
+
   // Ne pas afficher si une seule page
   if (totalPages <= 1) return;
-  
+
   const nav = document.createElement('div');
   nav.id = 'form-view-page-nav';
   nav.style.cssText = 'display: flex; justify-content: center; align-items: center; gap: 15px; padding: 15px; background: white; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);';
-  
+
   nav.innerHTML = `
     <button id="form-view-prev" class="btn btn-secondary" style="padding: 8px 16px;" ${currentPage === 1 ? 'disabled' : ''}>◀ Précédent</button>
     <span style="font-weight: 600; color: #475569;">Page ${currentPage} / ${totalPages}</span>
     <button id="form-view-next" class="btn btn-primary" style="padding: 8px 16px;" ${currentPage === totalPages ? 'disabled' : ''}>Suivant ▶</button>
   `;
-  
+
   // Insérer avant le canvas
   const canvasView = document.getElementById('form-canvas-view');
   canvasView.parentNode.insertBefore(nav, canvasView);
-  
+
   // Event listeners
   document.getElementById('form-view-prev')?.addEventListener('click', () => {
     if (currentPage > 1) {
@@ -3102,7 +3669,7 @@ function renderFormViewPageNav() {
       renderFormView();
     }
   });
-  
+
   document.getElementById('form-view-next')?.addEventListener('click', () => {
     if (currentPage < totalPages) {
       currentPage++;
@@ -3117,28 +3684,31 @@ function renderFormView() {
     formFieldsView.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 40px;">Aucun formulaire configuré.</p>';
     return;
   }
-  
+
   formFieldsView.innerHTML = '';
-  
+
   // Ajouter le sélecteur d'enregistrement existant
   renderRecordSelector();
-  
+
   // Filtrer les champs de la page courante
   const pageFields = formConfig.fields.filter(f => (f.page || 1) === currentPage);
-  
+
   // Calculer la hauteur minimale du canvas
   let maxY = 297; // A4 height in mm (converted to approximate px later)
   pageFields.forEach(field => {
     const fieldBottom = field.y + (field.height || 80);
     if (fieldBottom > maxY) maxY = fieldBottom;
   });
-  
+
   const canvasView = document.getElementById('form-canvas-view');
-  canvasView.style.minHeight = Math.max(maxY + 100, 800) + 'px';
-  
+  // Page à hauteur personnalisée : on la respecte, sans jamais couper un champ qui dépasse.
+  canvasView.style.minHeight = pageHeights[currentPage]
+    ? Math.max(maxY + 20, hauteurPageMm(currentPage) * PX_PAR_MM) + 'px'
+    : Math.max(maxY + 100, 800) + 'px';
+
   // Afficher la navigation si plusieurs pages
   renderFormViewPageNav();
-  
+
   pageFields.forEach(field => {
     if (field.fieldType === 'section') {
       const sectionDiv = document.createElement('div');
@@ -3158,7 +3728,7 @@ function renderFormView() {
       formFieldsView.appendChild(sectionDiv);
       return;
     }
-    
+
     // Image
     if (field.fieldType === 'image') {
       const imageDiv = document.createElement('div');
@@ -3173,13 +3743,13 @@ function renderFormView() {
       } else if (field.bgColor) {
         imageDiv.style.backgroundColor = field.bgColor;
       }
-      if (sourceImage(field)) {
-        imageDiv.innerHTML = `<img src="${escHtml(sourceImage(field))}" alt="${escHtml(field.label)}" style="width: 100%; height: 100%; object-fit: contain;">`;
+      if (field.imageData) {
+        imageDiv.innerHTML = `<img src="${field.imageData}" alt="${escHtml(field.label)}" style="width: 100%; height: 100%; object-fit: contain;">`;
       }
       formFieldsView.appendChild(imageDiv);
       return;
     }
-    
+
     // Titre/Texte
     if (field.fieldType === 'title') {
       const titleDiv = document.createElement('div');
@@ -3206,7 +3776,7 @@ function renderFormView() {
       formFieldsView.appendChild(titleDiv);
       return;
     }
-    
+
     // Filet (Divider)
     if (field.fieldType === 'divider') {
       const dividerDiv = document.createElement('div');
@@ -3214,14 +3784,14 @@ function renderFormView() {
       dividerDiv.style.left = field.x + 'px';
       dividerDiv.style.top = field.y + 'px';
       dividerDiv.style.width = field.width + 'px';
-      
+
       const lineStyle = field.dividerStyle === 'dashed' ? 'dashed' : (field.dividerStyle === 'dotted' ? 'dotted' : 'solid');
       dividerDiv.innerHTML = `<div style="width: 100%; height: 0; border-top: ${field.dividerHeight || 2}px ${lineStyle} ${field.dividerColor || '#cbd5e1'};"></div>`;
-      
+
       formFieldsView.appendChild(dividerDiv);
       return;
     }
-    
+
     // QR Code
     if (field.fieldType === 'qrcode') {
       const qrcodeDiv = document.createElement('div');
@@ -3239,7 +3809,7 @@ function renderFormView() {
       }
       qrcodeDiv.id = 'qr-view-' + field.id;
       formFieldsView.appendChild(qrcodeDiv);
-      
+
       // Générer le QR Code après l'ajout au DOM
       setTimeout(() => {
         const container = document.getElementById('qr-view-' + field.id);
@@ -3257,29 +3827,29 @@ function renderFormView() {
       }, 50);
       return;
     }
-    
+
     const group = document.createElement('div');
     group.className = 'form-field-view';
     group.dataset.fieldId = field.id;
     group.style.left = field.x + 'px';
     group.style.top = field.y + 'px';
     group.style.width = field.width + 'px';
-    
+
     // Appliquer la couleur de fond
     if (field.transparent) {
       group.style.backgroundColor = 'transparent';
     } else if (field.bgColor) {
       group.style.backgroundColor = field.bgColor;
     }
-    
+
     if (field.condition) {
       group.dataset.conditionFieldId = field.condition.fieldId;
       group.dataset.conditionOperator = field.condition.operator;
       group.dataset.conditionValue = field.condition.value || '';
     }
-    
+
     let inputHtml = '';
-    
+
     switch (field.fieldType) {
       case 'textarea':
         inputHtml = `<textarea id="input-${field.id}" class="form-textarea-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''} style="min-height: 60px;"></textarea>`;
@@ -3319,7 +3889,15 @@ function renderFormView() {
         `;
         break;
       case 'date':
-        inputHtml = `<input type="date" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
+        inputHtml = `<input type="${typeInputDate(field)}" id="input-${field.id}" class="form-input" ${field.required ? 'required' : ''}>`;
+        break;
+      case 'file':
+        inputHtml = `<div class="fb-fichier">
+          <input type="file" id="input-${field.id}" class="form-input fb-fichier-input" ${field.fileMultiple !== false ? 'multiple' : ''} ${field.fileAccept ? `accept="${escHtml(field.fileAccept)}"` : ''}>
+          <label for="input-${field.id}" class="fb-fichier-btn">📎 ${field.fileMultiple !== false ? 'Choisir des fichiers' : 'Choisir un fichier'}</label>
+          <span class="fb-fichier-noms" id="noms-${field.id}">Aucun fichier</span>
+        </div>
+          <div class="file-existing" id="existing-${field.id}"></div>`;
         break;
       case 'number':
         inputHtml = `<input type="number" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
@@ -3349,7 +3927,9 @@ function renderFormView() {
       default:
         inputHtml = `<input type="text" id="input-${field.id}" class="form-input" placeholder="${escHtml(field.placeholder || '')}" ${field.required ? 'required' : ''}>`;
     }
-    
+
+    if (field.fieldType === 'checkbox' && field.checkboxDropdown) inputHtml = enveloppeMulti(field, inputHtml);
+
     // Appliquer le style selon la position du label et si le label est masqué
     if (field.hideLabel) {
       // Label masqué - afficher uniquement le champ
@@ -3361,7 +3941,7 @@ function renderFormView() {
       group.innerHTML = `
         <div style="display: flex; align-items: flex-start; gap: 10px;">
           <label class="form-label ${field.required ? 'required' : ''}" for="input-${field.id}" style="flex-shrink: 0; min-width: 80px; max-width: 40%; padding-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(field.label)}</label>
-          <div style="flex: 1;">
+          <div style="flex: 1; min-width: 0;">
             ${inputHtml}
             <div class="form-error" id="error-${field.id}"></div>
           </div>
@@ -3374,25 +3954,27 @@ function renderFormView() {
         <div class="form-error" id="error-${field.id}"></div>
       `;
     }
-    
+
+    appliquerPolices(group, field);
     formFieldsView.appendChild(group);
   });
-  
+
   // Initialiser les signatures
   initSignatureCanvases();
-  
+
   // Initialiser les lookups
   initLookupFields();
-  
+
   // Initialiser les champs calculés
   initCalculatedFields();
-  
+
   // Initialiser les conditions
   initConditions();
 
   // Initialiser les sources d'options dynamiques (cascade)
   initFillModeDynamicSources();
   activerRecherche();
+  majTousMulti();
 }
 
 // =============================================================================
@@ -3682,13 +4264,14 @@ async function reloadFillDynamicField(field) {
     const c = document.getElementById(`input-${field.id}`);
     if (!c) return;
     const sel = Array.isArray(currentValue) ? currentValue : [];
-    if (hint) { c.innerHTML = emptyHintHtml(hint); return; }
+    if (hint) { c.innerHTML = emptyHintHtml(hint); majMultiDe(c); return; }
     c.innerHTML = opts.map(o => `
       <label class="form-checkbox-item">
         <input type="checkbox" value="${escHtml(o.value)}" ${sel.includes(o.value) ? 'checked' : ''}>
         <span>${escHtml(o.label)}</span>
       </label>
     `).join('');
+    majMultiDe(c);
   }
 }
 
@@ -3744,6 +4327,23 @@ function rendreCherchable(sel) {
     inp.style.borderColor = sel.style.borderColor || '';
   }
 
+
+  // Liste ouverte au premier plan. Dans la mise en page, chaque champ placé porte son propre
+  // z-index (l'ordre de l'éditeur) : le panneau restait enfermé dans celui de son champ et
+  // passait SOUS les champs suivants. On hisse le champ hôte le temps de l'ouverture.
+  var hote = box.closest('.fb-abs, .form-field-view');
+  function premierPlan(oui) {
+    if (!hote) return;
+    if (oui) {
+      if (hote.dataset.zOrigine === undefined) hote.dataset.zOrigine = hote.style.zIndex || '';
+      hote.style.zIndex = '10000';
+    } else if (hote.dataset.zOrigine !== undefined) {
+      hote.style.zIndex = hote.dataset.zOrigine;
+      delete hote.dataset.zOrigine;
+    }
+  }
+  function fermer() { pan.hidden = true; premierPlan(false); }
+
   function ligne(texte, cls, onPick) {
     var d = document.createElement('div');
     d.className = cls;
@@ -3752,20 +4352,6 @@ function rendreCherchable(sel) {
     pan.appendChild(d);
   }
 
-
-  // En mise en page absolue, chaque champ porte son propre z-index : le panneau reste
-  // prisonnier du contexte d'empilement de son champ et passe SOUS les champs posés après
-  // lui, malgré son z-index élevé. On hausse donc le champ entier le temps de l'ouverture.
-  var zAvant = null, hausse = null;
-  function hausser() {
-    hausse = box.closest ? box.closest('[style*="position: absolute"]') : null;
-    if (!hausse) { var p = box.parentNode; while (p && p.style && p.style.position !== 'absolute') p = p.parentNode;
-      hausse = (p && p.style) ? p : null; }
-    if (hausse) { zAvant = hausse.style.zIndex; hausse.style.zIndex = '1000'; }
-  }
-  function rabaisser() {
-    if (hausse) { hausse.style.zIndex = zAvant || ''; hausse = null; zAvant = null; }
-  }
   function ouvrir(q) {
     var t = String(q || '').trim().toLowerCase();
     var tous = Array.prototype.slice.call(sel.options, 1);
@@ -3778,24 +4364,23 @@ function rendreCherchable(sel) {
       ligne(o.text, 'fb-rech-item' + (o.value === sel.value ? ' sel' : ''), function () {
         sel.value = o.value;
         sync();
-        rabaisser();
-        pan.hidden = true;
+        fermer();
         sel.dispatchEvent(new Event('change'));
       });
     });
     if (trouves.length > RECHERCHE_MAX) {
       ligne('… et ' + (trouves.length - RECHERCHE_MAX) + ' autre(s) — affinez la recherche', 'fb-rech-vide');
     }
-    hausser();
     pan.hidden = false;
+    premierPlan(true);
   }
 
   inp.addEventListener('focus', function () { ouvrir(''); });
   inp.addEventListener('input', function () { ouvrir(inp.value); });
   // Le clic sur une ligne passe par mousedown : au moment du blur, la valeur est déjà posée.
-  inp.addEventListener('blur', function () { setTimeout(function () { rabaisser(); pan.hidden = true; sync(); }, 120); });
+  inp.addEventListener('blur', function () { setTimeout(function () { fermer(); sync(); }, 120); });
   inp.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { rabaisser(); pan.hidden = true; inp.blur(); }
+    if (e.key === 'Escape') { fermer(); inp.blur(); }
   });
   sel.addEventListener('change', sync);
   sync();
@@ -3851,25 +4436,25 @@ function initFillModeDynamicSources() {
 // Initialiser les champs calculés
 function initCalculatedFields() {
   if (!formConfig || !formConfig.fields) return;
-  
+
   const calculatedFields = formConfig.fields.filter(f => f.fieldType === 'calculated');
   if (calculatedFields.length === 0) return;
-  
+
   // Fonction pour recalculer tous les champs calculés
   function recalculateAll() {
     calculatedFields.forEach(field => {
       const resultEl = document.getElementById(`input-${field.id}`);
       if (!resultEl) return;
-      
+
       let valueA = 0;
       let valueB = 0;
-      
+
       // Obtenir valeur A
       if (field.calcFieldA) {
         const inputA = document.getElementById(`input-${field.calcFieldA}`);
         if (inputA) valueA = parseFloat(inputA.value) || 0;
       }
-      
+
       // Obtenir valeur B
       if (field.calcFieldB === '_constant') {
         valueB = field.calcConstant || 0;
@@ -3877,9 +4462,9 @@ function initCalculatedFields() {
         const inputB = document.getElementById(`input-${field.calcFieldB}`);
         if (inputB) valueB = parseFloat(inputB.value) || 0;
       }
-      
+
       let result = 0;
-      
+
       switch (field.calcType || 'sum') {
         case 'sum':
           result = valueA + valueB;
@@ -3907,12 +4492,12 @@ function initCalculatedFields() {
           }
           break;
       }
-      
+
       const decimals = field.calcDecimals !== undefined ? field.calcDecimals : 2;
       resultEl.textContent = result.toFixed(decimals);
     });
   }
-  
+
   // Écouter les changements sur tous les champs numériques
   formConfig.fields.forEach(field => {
     if (field.fieldType === 'number') {
@@ -3923,7 +4508,7 @@ function initCalculatedFields() {
       }
     }
   });
-  
+
   // Calculer au chargement
   recalculateAll();
 }
@@ -3931,16 +4516,16 @@ function initCalculatedFields() {
 // Initialiser les champs Lookup avec autocomplétion
 async function initLookupFields() {
   if (!formConfig || !formConfig.fields) return;
-  
+
   for (const field of formConfig.fields) {
     if (field.fieldType !== 'lookup' || !field.lookupTable) continue;
-    
+
     const input = document.getElementById(`input-${field.id}`);
     const hiddenInput = document.getElementById(`input-${field.id}-value`);
     const dropdown = document.getElementById(`dropdown-${field.id}`);
-    
+
     if (!input || !dropdown) continue;
-    
+
     // Charger les données si pas encore fait
     if (!field.lookupData) {
       try {
@@ -3951,13 +4536,13 @@ async function initLookupFields() {
         continue;
       }
     }
-    
+
     const displayColsRaw = field.lookupDisplayColumn || 'id';
     const valueCol = field.lookupValueColumn || 'id';
-    
+
     // Supporter plusieurs colonnes d'affichage séparées par des virgules
     const displayCols = displayColsRaw.split(',').map(c => c.trim()).filter(c => c);
-    
+
     // Préparer les options
     const options = [];
     if (field.lookupData && field.lookupData.id) {
@@ -3967,33 +4552,33 @@ async function initLookupFields() {
           return field.lookupData[col] ? field.lookupData[col][i] : '';
         }).filter(v => v !== null && v !== undefined && v !== '');
         const displayValue = displayParts.join(' ') || field.lookupData.id[i];
-        
+
         options.push({
           display: displayValue,
           value: field.lookupData[valueCol] ? field.lookupData[valueCol][i] : field.lookupData.id[i]
         });
       }
     }
-    
+
     // Filtrer et afficher les résultats
     function filterOptions(query) {
-      const filtered = options.filter(opt => 
+      const filtered = options.filter(opt =>
         String(opt.display).toLowerCase().includes(query.toLowerCase())
       ).slice(0, 10);
-      
+
       if (filtered.length === 0 || query === '') {
         dropdown.style.display = 'none';
         return;
       }
-      
+
       dropdown.innerHTML = filtered.map(opt => `
         <div class="lookup-option" data-value="${escHtml(opt.value)}" style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;">
           ${escHtml(opt.display)}
         </div>
       `).join('');
-      
+
       dropdown.style.display = 'block';
-      
+
       // Ajouter les event listeners
       dropdown.querySelectorAll('.lookup-option').forEach(optEl => {
         optEl.addEventListener('mouseenter', () => optEl.style.background = '#eff6ff');
@@ -4005,12 +4590,12 @@ async function initLookupFields() {
         });
       });
     }
-    
+
     input.addEventListener('input', (e) => filterOptions(e.target.value));
     input.addEventListener('focus', (e) => {
       if (e.target.value) filterOptions(e.target.value);
     });
-    
+
     // Fermer le dropdown quand on clique ailleurs
     document.addEventListener('click', (e) => {
       if (!e.target.closest(`#input-${field.id}`) && !e.target.closest(`#dropdown-${field.id}`)) {
@@ -4026,16 +4611,16 @@ function initSignatureCanvases() {
     const ctx = canvas.getContext('2d');
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
-    
+
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
-    
+
     canvas.addEventListener('mousedown', (e) => {
       isDrawing = true;
       [lastX, lastY] = [e.offsetX, e.offsetY];
     });
-    
+
     canvas.addEventListener('mousemove', (e) => {
       if (!isDrawing) return;
       ctx.beginPath();
@@ -4047,11 +4632,11 @@ function initSignatureCanvases() {
       ctx.stroke();
       [lastX, lastY] = [e.offsetX, e.offsetY];
     });
-    
+
     canvas.addEventListener('mouseup', () => isDrawing = false);
     canvas.addEventListener('mouseout', () => isDrawing = false);
   });
-  
+
   document.querySelectorAll('.signature-clear').forEach(btn => {
     btn.addEventListener('click', () => {
       const canvasId = btn.dataset.canvas;
@@ -4067,23 +4652,23 @@ function initSignatureCanvases() {
 // Initialiser les conditions d'affichage
 function initConditions() {
   if (!formConfig || !formConfig.fields) return;
-  
+
   // Trouver tous les champs avec des conditions
   formConfig.fields.forEach(field => {
     if (!field.condition || !field.condition.fieldId) return;
-    
+
     const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
     if (!group) return;
-    
+
     const sourceField = formConfig.fields.find(f => f.id === field.condition.fieldId);
     if (!sourceField) return;
-    
+
     const sourceInput = document.getElementById(`input-${field.condition.fieldId}`);
     if (!sourceInput) return;
-    
+
     function checkCondition() {
       let sourceValue = '';
-      
+
       if (sourceField.fieldType === 'radio') {
         const checked = sourceInput.querySelector('input:checked');
         sourceValue = checked ? checked.value : '';
@@ -4095,10 +4680,10 @@ function initConditions() {
       } else {
         sourceValue = sourceInput.value || '';
       }
-      
+
       let visible = false;
       const condValue = field.condition.value || '';
-      
+
       switch (field.condition.operator) {
         case 'equals':
           visible = sourceValue === condValue;
@@ -4116,10 +4701,10 @@ function initConditions() {
           visible = sourceValue === '';
           break;
       }
-      
+
       group.classList.toggle('hidden', !visible);
     }
-    
+
     // Écouter les changements
     if (sourceField.fieldType === 'radio' || sourceField.fieldType === 'checkbox') {
       sourceInput.querySelectorAll('input').forEach(input => {
@@ -4129,11 +4714,217 @@ function initConditions() {
       sourceInput.addEventListener('input', checkCondition);
       sourceInput.addEventListener('change', checkCondition);
     }
-    
+
     // Vérifier au chargement
     checkCondition();
   });
 }
+
+
+// ─── Pièces jointes ───────────────────────────────────────────────────────────
+
+/** Message d'erreur pour un champ fichier, ou '' s'il est valide. */
+function fileFieldError(field, files, existing) {
+  if (field.required && !files.length && !(existing && existing.length)) return 'Ce champ est obligatoire';
+  if (field.fileMultiple === false && files.length > 1) return 'Un seul fichier autorisé';
+  const max = Number((field.fileMaxMb === undefined || field.fileMaxMb === null) ? 10 : field.fileMaxMb);
+  if (max > 0) {
+    const trop = files.find(f => f.size > max * 1024 * 1024);
+    if (trop) return `« ${trop.name} » dépasse ${max} Mo`;
+  }
+  return '';
+}
+
+/**
+ * Téléverse des fichiers dans le document et rend leurs identifiants.
+ *
+ * L'API des widgets n'expose pas de téléversement : on passe par le jeton d'accès
+ * (requiredAccess 'full' requis) et l'API REST du document. Grist répond par un tableau
+ * d'identifiants, à écrire dans une colonne Pièces jointes sous la forme ['L', …ids].
+ */
+
+// ─── Relais par l'extension « Grist Widget Bridge » ──────────────────────────
+//
+// Le widget est servi depuis un autre site que Grist : ses requêtes partent sans le cookie du
+// portail d'authentification, qui les redirige vers la connexion. L'extension injecte dans la
+// page Grist elle-même un relais (grist-host-bridge.js) : le fichier lui est confié par
+// postMessage, et c'est la page Grist — même site, cookie compris — qui l'envoie.
+//
+// Protocole v1 de l'extension : HANDSHAKE → HANDSHAKE_ACK, puis UPLOAD { base64, name, type }
+// → { result: [ids] } ou { error }. Un fichier par message.
+
+let pontGrist = null; // Promise<string|null> : origine de la page Grist si le relais répond
+
+function pontDisponible() {
+  if (pontGrist) return pontGrist;
+  pontGrist = new Promise(resolve => {
+    if (window.parent === window) { resolve(null); return; }
+    const fin = setTimeout(() => { window.removeEventListener('message', ecoute); resolve(null); }, 800);
+    function ecoute(e) {
+      if (e.source !== window.parent) return;
+      const m = e.data;
+      if (!m || !m._gristBridge || m.type !== 'HANDSHAKE_ACK') return;
+      clearTimeout(fin);
+      window.removeEventListener('message', ecoute);
+      resolve(e.origin); // les fichiers ne partiront que vers cette origine
+    }
+    window.addEventListener('message', ecoute);
+    // Le handshake ne contient rien de sensible : '*' permet de découvrir l'origine du parent.
+    window.parent.postMessage({ _gristBridge: true, type: 'HANDSHAKE', version: '1' }, '*');
+  });
+  return pontGrist;
+}
+
+function lireBase64(fichier) {
+  return new Promise((ok, ko) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] || '');
+    r.onerror = () => ko(r.error || new Error('lecture du fichier impossible'));
+    r.readAsDataURL(fichier);
+  });
+}
+
+async function envoyerParPont(fichier, origine, docId) {
+  const base64 = await lireBase64(fichier);
+  const requestId = 'fbp_' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return new Promise((ok, ko) => {
+    const fin = setTimeout(() => {
+      window.removeEventListener('message', ecoute);
+      ko(new Error(`l'extension Grist Widget Bridge n'a pas répondu pour « ${fichier.name} ». Rien n'a été enregistré.`));
+    }, 120000);
+    function ecoute(e) {
+      if (e.source !== window.parent || e.origin !== origine) return;
+      const m = e.data;
+      if (!m || !m._gristBridge || m.requestId !== requestId) return;
+      clearTimeout(fin);
+      window.removeEventListener('message', ecoute);
+      if (m.error) ko(new Error(`envoi de « ${fichier.name} » refusé par Grist (via l'extension) : ${m.error}. Rien n'a été enregistré.`));
+      else ok(Array.isArray(m.result) ? m.result : [m.result]);
+    }
+    window.addEventListener('message', ecoute);
+    window.parent.postMessage({
+      _gristBridge: true, type: 'UPLOAD', version: '1', requestId,
+      payload: { base64, name: fichier.name, type: fichier.type || 'application/octet-stream', docId }
+    }, origine);
+  });
+}
+
+async function uploadAttachments(files) {
+  const { token, baseUrl } = await grist.docApi.getAccessToken({ readOnly: false });
+
+  // 1) Par l'extension, quand elle est installée et que ce widget y est déclaré.
+  const origineGrist = await pontDisponible();
+  if (origineGrist) {
+    const docId = (String(baseUrl).match(/\/api\/docs\/([^/?#]+)/) || [])[1] || '';
+    const ids = [];
+    for (const f of files) ids.push(...await envoyerParPont(f, origineGrist, docId));
+    return ids;
+  }
+
+  // 2) Sinon, envoi direct à l'API (fonctionne quand aucun portail ne s'interpose).
+  const fd = new FormData();
+  files.forEach(f => fd.append('upload', f, f.name));
+  const hote = (function () { try { return new URL(baseUrl).host; } catch (e) { return 'le serveur Grist'; } })();
+  // Grist accepte cette requête d'une autre origine (jeton dans l'URL, sans cookie) : s'il
+  // y a blocage, il vient d'un intermédiaire.
+  let res;
+  try {
+    res = await fetch(`${baseUrl}/attachments?auth=${encodeURIComponent(token)}`, { method: 'POST', body: fd });
+  } catch (e) {
+    // Le navigateur ne dit pas pourquoi (réseau, redirection, CORS) et interdit de le savoir.
+    // Grist acceptant cette requête, la cause est un intermédiaire placé devant lui.
+    throw new Error(`${hote} a intercepté l'envoi du fichier avant qu'il n'atteigne Grist `
+      + '(portail d\'authentification, proxy ou pare-feu). Les adresses /api/docs/…/attachments '
+      + 'doivent être laissées passer : Grist vérifie lui-même le jeton. '
+      + 'Contournement : installer l\'extension Grist Widget Bridge et y déclarer cette page comme widget. '
+      + 'Rien n\'a été enregistré.');
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !Array.isArray(data)) {
+    const raison = res.status === 413 ? 'fichier trop volumineux pour le serveur'
+      : (res.status === 401 || res.status === 403) ? 'droits insuffisants sur le document'
+      : ((data && data.error) || 'HTTP ' + res.status);
+    throw new Error('envoi du fichier refusé : ' + raison + '. Rien n\'a été enregistré.');
+  }
+  return data;
+}
+
+// ─── Date, date + heure, heure seule ─────────────────────────────────────────
+
+/** Mode d'un champ Date : 'date' (défaut), 'datetime' ou 'time'. */
+function modeDate(field) {
+  return (field && field.dateMode) || 'date';
+}
+
+/** Type de l'<input> HTML correspondant au mode. */
+function typeInputDate(field) {
+  const m = modeDate(field);
+  return m === 'datetime' ? 'datetime-local' : (m === 'time' ? 'time' : 'date');
+}
+
+/**
+ * Valeur à écrire dans Grist pour une saisie date + heure (« 2026-11-05T10:30 »).
+ *
+ * Une colonne DateTime stocke des secondes depuis 1970 : on convertit en instant absolu, à
+ * partir de l'heure locale du navigateur — Grist l'affichera ensuite dans le fuseau de la
+ * colonne. Une colonne Date ne garde que le jour. Ailleurs (Texte, type inconnu), on écrit un
+ * texte lisible « 05/11/2026 10:30 ». Date seule et heure seule passent inchangées.
+ */
+function valeurDateHeure(raw, mode, colType) {
+  if (!raw) return null;
+  if (mode !== 'datetime') return raw;
+  const t = String(colType || '');
+  if (t.startsWith('DateTime')) {
+    const ms = new Date(raw).getTime();
+    return isNaN(ms) ? raw : Math.floor(ms / 1000);
+  }
+  if (t === 'Date') return raw.slice(0, 10);
+  const [jour, heure] = String(raw).split('T');
+  const [a, m, j] = jour.split('-');
+  return `${j}/${m}/${a}${heure ? ' ' + heure.slice(0, 5) : ''}`;
+}
+
+/**
+ * Valeur Grist → valeur d'<input> (date, datetime-local ou time).
+ *
+ * fetchTable rend des secondes depuis 1970, onRecord peut rendre des objets Date, et une
+ * colonne Texte rend ce qu'on y a écrit. Une colonne Date vaut minuit UTC : on la lit en UTC,
+ * sinon elle reculerait d'un jour à l'ouest de Greenwich. Une DateTime se lit en heure locale.
+ */
+function versChampDate(value, mode) {
+  if (value === null || value === undefined || value === '') return '';
+  const p = n => String(n).padStart(2, '0');
+  if (mode === 'time') {
+    const m = String(value).match(/(\d{1,2}):(\d{2})/);
+    return m ? `${p(m[1])}:${m[2]}` : '';
+  }
+  let d;
+  if (value instanceof Date) d = value;
+  else if (typeof value === 'number') d = new Date(value * 1000);
+  else {
+    const s = String(value).trim();
+    if (mode === 'date' && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    if (mode === 'datetime' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
+    const fr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}:\d{2}))?/);
+    if (fr) return mode === 'date' ? `${fr[3]}-${fr[2]}-${fr[1]}` : `${fr[3]}-${fr[2]}-${fr[1]}T${fr[4] || '00:00'}`;
+    d = new Date(s);
+  }
+  if (isNaN(d)) return '';
+  if (mode === 'date') return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+
+// Affiche les noms des fichiers choisis à côté du bouton (voir .fb-fichier).
+document.addEventListener('change', function (e) {
+  const i = e.target;
+  if (!i || !i.classList || !i.classList.contains('fb-fichier-input')) return;
+  const n = document.getElementById('noms-' + i.id.replace(/^input-/, ''));
+  if (!n) return;
+  const f = Array.from(i.files || []);
+  n.textContent = f.length ? f.map(x => x.name).join(', ') : 'Aucun fichier';
+  n.title = n.textContent;
+});
 
 // Soumettre le formulaire
 async function submitForm() {
@@ -4148,7 +4939,7 @@ async function submitForm() {
     showToast('Configuration invalide : aucune table de destination', 'error');
     return;
   }
-  
+
   // La ligne sélectionnée vient TOUJOURS de la table source : elle est fournie
   // par grist.onRecord ou par le sélecteur, qui lisent formConfig.tableId. Si
   // l'on écrit dans une table de réponses distincte, son identifiant n'y
@@ -4159,10 +4950,12 @@ async function submitForm() {
     console.warn('[Form Builder] ligne #' + selectedRecordId + ' sélectionnée dans ' + formConfig.tableId
       + ' mais écriture dans ' + destTable + ' : un nouvel enregistrement est créé.');
   }
-  
+
   const record = {};
   let hasError = false;
-  
+  const pendingFiles = [];   // fichiers à téléverser après validation
+  const dateTimeCols = [];   // colonnes saisies en date + heure, converties selon leur type
+
   formConfig.fields.forEach(field => {
     // Ignorer les éléments non-champs et les champs calculés/formule
     if (field.fieldType === 'section') return;
@@ -4173,15 +4966,26 @@ async function submitForm() {
     if (field.fieldType === 'qrcode') return;
     if (!field.columnId) return;
     if (field.isFormula) return; // Colonnes de formule Grist
-    
+
     const group = document.querySelector(`.form-field-view[data-field-id="${field.id}"]`);
     if (group && group.classList.contains('hidden')) return;
-    
+
     const errorEl = document.getElementById(`error-${field.id}`);
     if (errorEl) errorEl.textContent = '';
-    
+
+    if (field.fieldType === 'file') {
+      const input = document.getElementById(`input-${field.id}`);
+      const files = input && input.files ? Array.from(input.files) : [];
+      const existing = metAJour ? (existingAttachments[field.id] || []) : [];
+      const err = fileFieldError(field, files, existing);
+      if (err) { if (errorEl) errorEl.textContent = err; hasError = true; return; }
+      if (files.length) pendingFiles.push({ colId: field.columnId, files, existing });
+      return; // la valeur n'existera qu'après téléversement
+    }
+    if (field.fieldType === 'date' && modeDate(field) === 'datetime') dateTimeCols.push(field.columnId);
+
     let value = null;
-    
+
     if (field.fieldType === 'radio') {
       const container = document.getElementById(`input-${field.id}`);
       const checked = container?.querySelector('input:checked');
@@ -4205,7 +5009,7 @@ async function submitForm() {
         }
       }
     }
-    
+
     // Validation obligatoire
     if (field.required) {
       const isEmpty = value === null || value === '' || (Array.isArray(value) && value.length === 0);
@@ -4214,7 +5018,7 @@ async function submitForm() {
         hasError = true;
       }
     }
-    
+
     // Validation min/max pour les nombres
     if (value !== null && field.fieldType === 'number') {
       if (field.minValue !== undefined && parseFloat(value) < field.minValue) {
@@ -4226,7 +5030,7 @@ async function submitForm() {
         hasError = true;
       }
     }
-    
+
     // Validation longueur pour les textes
     if (value && typeof value === 'string') {
       if (field.minLength && value.length < field.minLength) {
@@ -4238,7 +5042,7 @@ async function submitForm() {
         hasError = true;
       }
     }
-    
+
     // Validation regex/pattern
     if (value && field.pattern) {
       try {
@@ -4251,7 +5055,7 @@ async function submitForm() {
         // Regex invalide, ignorer
       }
     }
-    
+
     // Validation email
     if (value && field.fieldType === 'email') {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
@@ -4259,40 +5063,42 @@ async function submitForm() {
         hasError = true;
       }
     }
-    
+
     record[field.columnId] = Array.isArray(value) ? value.join(', ') : value;
   });
-  
+
   if (hasError) {
     showToast('Veuillez corriger les erreurs', 'error');
     return;
   }
-  
+
   // Métadonnées de la table où l'on ÉCRIT — et non de la table source. Avec une
   // table de réponses distincte, les colonnes de formule relevées étaient celles
   // de l'autre table : elles n'étaient donc pas écartées et Grist refusait
   // l'écriture.
   let formulaColumns = [];
   let destColumns = null;
+  const destTypes = {};
   try {
     const colMeta = await grist.docApi.fetchTable('_grist_Tables_column');
     const tableMeta = await grist.docApi.fetchTable('_grist_Tables');
-    
+
     const tableIndex = tableMeta.tableId?.findIndex(t => t === destTable);
     const tableRef = tableIndex >= 0 ? tableMeta.id[tableIndex] : null;
-    
+
     if (tableRef && colMeta.colId) {
       destColumns = {};
       for (let i = 0; i < colMeta.id.length; i++) {
         if (colMeta.parentId[i] !== tableRef) continue;
         destColumns[colMeta.colId[i]] = true;
+        destTypes[colMeta.colId[i]] = colMeta.type[i];
         if (colMeta.isFormula[i]) formulaColumns.push(colMeta.colId[i]);
       }
     }
   } catch (e) {
     console.log('Impossible de récupérer les métadonnées des colonnes:', e);
   }
-  
+
   // Filtrer les colonnes de formule du record
   for (const colName of formulaColumns) {
     if (record[colName] !== undefined) {
@@ -4300,7 +5106,35 @@ async function submitForm() {
       delete record[colName];
     }
   }
-  
+
+  // Colonnes absentes de la table où l'on écrit. Cas typique : un champ ajouté au formulaire
+  // APRÈS la création de la table de réponses. Grist répondait « [Sandbox] KeyError 'X' »,
+  // ce qui ne dit ni quelle table ni quoi faire. On s'arrête avant, avec le remède.
+  if (destColumns) {
+    const absentes = Object.keys(record).concat(pendingFiles.map(p => p.colId))
+      .filter((c, i, tous) => !destColumns[c] && tous.indexOf(c) === i);
+    if (absentes.length) {
+      showToast(`Rien n'a été enregistré : la table ${destTable} n'a pas de colonne ${absentes.join(', ')}. `
+        + 'Passez en Édition et cliquez sur « ↻ Compléter », à côté de la table de réponses : les colonnes manquantes y seront ajoutées.', 'error', 12000);
+      return;
+    }
+  }
+
+  // Date + heure : secondes pour une colonne DateTime, jour pour une colonne Date, texte sinon.
+  dateTimeCols.forEach(col => {
+    if (record[col] !== undefined) record[col] = valeurDateHeure(record[col], 'datetime', destTypes[col]);
+  });
+
+  // Contrôle AVANT tout téléversement : sinon les fichiers partiraient pour rien
+  // et l'écriture échouerait ensuite.
+  if (destColumns) {
+    const mauvaise = pendingFiles.find(p => destTypes[p.colId] !== 'Attachments');
+    if (mauvaise) {
+      showToast(`La colonne "${mauvaise.colId}" de ${destTable} n'est pas de type Pièces jointes`, 'error');
+      return;
+    }
+  }
+
   // Horodatage : seulement si la colonne existe réellement. Il était ajouté dès
   // qu'une table de réponses était configurée, ce qui faisait échouer l'écriture
   // sur une table préexistante dépourvue de cette colonne. Quand les
@@ -4309,18 +5143,23 @@ async function submitForm() {
   if (formConfig.responseTableId && !metAJour && destColumns && destColumns['Soumis_le']) {
     record['Soumis_le'] = Math.floor(Date.now() / 1000);
   }
-  
+
   // Trace de débogage retirée : elle écrivait l'intégralité de l'enregistrement
   // soumis dans la console, y compris des données personnelles.
-  
-  if (Object.keys(record).length === 0) {
+
+  if (Object.keys(record).length === 0 && pendingFiles.length === 0) {
     showToast('Aucune donnée à enregistrer (vérifiez que les champs ont un columnId)', 'error');
     return;
   }
-  
+
   try {
     showLoading();
-    
+
+    for (const p of pendingFiles) {
+      const ids = await uploadAttachments(p.files);
+      record[p.colId] = ['L', ...p.existing, ...ids];
+    }
+
     if (metAJour) {
       // Mode mise à jour : UpdateRecord
       await grist.docApi.applyUserActions([
@@ -4340,12 +5179,17 @@ async function submitForm() {
   } catch (error) {
     hideLoading();
     console.error('Erreur soumission:', error);
-    
+
     // Gérer l'erreur de colonne de formule
     if (error.message && error.message.includes('formula column')) {
       const match = error.message.match(/formula column (\w+)/);
       const colName = match ? match[1] : 'une colonne';
       showToast(`Erreur: "${colName}" est une colonne de formule et ne peut pas être modifiée. Retirez ce champ du formulaire.`, 'error');
+    } else if (/KeyError/.test(error.message || '')) {
+      // Filet de sécurité quand les métadonnées n'ont pas pu être lues avant l'écriture.
+      const m = error.message.match(/KeyError\s+'?([^']+)'?/);
+      showToast(`Rien n'a été enregistré : la table ${destTable} n'a pas de colonne ${m ? m[1] : '(inconnue)'}. `
+        + 'Passez en Édition et cliquez sur « ↻ Compléter », à côté de la table de réponses.', 'error', 12000);
     } else {
       showToast('Erreur: ' + error.message, 'error');
     }
@@ -4355,13 +5199,18 @@ async function submitForm() {
 // Réinitialiser les champs
 function resetFormInputs() {
   if (!formConfig || !formConfig.fields) return;
-  
+  existingAttachments = {};
+
   formConfig.fields.forEach(field => {
     if (field.fieldType === 'section') return;
-    
+
     const errorEl = document.getElementById(`error-${field.id}`);
     if (errorEl) errorEl.textContent = '';
-    
+    const exist = document.getElementById(`existing-${field.id}`);
+    if (exist) exist.textContent = '';
+    const noms = document.getElementById(`noms-${field.id}`);
+    if (noms) { noms.textContent = 'Aucun fichier'; noms.title = ''; }
+
     if (field.fieldType === 'radio' || field.fieldType === 'checkbox') {
       const container = document.getElementById(`input-${field.id}`);
       if (container) {
@@ -4378,9 +5227,10 @@ function resetFormInputs() {
       if (input) input.value = '';
     }
   });
-  
+
   // Réinitialiser les conditions
   initConditions();
+  majTousMulti();
 }
 
 // Export PDF
@@ -4389,26 +5239,34 @@ async function exportPdf() {
     showToast('Aucun formulaire à exporter', 'error');
     return;
   }
-  
+
   showLoading();
-  
+
   try {
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    
+    // La feuille du PDF prend la hauteur de la page affichée (A4 par défaut).
+    const hMm = hauteurPageMm(currentPage);
+    const pdf = new jsPDF({ orientation: hMm >= 210 ? 'p' : 'l', unit: 'mm', format: [210, hMm] });
+
     // Capturer le canvas
     const canvas = await html2canvas(formCanvas, {
       scale: 2,
       backgroundColor: '#ffffff'
     });
-    
+
     const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 190;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+    let imgWidth = 190;
+    let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    // Page courte : l'image est réduite pour tenir entre les marges de 10 mm.
+    if (imgHeight > hMm - 20) {
+      const k = (hMm - 20) / imgHeight;
+      imgWidth *= k;
+      imgHeight *= k;
+    }
+
+    pdf.addImage(imgData, 'PNG', (210 - imgWidth) / 2, 10, imgWidth, imgHeight);
     pdf.save('formulaire.pdf');
-    
+
     hideLoading();
     showToast('PDF exporté', 'success');
   } catch (error) {
@@ -4433,7 +5291,7 @@ function renderTemplatesList() {
     templatesList.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun template</p>';
     return;
   }
-  
+
   templatesList.innerHTML = templates.map((t, i) => `
     <div class="template-item" data-index="${i}" style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
       <div style="cursor: pointer; flex: 1;" class="template-load">
@@ -4444,25 +5302,25 @@ function renderTemplatesList() {
       <button class="template-delete" data-index="${i}" title="Supprimer" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8em;">🗑️</button>
     </div>
   `).join('');
-  
+
   templatesList.querySelectorAll('.template-load').forEach(item => {
     item.addEventListener('click', () => {
       const index = parseInt(item.parentElement.dataset.index);
       loadTemplate(index);
     });
   });
-  
+
   templatesList.querySelectorAll('.template-overwrite').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const index = parseInt(btn.dataset.index);
       const templateName = templates[index].name;
-      
+
       if (formFields.length === 0) {
         showToast('Aucun champ à sauvegarder', 'error');
         return;
       }
-      
+
       const confirmed = await showConfirm({
         icon: '💾',
         title: 'Écraser le template',
@@ -4470,7 +5328,7 @@ function renderTemplatesList() {
         confirmText: 'Écraser',
         cancelText: 'Annuler'
       });
-      
+
       if (confirmed) {
         templates[index] = {
           name: templateName,
@@ -4484,7 +5342,7 @@ function renderTemplatesList() {
       }
     });
   });
-  
+
   templatesList.querySelectorAll('.template-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -4512,15 +5370,15 @@ async function saveTemplate() {
     showToast('Veuillez entrer un nom', 'error');
     return;
   }
-  
+
   if (formFields.length === 0) {
     showToast('Aucun champ à sauvegarder', 'error');
     return;
   }
-  
+
   // Vérifier si un template avec ce nom existe déjà
   const existingIndex = templates.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
-  
+
   if (existingIndex >= 0) {
     // Demander confirmation pour écraser
     const confirmed = await showConfirm(
@@ -4528,7 +5386,7 @@ async function saveTemplate() {
       '📁',
       'Remplacer'
     );
-    
+
     if (confirmed) {
       // Remplacer le template existant
       templates[existingIndex] = {
@@ -4551,7 +5409,7 @@ async function saveTemplate() {
     });
     showToast('Template sauvegardé', 'success');
   }
-  
+
   templateNameInput.value = '';
   renderTemplatesList();
   saveFormConfig();
@@ -4560,7 +5418,7 @@ async function saveTemplate() {
 // Sauvegarder une version dans l'historique
 function saveVersion(action = 'Modification') {
   if (formFields.length === 0) return;
-  
+
   const now = new Date();
   versionHistory.unshift({
     action: action,
@@ -4571,12 +5429,12 @@ function saveVersion(action = 'Modification') {
     tableId: currentTable,
     title: formConfig?.title || ''
   });
-  
+
   // Garder max 20 versions
   if (versionHistory.length > 20) {
     versionHistory = versionHistory.slice(0, 20);
   }
-  
+
   renderHistoryList();
 }
 
@@ -4584,12 +5442,12 @@ function saveVersion(action = 'Modification') {
 function renderHistoryList() {
   const historyList = document.getElementById('history-list');
   if (!historyList) return;
-  
+
   if (versionHistory.length === 0) {
     historyList.innerHTML = '<p style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">Aucun historique</p>';
     return;
   }
-  
+
   historyList.innerHTML = versionHistory.map((version, index) => `
     <div class="template-item" style="display: flex; justify-content: space-between; align-items: center;">
       <div>
@@ -4605,7 +5463,7 @@ function renderHistoryList() {
 async function restoreVersion(index) {
   const version = versionHistory[index];
   if (!version) return;
-  
+
   const confirmed = await showConfirm({
     icon: '📜',
     title: 'Restaurer cette version',
@@ -4613,18 +5471,18 @@ async function restoreVersion(index) {
     confirmText: 'Restaurer',
     cancelText: 'Annuler'
   });
-  
+
   if (!confirmed) return;
-  
+
   // Sauvegarder l'état actuel avant restauration
   saveVersion('Avant restauration');
-  
+
   formFields = JSON.parse(JSON.stringify(version.fields));
   if (version.title) {
     formConfig.title = version.title;
     document.getElementById('form-title-input').value = version.title;
   }
-  
+
   renderFormFields();
   showToast('Version restaurée', 'success');
 }
@@ -4632,7 +5490,7 @@ async function restoreVersion(index) {
 async function loadTemplate(index) {
   const template = templates[index];
   if (!template) return;
-  
+
   if (formFields.length > 0) {
     const confirmed = await showConfirm({
       icon: '📄',
@@ -4643,24 +5501,27 @@ async function loadTemplate(index) {
     });
     if (!confirmed) return;
   }
-  
+
   formFields = JSON.parse(JSON.stringify(template.fields));
   if (template.tableId) {
     tableSelect.value = template.tableId;
     currentTable = template.tableId;
     loadTableColumns(template.tableId);
   }
-  
+
   renderFormFields();
   closeTemplatesModal();
   showToast('Template chargé', 'success');
 }
 
 // Utilitaires
-function showToast(message, type = 'info') {
+let toastFin = null;
+function showToast(message, type = 'info', duree = 3000) {
   toast.textContent = message;
   toast.className = 'toast ' + type + ' show';
-  setTimeout(() => toast.classList.remove('show'), 3000);
+  // Un seul minuteur : sans cela, celui d'un message précédent refermait le suivant trop tôt.
+  clearTimeout(toastFin);
+  toastFin = setTimeout(() => toast.classList.remove('show'), duree);
 }
 
 function showLoading() {
@@ -4688,13 +5549,13 @@ function showConfirm(options = {}) {
     confirmMessage.textContent = options.message || 'Êtes-vous sûr ?';
     btnConfirmOk.textContent = options.confirmText || 'Confirmer';
     btnConfirmCancel.textContent = options.cancelText || 'Annuler';
-    
+
     if (options.danger) {
       btnConfirmOk.classList.add('danger');
     } else {
       btnConfirmOk.classList.remove('danger');
     }
-    
+
     modalConfirm.classList.remove('hidden');
   });
 }
@@ -4719,6 +5580,7 @@ tableSelect.addEventListener('change', (e) => loadTableColumns(e.target.value));
 // Sélection de la table de réponses
 responseTableSelect?.addEventListener('change', (e) => {
   responseTableId = e.target.value || null;
+  majBoutonReponses();
   saveFormConfig();
 });
 
@@ -4731,27 +5593,141 @@ function labelToColumnId(label) {
     .substring(0, 40) || 'col';
 }
 
+/** Type de colonne Grist adapté à un champ du formulaire. */
+function typeColonnePour(field) {
+  if (field.fieldType === 'number') return 'Numeric';
+  if (field.fieldType === 'date') {
+    const dm = modeDate(field);
+    return dm === 'datetime' ? 'DateTime' : (dm === 'time' ? 'Text' : 'Date');
+  }
+  if (field.fieldType === 'file') return 'Attachments';
+  return 'Text';
+}
+
+/** Le bouton à côté de la table de réponses crée la table, ou complète celle qui est choisie. */
+function majBoutonReponses() {
+  const b = document.getElementById('btn-create-response-table');
+  if (!b) return;
+  b.textContent = responseTableId ? '↻ Compléter' : '+ Créer';
+  b.title = responseTableId
+    ? `Ajouter à ${responseTableId} les colonnes qui lui manquent pour recevoir tous les champs du formulaire`
+    : 'Créer automatiquement une table de réponses';
+}
+
+/**
+ * Ajoute à une table de réponses EXISTANTE les colonnes qui lui manquent.
+ *
+ * « + Créer » ne servait qu'une fois : tout champ ajouté au formulaire ensuite visait une
+ * colonne absente de la table, et l'enregistrement échouait (KeyError). Deux cas traités :
+ *  - le champ est lié à une colonne (souvent le nom d'une colonne de la table SOURCE) que la
+ *    table de réponses n'a pas : on l'y ajoute ;
+ *  - le champ n'est lié à rien (élément glissé depuis « Éléments ») : sa saisie n'était pas
+ *    enregistrée du tout. On le lie à une colonne tirée de son libellé, créée si nécessaire.
+ * Aucune colonne existante n'est modifiée ni supprimée.
+ */
+async function completerTableReponses(table) {
+  const DECOR = ['section', 'title', 'image', 'divider', 'qrcode', 'calculated'];
+  delete fillColumnTypesCache[table];
+  const types = await fillGetColumnTypes(table);
+  if (!Object.keys(types).length) {
+    showToast(`Impossible de lire les colonnes de ${table}`, 'error');
+    return;
+  }
+  const pris = new Set(formFields.filter(f => f.columnId && !DECOR.includes(f.fieldType)).map(f => f.columnId));
+  const aAjouter = [];
+  const liaisons = [];
+  formFields.forEach(field => {
+    if (DECOR.includes(field.fieldType)) return;
+    let nom = field.columnId;
+    if (!nom) {
+      const base = labelToColumnId(field.label);
+      nom = base;
+      let n = 2;
+      while (pris.has(nom)) nom = base + '_' + (n++);
+      pris.add(nom);
+      liaisons.push({ field, nom });
+    }
+    if (!types[nom] && !aAjouter.some(c => c.id === nom)) aAjouter.push({ id: nom, type: typeColonnePour(field) });
+  });
+
+  if (!aAjouter.length && !liaisons.length) {
+    showToast(`${table} a déjà une colonne pour chaque champ du formulaire`, 'success');
+    return;
+  }
+  if (aAjouter.length) {
+    const ok = await showConfirm({
+      icon: '↻',
+      title: 'Compléter la table de réponses',
+      message: `Ajouter ${aAjouter.length} colonne(s) à ${table} : ${aAjouter.map(c => c.id).join(', ')} ? Les colonnes et les réponses existantes ne sont pas touchées.`,
+      confirmText: 'Ajouter',
+      cancelText: 'Annuler'
+    });
+    if (!ok) return;
+  }
+
+  try {
+    showLoading();
+    if (aAjouter.length) {
+      await grist.docApi.applyUserActions(aAjouter.map(c => ['AddColumn', table, c.id, { type: c.type }]));
+    }
+    liaisons.forEach(l => { l.field.columnId = l.nom; });
+    delete fillColumnTypesCache[table];
+    hideLoading();
+    renderFormFields();
+    if (selectedField) selectField(selectedField.id);
+    const sauve = await saveFormConfig();
+    const bilan = [];
+    if (aAjouter.length) bilan.push(`${aAjouter.length} colonne(s) ajoutée(s) à ${table}`);
+    if (liaisons.length) bilan.push(`${liaisons.length} champ(s) relié(s)`);
+    showToast(bilan.join(', ') + (sauve === false ? ' — formulaire non sauvegardé' : ''), sauve === false ? 'error' : 'success', 6000);
+  } catch (error) {
+    hideLoading();
+    console.error('Erreur ajout de colonnes:', error);
+    showToast('Ajout impossible : ' + ((error && error.message) || String(error))
+      + ' — modifier une table est réservé aux propriétaires du document.', 'error', 8000);
+  }
+}
+
 // Créer automatiquement une table de réponses
 document.getElementById('btn-create-response-table')?.addEventListener('click', async () => {
   if (formFields.length === 0) {
     showToast('Ajoutez d\'abord des champs au formulaire', 'error');
     return;
   }
-  
+
   const title = formTitleInput.value || 'Formulaire';
   const tableName = 'Reponses_' + labelToColumnId(title).substring(0, 30);
-  
+
+  // Une table de réponses est déjà choisie (ou existe déjà sous le nom attendu) : on ne la
+  // recrée pas, on lui ajoute ce qui manque.
+  try {
+    const existantes = await grist.docApi.listTables();
+    const cible = (responseTableId && existantes.includes(responseTableId)) ? responseTableId
+      : (existantes.includes(tableName) ? tableName : null);
+    if (cible) {
+      if (responseTableId !== cible) {
+        responseTableId = cible;
+        if (responseTableSelect) responseTableSelect.value = cible;
+        majBoutonReponses();
+      }
+      await completerTableReponses(cible);
+      return;
+    }
+  } catch (e) {
+    console.warn('Lecture des tables impossible :', e);
+  }
+
   // Collecter les colonnes à créer (1 par champ)
   const columns = [];
   const seenCols = new Set();
   const fieldColumnMap = []; // Pour mettre à jour les columnId des champs
-  
+
   formFields.forEach(field => {
     if (['section', 'title', 'image', 'divider', 'qrcode', 'calculated'].includes(field.fieldType)) return;
-    
+
     // Utiliser le columnId existant s'il est propre, sinon générer depuis le label
     let colName = field.columnId ? field.columnId : labelToColumnId(field.label);
-    
+
     // Dédupliquer
     let finalName = colName;
     let suffix = 2;
@@ -4760,26 +5736,30 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
       suffix++;
     }
     seenCols.add(finalName);
-    
+
     let colType = 'Text';
     if (field.fieldType === 'number') colType = 'Numeric';
-    else if (field.fieldType === 'date') colType = 'Date';
-    
+    else if (field.fieldType === 'date') {
+      const dm = modeDate(field);
+      colType = dm === 'datetime' ? 'DateTime' : (dm === 'time' ? 'Text' : 'Date');
+    }
+    else if (field.fieldType === 'file') colType = 'Attachments';
+
     columns.push({ id: finalName, type: colType });
     fieldColumnMap.push({ fieldId: field.id, columnId: finalName });
   });
-  
+
   if (columns.length === 0) {
     showToast('Aucune colonne à créer', 'error');
     return;
   }
-  
+
   // Ajouter une colonne horodatage
   columns.push({ id: 'Soumis_le', type: 'DateTime:UTC' });
-  
+
   try {
     showLoading();
-    
+
     // Vérifier si la table existe déjà
     const tables = await grist.docApi.listTables();
     if (tables.includes(tableName)) {
@@ -4789,33 +5769,35 @@ document.getElementById('btn-create-response-table')?.addEventListener('click', 
       responseTableId = tableName;
       return;
     }
-    
+
     // Créer la table
     await grist.docApi.applyUserActions([
       ['AddTable', tableName, columns]
     ]);
-    
+
     // Mettre à jour le columnId de chaque champ pour qu'il pointe vers la bonne colonne
     fieldColumnMap.forEach(({ fieldId, columnId }) => {
       const field = formFields.find(f => f.id === fieldId);
       if (field) field.columnId = columnId;
     });
-    
+
     // Rafraîchir la liste des tables
     await loadTables();
-    
+
     // Sélectionner automatiquement la nouvelle table comme destination
     responseTableSelect.value = tableName;
     responseTableId = tableName;
-    
+    majBoutonReponses();
+
     // Rafraîchir l'affichage
     renderFormFields();
-    
+
     // Sauvegarder automatiquement la config avec les nouveaux columnId
-    await saveFormConfig();
-    
-    hideLoading();
-    showToast('Table "' + tableName + '" créée et configuration sauvegardée !', 'success');
+    hideLoading(); // la sauvegarde peut afficher une confirmation : pas sous le voile
+    const sauve = await saveFormConfig();
+
+    if (sauve === false) showToast('Table "' + tableName + '" créée — formulaire non sauvegardé', 'error');
+    else showToast('Table "' + tableName + '" créée et configuration sauvegardée !', 'success');
   } catch (error) {
     hideLoading();
     console.error('Erreur création table:', error);
@@ -4925,15 +5907,7 @@ function etatLienPartage() {
     el.style.color = '#b45309';
     return;
   }
-  // Une clé n'autorise que la table de SON formulaire publié. Changer de table de réponses
-  // sans recoller un lien laisse une clé périmée, et Grist refuse l'écriture sans dire
-  // laquelle des deux est en cause.
-  el.innerHTML = 'Les r\u00e9ponses seront d\u00e9pos\u00e9es dans <b>' + escHtml(table) + '</b> via '
-    + escHtml(new URL(url).origin) + '. Aucun proxy n\u2019est n\u00e9cessaire.'
-    + '<br><b>Le formulaire Grist publi\u00e9 doit \u00eatre celui de ' + escHtml(table) + '</b> : '
-    + 'une cl\u00e9 n\u2019autorise l\u2019\u00e9criture que dans sa propre table. '
-    + 'Si vous venez de changer de table de r\u00e9ponses, publiez un formulaire sur la nouvelle '
-    + 'et recollez SON lien \u2014 l\u2019ancienne cl\u00e9 sera refus\u00e9e.';
+  el.textContent = 'Les r\u00e9ponses seront d\u00e9pos\u00e9es dans ' + table + ' via ' + new URL(url).origin + '. Aucun proxy n\u2019est n\u00e9cessaire.';
   el.style.color = '#047857';
 }
 document.getElementById('cfg-doc-id')?.addEventListener('change', (e) => {
@@ -5104,6 +6078,13 @@ btnModeFill.addEventListener('click', () => switchMode('fill'));
 document.getElementById('btn-mode-guide')?.addEventListener('click', () => switchMode('guide'));
 btnSave.addEventListener('click', saveFormConfig);
 document.getElementById('btn-new-form')?.addEventListener('click', newForm);
+document.getElementById('btn-open-form')?.addEventListener('click', ouvrirListeFormulaires);
+document.getElementById('btn-close-open')?.addEventListener('click', () => {
+  document.getElementById('modal-open')?.classList.add('hidden');
+});
+document.getElementById('modal-open')?.addEventListener('click', (e) => {
+  if (e.target.id === 'modal-open') e.target.classList.add('hidden');
+});
 btnClear.addEventListener('click', clearForm);
 btnSubmit.addEventListener('click', submitForm);
 btnResetForm.addEventListener('click', resetFormInputs);
@@ -5170,14 +6151,6 @@ function basePubliqueValide(raw) {
  * Tout le reste — manualSort, gristHelper_Display, colonnes métier non affichées — ne sert à
  * rien dans le formulaire public et ne fait que gonfler l'adresse.
  */
-// Source d'une image : un fichier déposé (stocké dans le formulaire) ou une adresse.
-// L'adresse est préférée quand les deux existent : elle est plus légère et voyage partout.
-function sourceImage(field) {
-  const url = String((field && field.imageUrl) || '').trim();
-  if (/^https?:\/\//i.test(url)) return url;
-  return (field && field.imageData) || '';
-}
-
 function colonnesUtiles(tableId, champs) {
   const set = new Set();
   (champs || []).forEach(f => {
@@ -5207,15 +6180,16 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     showToast('Aucun formulaire à partager', 'error');
     return;
   }
-  
+
   if (!currentTable) {
     showToast('Veuillez sélectionner une table', 'error');
     return;
   }
-  
-  // Sauvegarder d'abord la configuration
-  await saveFormConfig();
-  
+
+  // Sauvegarder d'abord la configuration. Si l'utilisateur refuse d'écraser un formulaire
+  // homonyme, on ne partage pas : le lien désignerait l'autre formulaire.
+  if (await saveFormConfig() === false) return;
+
   const title = formTitleInput.value || 'Formulaire ' + currentTable;
   const formId = generateFormId(title);
   const cacheBuster = Date.now();
@@ -5229,16 +6203,16 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
   // intranet alors que le formulaire vise l'extérieur, ou l'inverse. `publicBaseUrl`, réglé
   // dans le modal Proxy, désigne alors l'hébergeur qui sert le même form.html.
   const publicBase = basePubliqueValide(formConfig.publicBaseUrl) || baseUrl;
-  
+
   // Lien public (via proxy) — nécessite proxyUrl et docId configurés
   const proxyUrl = formConfig.proxyUrl || '';
   const docId = formConfig.docId || '';
-  
+
   // Créer une config allégée pour le lien public
   // Pré-charger les données des tables sources dynamiques pour le filtrage cascade
   const dsTablesData = {};
   const resolvedFields = [];
-  
+
   for (const f of formConfig.fields) {
     const fieldOut = {
       id: f.id, columnId: f.columnId, fieldType: f.fieldType,
@@ -5253,27 +6227,21 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
       calcType: f.calcType, calcFieldA: f.calcFieldA, calcFieldB: f.calcFieldB,
       calcConstant: f.calcConstant, calcFormula: f.calcFormula,
       calcDecimals: f.calcDecimals, calcSuffix: f.calcSuffix,
-      // Mise en page. Sans ces coordonnées, le formulaire public empilait tout
-      // verticalement dans l'ordre de création : deux champs côte à côte se retrouvaient
-      // l'un sous l'autre, et un titre placé en haut atterrissait en bas.
+      checkboxDropdown: f.checkboxDropdown,
+      labelFontFamily: f.labelFontFamily, labelFontSize: f.labelFontSize, labelBold: f.labelBold,
+      labelColor: f.labelColor, inputFontFamily: f.inputFontFamily, inputFontSize: f.inputFontSize,
+      dateMode: f.dateMode, fileAccept: f.fileAccept, fileMaxMb: f.fileMaxMb, fileMultiple: f.fileMultiple,
+      // Mise en page : sans ces coordonnées, form.html empilait tout et perdait le dessin.
+      // Les images (imageData, en base64) restent exclues : une seule suffit à dépasser la
+      // longueur d'URL que les serveurs acceptent.
       x: f.x, y: f.y, width: f.width, height: f.height,
-      // Apparence. imageData portait l'image déposée, fontSize et textColor le style d'un
-      // titre : form.html savait les afficher, mais ne les recevait jamais.
-      // L'image DÉPOSÉE n'est pas transmise : elle pèse des dizaines de milliers de
-      // caractères pour une adresse qui en tolère 7 800. Seule l'adresse voyage.
-      imageUrl: f.imageUrl, fontSize: f.fontSize, fontFamily: f.fontFamily,
-      fontWeight: f.fontWeight, fontStyle: f.fontStyle, textDecoration: f.textDecoration,
-      textAlign: f.textAlign, lineHeight: f.lineHeight,
+      fontSize: f.fontSize, fontFamily: f.fontFamily, fontWeight: f.fontWeight, fontStyle: f.fontStyle,
+      textDecoration: f.textDecoration, textAlign: f.textAlign, lineHeight: f.lineHeight,
       textColor: f.textColor, bgColor: f.bgColor, transparent: f.transparent,
-      dividerStyle: f.dividerStyle, dividerColor: f.dividerColor, dividerHeight: f.dividerHeight
+      dividerStyle: f.dividerStyle, dividerHeight: f.dividerHeight, dividerColor: f.dividerColor,
+      qrContent: f.qrContent, qrSize: f.qrSize, qrColor: f.qrColor
     };
-    // Les propriétés non renseignées partiraient en « null » dans l'adresse — 331 octets par
-    // champ pour ne rien dire, sur une limite d'environ 7 800. On ne garde que le renseigné.
-    // `false` et `0` sont des valeurs, pas des absences : ils restent.
-    Object.keys(fieldOut).forEach(k => {
-      if (fieldOut[k] === undefined || fieldOut[k] === null || fieldOut[k] === '') delete fieldOut[k];
-    });
-    
+
     // Si le champ a une source dynamique, conserver dataSource et pré-charger la table
     if (f.dataSource && f.dataSource.mode === 'grist' && f.dataSource.tableId && f.dataSource.labelColumn) {
       fieldOut.dataSource = f.dataSource;
@@ -5299,10 +6267,10 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
         }
       }
     }
-    
+
     resolvedFields.push(fieldOut);
   }
-  
+
   // Vérifier si la table de réponses a la colonne Soumis_le
   let hasTimestamp = false;
   const respTable = formConfig.responseTableId || formConfig.tableId;
@@ -5312,7 +6280,19 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
       hasTimestamp = cols && cols.Soumis_le !== undefined;
     } catch (e) { /* ignore */ }
   }
-  
+
+  // Le formulaire public n'a pas accès aux métadonnées : on lui transmet le type des seules
+  // colonnes saisies en date + heure, pour qu'il écrive la valeur dans la bonne forme.
+  const colTypes = {};
+  const champsDH = formConfig.fields.filter(f => f.fieldType === 'date' && modeDate(f) === 'datetime' && f.columnId);
+  if (respTable && champsDH.length) {
+    try {
+      delete fillColumnTypesCache[respTable];
+      const types = await fillGetColumnTypes(respTable);
+      champsDH.forEach(f => { if (types[f.columnId]) colTypes[f.columnId] = types[f.columnId]; });
+    } catch (e) { /* ignore */ }
+  }
+
   const publicConfig = {
     tableId: formConfig.tableId,
     responseTableId: formConfig.responseTableId || null,
@@ -5320,10 +6300,12 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     fields: resolvedFields,
     dsTablesData: dsTablesData,
     hasTimestamp: hasTimestamp,
-    totalPages: formConfig.totalPages
+    colTypes: colTypes,
+    totalPages: formConfig.totalPages,
+    pageHeights: formConfig.pageHeights || {}
   };
   const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(publicConfig))));
-  
+
   // Deux voies de soumission. La clé de partage passe en premier : elle n'expose aucune clé
   // d'API et ne demande aucun hébergeur. Le proxy ne sert que si elle est absente ou refusée.
   const tableReponses = responseTableId || currentTable || '';
@@ -5336,12 +6318,12 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
     publicUrl = `${publicBase}?_cb=${cacheBuster}&proxy=${encodeURIComponent(proxyUrl)}&docId=${encodeURIComponent(docId)}&config=${configB64}`;
     voiePublique = 'proxy';
   }
-  
+
   // Afficher la modale de partage
   const shareModal = document.getElementById('modal-share');
   const shareUrlInput = document.getElementById('share-url');
   const sharePublicInput = document.getElementById('share-url-public');
-  
+
   if (shareModal && shareUrlInput) {
     shareUrlInput.value = internalUrl;
     if (sharePublicInput) {
@@ -5403,20 +6385,6 @@ document.getElementById('btn-share-form')?.addEventListener('click', async () =>
           + ', l\u2019h\u00e9bergeur de cette page. Si vos destinataires ne l\u2019atteignent pas, '
           + 'indiquez une autre adresse dans le modal Proxy.';
         note.style.color = '#64748b';
-      }
-      // Ajouté APRÈS les textContent ci-dessus, qui remplacent tout le contenu du nœud.
-      // Une image déposée en fichier ne part jamais dans le lien public : on le dit, plutôt
-      // que de laisser découvrir un emplacement vide chez le destinataire.
-      const deposees = formConfig.fields.filter(f =>
-        f.fieldType === 'image' && f.imageData
-        && !/^https?:\/\//i.test(String(f.imageUrl || '').trim())).length;
-      if (deposees) {
-        const avis = document.createElement('div');
-        avis.style.cssText = 'margin-top:8px;color:#b45309;';
-        avis.textContent = deposees + ' image(s) déposée(s) en fichier ne figureront pas dans ce lien : '
-          + 'une image ne tient pas dans une adresse. Renseignez « ou adresse de l\u2019image » dans '
-          + 'les propriétés de l\u2019élément, en l\u2019hébergeant à côté du widget.';
-        note.appendChild(avis);
       }
       note.style.display = '';
     }
@@ -5503,14 +6471,16 @@ btnExportTemplate.addEventListener('click', () => {
     fields: formFields,
     config: {
       title: formConfig.title,
-      tableId: selectedTableId
+      // « selectedTableId » n'existait nulle part : le clic levait une ReferenceError
+      // et rien n'était exporté.
+      tableId: currentTable
     }
   };
-  
+
   const jsonStr = JSON.stringify(templateData, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  
+
   const a = document.createElement('a');
   a.href = url;
   a.download = `${formConfig.title || 'template'}_${new Date().toISOString().slice(0,10)}.json`;
@@ -5518,7 +6488,7 @@ btnExportTemplate.addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  
+
   showToast('Template exporté !', 'success');
 });
 
@@ -5530,23 +6500,23 @@ btnImportTemplate.addEventListener('click', () => {
 importFile.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  
+
   const reader = new FileReader();
   reader.onload = (event) => {
     try {
       const templateData = JSON.parse(event.target.result);
-      
+
       if (!templateData.fields || !Array.isArray(templateData.fields)) {
         showToast('Format de template invalide', 'error');
         return;
       }
-      
+
       formFields = templateData.fields;
       if (templateData.config) {
         formConfig.title = templateData.config.title || '';
         document.getElementById('form-title-input').value = formConfig.title;
       }
-      
+
       renderFormFields();
       showToast(`Template "${templateData.name}" importé !`, 'success');
       closeTemplatesModal();
@@ -5555,7 +6525,7 @@ importFile.addEventListener('change', (e) => {
     }
   };
   reader.readAsText(file);
-  
+
   // Reset input pour permettre de réimporter le même fichier
   importFile.value = '';
 });
@@ -5593,23 +6563,23 @@ btnZoomOut.addEventListener('click', () => {
 btnZoomFit.addEventListener('click', () => {
   const workspaceRect = workspace.getBoundingClientRect();
   const pageWidth = 210 * 3.78; // 210mm en pixels (1mm ≈ 3.78px)
-  const pageHeight = 297 * 3.78; // 297mm en pixels
-  
+  const pageHeight = hauteurPageMm(currentPage) * 3.78; // hauteur de la page courante en pixels
+
   // Calculer le zoom pour que la page tienne dans l'espace disponible
   const availableWidth = workspaceRect.width - 80; // Marge
   const availableHeight = workspaceRect.height - 80;
-  
+
   const scaleX = availableWidth / pageWidth;
   const scaleY = availableHeight / pageHeight;
   const fitScale = Math.min(scaleX, scaleY);
-  
+
   // Arrondir à 10% près
   zoomLevel = Math.round(fitScale * 100 / 10) * 10;
   zoomLevel = Math.max(50, Math.min(150, zoomLevel)); // Limiter entre 50% et 150%
-  
+
   formCanvas.style.transform = `scale(${zoomLevel / 100})`;
   document.getElementById('zoom-level').textContent = zoomLevel + '%';
-  
+
   // Mettre à jour les règles si elles sont affichées
   if (showRulers) {
     generateRulerMarks();
@@ -5641,12 +6611,114 @@ document.getElementById('btn-add-page')?.addEventListener('click', () => {
   showToast(`Page ${totalPages} ajoutée`, 'success');
 });
 
+/**
+ * Supprime la page affichée.
+ *
+ * « + Page » existait sans son contraire : une page ajoutée par erreur restait à vie. Les
+ * pages suivantes remontent d'un rang — leurs éléments et leur hauteur réglée les suivent.
+ * Une page qui porte des éléments n'est supprimée qu'après confirmation, et l'état d'avant
+ * est versé à l'historique (Templates → Historique) pour pouvoir retrouver les éléments.
+ */
+async function supprimerPageCourante() {
+  if (totalPages <= 1) {
+    showToast('Le formulaire doit garder au moins une page', 'error');
+    return;
+  }
+  const page = currentPage;
+  const dessus = formFields.filter(f => (f.page || 1) === page).length;
+  if (dessus > 0) {
+    const ok = await showConfirm({
+      icon: '🗑️',
+      title: `Supprimer la page ${page}`,
+      message: `La page ${page} contient ${dessus} élément(s) : ils seront supprimés avec elle. Pour les garder, annulez et déplacez-les d'abord sur une autre page (propriété « Page »).`,
+      confirmText: 'Supprimer la page',
+      cancelText: 'Annuler',
+      danger: true
+    });
+    if (!ok) return;
+    saveVersion('Suppression de la page ' + page);
+  }
+
+  formFields = formFields.filter(f => (f.page || 1) !== page);
+  formFields.forEach(f => { if ((f.page || 1) > page) f.page = (f.page || 1) - 1; });
+
+  // Les hauteurs réglées sont rangées par numéro de page : elles remontent aussi.
+  const hauteurs = {};
+  Object.keys(pageHeights).forEach(k => {
+    const n = Number(k);
+    if (n < page) hauteurs[n] = pageHeights[k];
+    else if (n > page) hauteurs[n - 1] = pageHeights[k];
+  });
+  pageHeights = hauteurs;
+
+  totalPages--;
+  currentPage = Math.min(page, totalPages);
+  selectedField = null;
+  updatePageIndicator();
+  renderFormFields();
+  renderPropertiesPanel();
+  showToast(`Page ${page} supprimée — pensez à sauvegarder`, 'success');
+}
+document.getElementById('btn-delete-page')?.addEventListener('click', supprimerPageCourante);
+
 function updatePageIndicator() {
   const indicator = document.getElementById('page-indicator');
   if (indicator) {
     indicator.textContent = `${currentPage} / ${totalPages}`;
   }
+  // Rien à supprimer tant qu'il n'y a qu'une page.
+  const btnSuppr = document.getElementById('btn-delete-page');
+  if (btnSuppr) btnSuppr.disabled = totalPages <= 1;
+  // Appelée à chaque changement de page et à chaque chargement : le bon endroit pour
+  // donner à la page affichée sa hauteur.
+  appliquerHauteurPage();
 }
+
+/** Hauteur d'une page en millimètres : la valeur réglée, sinon A4. */
+function hauteurPageMm(page) {
+  const v = Number(pageHeights[page]);
+  return v > 0 ? v : HAUTEUR_A4_MM;
+}
+
+/** Donne à la page de l'éditeur la hauteur de la page courante et met le champ à jour. */
+function appliquerHauteurPage() {
+  const mm = hauteurPageMm(currentPage);
+  formCanvas.style.minHeight = mm + 'mm';
+  const champ = document.getElementById('page-height-cm');
+  if (champ) champ.value = (mm / 10).toFixed(1);
+  const btnA4 = document.getElementById('btn-page-height-a4');
+  if (btnA4) btnA4.classList.toggle('active', mm === HAUTEUR_A4_MM);
+  const regle = document.getElementById('ruler-v');
+  if (regle) {
+    regle.style.minHeight = `calc(${mm}mm + 50px)`;
+    if (regle.classList.contains('show')) setTimeout(generateRulerMarks, 50);
+  }
+}
+
+/** Règle la hauteur de la page courante (en mm). 297 = retour à A4. */
+function reglerHauteurPage(mm) {
+  if (mm === HAUTEUR_A4_MM) delete pageHeights[currentPage];
+  else pageHeights[currentPage] = mm;
+  appliquerHauteurPage();
+  // On ne déplace ni ne supprime rien : on signale seulement ce qui sort de la page.
+  const basPx = mm * PX_PAR_MM;
+  const dehors = formFields.filter(f => (f.page || 1) === currentPage
+    && (f.y || 0) + (f.height || 40) > basPx).length;
+  if (dehors) {
+    showToast(`Page ${currentPage} : ${(mm / 10).toFixed(1)} cm — ${dehors} élément(s) dépassent le bas de la page`, 'error');
+  } else {
+    showToast(`Page ${currentPage} : hauteur ${(mm / 10).toFixed(1)} cm — pensez à sauvegarder`, 'success');
+  }
+}
+
+document.getElementById('page-height-cm')?.addEventListener('change', (e) => {
+  const cm = parseFloat(String(e.target.value).replace(',', '.'));
+  if (!isFinite(cm)) { appliquerHauteurPage(); return; } // saisie illisible : on réaffiche
+  reglerHauteurPage(Math.round(Math.min(300, Math.max(5, cm)) * 10));
+});
+document.getElementById('btn-page-height-a4')?.addEventListener('click', () => {
+  reglerHauteurPage(HAUTEUR_A4_MM);
+});
 
 // Toggle panneaux latéraux
 sidebarToggle.addEventListener('click', () => {
@@ -5704,30 +6776,30 @@ let showRulers = false;
 function generateRulerMarks() {
   const rulerHMarks = document.getElementById('ruler-h-marks');
   const rulerVMarks = document.getElementById('ruler-v-marks');
-  
+
   // Obtenir la position de la page A4 par rapport au workspace
   const pageRect = formCanvas.getBoundingClientRect();
   const workspaceRect = workspace.getBoundingClientRect();
   const rulerHRect = document.getElementById('ruler-h').getBoundingClientRect();
   const rulerVRect = document.getElementById('ruler-v').getBoundingClientRect();
-  
+
   // Calculer l'offset pour que le 0 soit à l'angle de la page
   const offsetX = pageRect.left - rulerHRect.left;
   const offsetY = pageRect.top - rulerVRect.top;
-  
+
   // A4 = 21cm x 29.7cm, 1cm = 37.8px
   const cmToPx = 37.8;
-  
+
   // Règle horizontale (21 cm)
   let hHtml = '';
   for (let i = 0; i <= 21; i++) {
     hHtml += `<div class="ruler-mark" style="left: ${offsetX + i * cmToPx}px;">${i}</div>`;
   }
   rulerHMarks.innerHTML = hHtml;
-  
+
   // Règle verticale (30 cm pour couvrir la page A4 de 29.7cm)
   let vHtml = '';
-  for (let i = 0; i <= 30; i++) {
+  for (let i = 0; i <= Math.ceil(hauteurPageMm(currentPage) / 10); i++) {
     vHtml += `<div class="ruler-mark" style="top: ${offsetY + i * cmToPx}px;">${i}</div>`;
   }
   rulerVMarks.innerHTML = vHtml;
@@ -5740,7 +6812,7 @@ btnRulers.addEventListener('click', () => {
   rulerV.classList.toggle('show', showRulers);
   rulerCorner.classList.toggle('show', showRulers);
   workspace.classList.toggle('with-rulers', showRulers);
-  
+
   if (showRulers) {
     setTimeout(generateRulerMarks, 50); // Attendre que le layout soit mis à jour
   }
